@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, FlexibleContexts #-}
+{-# LANGUAGE LambdaCase, RecordWildCards, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
                      -fwarn-unused-binds
                      -fwarn-unused-imports #-}
@@ -12,7 +12,8 @@ import Debug.Trace
 
 --------------------------------------------------------------------------------
 
--- type Pos = (Int, Int)
+type Parser s = StateT (PS s Char) (Either String)
+
 newtype Pos = Pos { unPos :: (Int, Int) }
 	deriving (Eq, Ord)
 
