@@ -19,7 +19,7 @@ import DiagramParser
 
 data Symbol
 	= Source { location :: Pos, succs :: [Symbol] }
-	| Sink -- { location :: Pos }
+	| Sink { location :: Pos }
 	| Device { location :: Pos, body :: String, options :: [String]
 		, output :: Pos, succs :: [Symbol] }
 	| Jump { location :: Pos, target :: String }
@@ -94,7 +94,7 @@ varName (Pos(x, y)) dy = do
 
 device :: LDParser Symbol --TODO [Symbol]
 device = do
-	(begin, src) <- getLocs
+	(begin, _) <- getLocs
 	devType <- string "[ ]"
 		<|> string "[/]"
 		<|> string "( )"
@@ -111,17 +111,17 @@ device = do
 node :: LDParser Symbol
 node = peek >>= \case
 		Value visited '+'
-			| visited -> getLocs >>= \(loc, src)
+			| visited -> getLocs >>= \(loc, _)
 				-> return $ Node loc []
 			| otherwise
 				-> justEatDontMove --XXX i guess 'eat' would work jsut as good, as pos is forced
 					--XXX only it has to be moved after 'getLocs'
-				>> getLocs >>= \(loc@(Pos(x, y)), src)
+				>> getLocs >>= \(loc@(Pos(x, y)), _)
 					-> Node loc <$> collect
 						[ setLocs (Pos (x+1, y)) loc >> ( (:[]) <$> hlink)--FIXME
 						, setLocs (Pos (x, y+1)) loc >> ( (:[]) <$> vlink)--FIXME
 						]
-		_ -> return Sink
+		_ -> getLocs >>= \(loc, _) -> return $ Sink loc
 
 collect :: (Monad m, Alternative m, Foldable t, Monoid a) => t (m a) -> m a
 collect = foldM (\m f -> (flip mappend m <$> f) <|> pure m) mempty

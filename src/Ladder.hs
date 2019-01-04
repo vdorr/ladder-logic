@@ -7,4 +7,8 @@
 
 module Ladder where
 
-main = print 1
+import DiagramParser
+
+main = do
+	print here
+

@@ -21,6 +21,7 @@ import qualified Data.Map.Strict as M
 import DiagramParser
 import LadderParser
 
+--------------------------------------------------------------------------------
 
 onlySpaceOrCommentsRemain :: Vector (Vector (Bool, Char)) -> Either String ()
 onlySpaceOrCommentsRemain c = 
@@ -30,6 +31,8 @@ onlySpaceOrCommentsRemain c =
 			forM_ (indexed row) $ \(x, (visited, c')) -> do
 				unless (visited || isSpace c') $
 					throwError $ show (here, (x, y), c')
+
+--------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 
@@ -61,7 +64,7 @@ compile file = do
 			print (here, "unparsed:", onlySpaceOrCommentsRemain chars)
 			putStrLn ""
 
-			print (here, ast)
+			print (here, ast :: Symbol)
 			return undefined
 -- 		Right (_, PS{..}) -> do
 -- #if 0
