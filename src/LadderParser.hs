@@ -134,10 +134,12 @@ hlink
 		<|> device
 		<|> node)
 
+topDown = Pos (0, 1)
+
 vlink :: LDParser Symbol
-vlink = setDir (Pos (0, 1))
+vlink = setDir topDown
 	*> (char '|' *> vlink
-		<|> lookahead (== '-') *> skip *> vlink
+		<|> lookahead (== '-') *> skip *> vlink --walking over horizontal link
 		<|> label
 		<|> node)
 

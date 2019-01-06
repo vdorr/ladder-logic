@@ -101,16 +101,16 @@ preproc2 src =
 
 --------------------------------------------------------------------------------
 
--- xxxx :: Symbol -> (Maybe String, [Symbol])
--- xxxx = undefined
--- 	where
--- 	f (Source pos (succs :: [Symbol])) = undefined
--- 	f (Sink pos) = undefined
--- 	f (Device pos (body :: String) (options :: [String])
--- 		(output :: Pos) (succs :: [Symbol]) ) = undefined
--- 	f (Jump pos target) = undefined
--- 	f (Label pos (labelName :: String) (nextRung :: Symbol) ) = undefined
--- 	f (Node pos (succs :: [Symbol])) = undefined
+xxxx :: Symbol -> IO ()
+xxxx net = undefined
+	where
+	f (Source pos (succs :: [Symbol])) = undefined
+	f (Sink pos) = undefined
+	f (Device pos (body :: String) (options :: [String])
+		(output :: Pos) (succs :: [Symbol]) ) = undefined
+	f (Jump pos target) = undefined
+	f Label{} = error "should not happen"
+	f (Node pos (succs :: [Symbol])) = undefined
 
 --------------------------------------------------------------------------------
 
@@ -119,6 +119,71 @@ parseNet net = do
 	(ast, PS{..}) <- runParser' 0 0 net take3 (Pos(0,0), [])
 	onlySpaceOrCommentsRemain chars
 	return ast
+
+--------------------------------------------------------------------------------
+
+#if 0
+gatherVariables :: [(Maybe String, [(Pos, Gizmo)])] -> [String]
+gatherVariables = nub . foldMap (foldMap (variables . snd) . snd)
+	where
+	variables Device { options = vars } = vars
+	variables _ = []
+
+data Size = X | B | W | D | L deriving (Show, Read) -- 1 8 16 32 64
+data Value = X' Bool | W' Int deriving Show
+data Section = I | Q | M deriving (Show, Read)
+
+parseVarName :: String -> Either String (Section, Size, Int)
+parseVarName ('%' : sect : ty : loc) -- = error here
+	= (,,) <$> readEither [sect] <*> readEither [ty] <*> readEither loc
+parseVarName _ = Left "wrong format"
+
+run :: [(Maybe String, [(Pos, Gizmo)])] -> IO ()
+run net = run' vars M.empty states net'
+	where
+	net' = foldMap snd net
+
+ 	run' io out m ((p, x):xs) =
+		let
+			(out', m') = step io m p x
+			out'' = M.union out' out
+		in run' io out'' m' xs
+ 	run' io out m [] = do
+		let io' = M.union out io
+		print (here, io')
+		run' io' M.empty m net'
+
+	vars = M.fromList $ zip (gatherVariables net) (repeat $ X' False)
+	states = M.fromList $ zip (foldMap (getTempVars) net) (repeat $ X' False)
+
+	getTempVars :: (Maybe String, [(Pos, Gizmo)]) -> [Pos]
+	getTempVars (_, l) = foldMap getOut l
+
+	gatherInputs m = X' . or . fmap ((\(X' v) -> v) . (m M.!))
+	
+	step io m p Source{} = (io, M.adjust (const $ X' True) p m)
+	step io m _p Device {options=[v], ..} = (io', M.adjust (const $ X' y) output m)
+		where
+		X' pwr = gatherInputs m predecessors
+		X' var = case M.lookup v io of
+			Nothing -> error here
+			Just var' -> var'
+
+		op "[ ]" = (M.empty, pwr && var)
+		op "[/]" = (M.empty, pwr && not var)
+		op "( )" = (setIo (X' pwr), pwr)
+		op "(S)" = (if pwr then setIo (X' True) else M.empty, pwr)
+		op "(R)" = (if pwr then setIo (X' False) else M.empty, pwr)
+		op other = error $ show (here, other)
+
+		(io', y) = op body
+		setIo w = M.fromList [(v, w)]
+
+	step _io _m _p Device{} = error here
+	step _io _m _p Jump{} = error here
+	step _io _m _p Label{} = error here --should not happen
+	step io m p Node{..} = (io, M.adjust (const (gatherInputs m predecessors)) p m)
+#endif
 
 --------------------------------------------------------------------------------
 
@@ -147,7 +212,6 @@ compile file = do		 --print (here, start)
 			Right ast -> do
 				print (here, ast :: Symbol)
 				return (lbl, ast)
-
 -- 		case r of
 -- 			Left e -> error $ show (here, e)
 -- 			Right (ast, PS{..}) -> do
@@ -168,6 +232,10 @@ main = do
 	getArgs >>= \case
 -- 		["run", file] -> compile file >>= runLadder
 		[file] -> do
-			compile file
+			nets <- compile file
+			print (here, "----------------------------------------")
+			forM_ nets $ \(lbl, net) -> do
+				print (here, lbl, ">>>")
+				xxxx net
 			print (here, "DONE")
 		_ -> error $ show (here, "wrong arguments")
