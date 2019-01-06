@@ -27,11 +27,19 @@ runParser
 	-> StateT (PS st Char) (Either String) b
 	-> st
 	-> Either String (b, PS st Char)
-runParser x y s f initSt = runStateT f $ PS (Pos (x, y)) (mat s') initPos initSt
+runParser x y s f initSt = runParser' x y (lines s) f initSt
+
+runParser'
+	:: Int
+	-> Int
+	-> [String]
+	-> StateT (PS st Char) (Either String) b
+	-> st
+	-> Either String (b, PS st Char)
+runParser' x y s f initSt = runStateT f $ PS (Pos (x, y)) (mat s') initPos initSt
 	where
 	initPos = Pos (0, 1)
--- 	initSt = (initPos, [])
-	s' = fromList $ fmap fromList $ lines s
+	s' = fromList $ fmap fromList s
 
 -- skip one character in current direction without eating it
 skip :: MonadState (PS s a) m => m ()
