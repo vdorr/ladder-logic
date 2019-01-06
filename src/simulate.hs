@@ -45,27 +45,59 @@ lpad filler n str = reverse $ take n $ reverse str ++ repeat filler
 
 --------------------------------------------------------------------------------
 
-test3 = test3' <* eof
+preproc :: String -> Either String [String]
+preproc src =
+	case parse test3 "(file)" src of
+		 Left err -> Left $ show err
+		 Right n -> Right $ concat n
 
-test3' = (:[]) <$> do
+	where
+
+	test3 = test3' <* eof
+
+	test3' = (:[]) <$> do
+		white --FIXME this would eat leading column (when implemented)
+		P.many $ (P.many comment) *> eol
+		P.many1 rung
+		where
+		rung =
+			lookAhead (P.oneOf "|+" P.<|> alphaNum)
+			*> manyTill anyChar eol
+		comment =
+			P.string "(*" *> manyTill anyChar (try (P.string "*)"))
+			*> white
+		white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n'))
+		eol = P.char '\n'
+
+--------------------------------------------------------------------------------
+
+test4 = test4' <* eof
+
+--TODO nice leading column
+--maybe parse even rungs, its alphabet is not that big
+test4' = do
 	white --FIXME this would eat leading column (when implemented)
 	P.many $ (P.many comment) *> eol
 	P.many1 rung
 	where
-	rung =
-		lookAhead (P.oneOf "|+" P.<|> alphaNum)
-		*> manyTill anyChar eol
+	rung = do
+		lbl <- optionMaybe (many1 alphaNum <* P.char ':' <* white <* eol)
+		net <-
+			many1 $
+				lookAhead (P.oneOf "|+" P.<|> alphaNum)
+				*> manyTill anyChar eol
+		return (lbl, net)
 	comment =
 		P.string "(*" *> manyTill anyChar (try (P.string "*)"))
 		*> white
 	white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n'))
 	eol = P.char '\n'
 
-preproc :: String -> Either String [String]
-preproc src =
-	case parse test3 "(file)" src of
+preproc2 :: String -> Either String [(Maybe String, [String])]
+preproc2 src =
+	case parse test4 "(file)" src of
 		 Left err -> Left $ show err
-		 Right n -> Right $ concat n
+		 Right n -> Right n
 
 --------------------------------------------------------------------------------
 
@@ -82,76 +114,55 @@ preproc src =
 
 --------------------------------------------------------------------------------
 
-compile :: FilePath -> IO [(Maybe String, [(Pos, Symbol)])]
+parseNet :: [String] -> Either String Symbol --(b, PS st Char)
+parseNet net = do
+	(ast, PS{..}) <- runParser' 0 0 net take3 (Pos(0,0), [])
+	onlySpaceOrCommentsRemain chars
+	return ast
+
+--------------------------------------------------------------------------------
+
+compile :: FilePath -> IO [(Maybe String, Symbol)]
 compile file = do		 --print (here, start)
 
 	print (here, file)
 	s <- readFile file
 
-	lines' <- case preproc s of
+	nets <- case preproc2 s of
 		Left err -> error $ show (here, err) --TODO fail properly
 		Right l -> return l
 
-	let nrW = 1 + length (show (length lines'))
--- 			let maxX = maximum $ fmap length lines'
--- 			let wX = length $ show maxX
-	putStrLn ""
-	forM_ (zip [0..] lines') $ \(n::Int, l) ->
-		putStrLn $ lpad ' ' nrW (show n) ++ ": " ++ l
-	putStrLn ""
-	putStrLn "---------------------"
+-- 	let nrW = 1 + length (show (length lines'))
+-- 	putStrLn ""
+-- 	forM_ (zip [0..] lines') $ \(n::Int, l) ->
+-- 		putStrLn $ lpad ' ' nrW (show n) ++ ": " ++ l
+-- 	putStrLn ""
+-- 	putStrLn "---------------------"
 
-	let r = runParser' 0 0 lines' take3 (Pos(0,0), [])
--- 	let r = runRun 0 0 s take2
+	forM nets $ \(lbl, net) -> do
+-- 		let n = parseNet net
 
-	case r of
-		Left e -> error $ show (here, e)
-		Right (ast, PS{..}) -> do
+		case parseNet net of
+			Left e -> error $ show (here, e)
+			Right ast -> do
+				print (here, ast :: Symbol)
+				return (lbl, ast)
 
-			putStrLn ""
-			print (here, "unparsed:", onlySpaceOrCommentsRemain chars)
-			putStrLn ""
-
-			print (here, ast :: Symbol)
-			return undefined
--- 		Right (_, PS{..}) -> do
--- #if 0
--- 			putStrLn ""
--- 			forM_ (sortOn (\((x, y), _) -> (y, x)) $ snd user)
--- 				$ \((x, y), g) ->
--- 					putStrLn $ lpad ' ' nrW (show y)
--- 						++ ": "  ++ lpad ' ' 4 (show x)
--- 						++ " "  ++ show g
--- 			putStrLn ""
--- 			forM_ bits $ \row -> do
--- 				forM_ row $ \b -> putStr $ if b then "." else "●" --show $ fromEnum b
+-- 		case r of
+-- 			Left e -> error $ show (here, e)
+-- 			Right (ast, PS{..}) -> do
+-- 
 -- 				putStrLn ""
--- #endif
+-- 				print (here, "unparsed:", onlySpaceOrCommentsRemain chars)
+-- 				putStrLn ""
 -- 
--- 			putStrLn ""
--- 			putStrLn "location is printed as col/row"
--- 			putStrLn ""
--- 
--- 			putStrLn $ lpad ' ' 4 "y" ++ lpad ' ' 3 "x"
--- 			putStrLn $ lpad ' ' 4 "line"
--- 			forM_ (omg $ snd user) $ \(lbl, l) -> do
--- 				print lbl
--- 				forM_ l $ \(Pos (x, y), g) -> do
--- -- 							putStrLn $ "  " ++ show g
--- 					putStrLn $ lpad ' ' 4 (show y)
--- 						++ lpad ' ' 3 (show x)
--- 						++ ":  "  ++ show g
--- 
--- 			return $ omg $ snd user
+-- 				print (here, ast :: Symbol)
+-- 				return (lbl, ast)
 
 --------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
-
--- 	print $ readP_to_S test "  (* comment *) "
--- 	print $ readP_to_S test "   "
--- 	print $ readP_to_S test ""
 
 	print here
 	getArgs >>= \case
