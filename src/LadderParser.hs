@@ -18,14 +18,14 @@ import DiagramParser
 --------------------------------------------------------------------------------
 
 data Symbol
-	= Source { location :: Pos, succs :: [Symbol] }
+	= Source { location :: Pos, succ :: Symbol }
 	| Sink { location :: Pos }
 	| Device { location :: Pos, body :: String, options :: [String]
-		, output :: Pos, succs :: [Symbol] }
+		, output :: Pos, succ :: Symbol }
 	| Jump { location :: Pos, target :: String }
 	| Label { location :: Pos, labelName :: String, nextRung :: Symbol }
---  	| Sink Pos
 	| Node { location :: Pos, succs :: [Symbol] } --output is implied
+--XXX XXX XXX maybe 'LooseEnd'?
 	deriving Show
 
 --------------------------------------------------------------------------------
@@ -38,7 +38,7 @@ take3 = do
 	setSource begin
 	setDir (Pos (0, 1))
 	char '|'
-	Source begin <$> ((:[]) <$> vlink)
+	Source begin <$> vlink
 
 --------------------------------------------------------------------------------
 
@@ -105,14 +105,13 @@ device = do
 	n <- varName begin (-1)
 	setPos end --restore position to where parsing should continue
 	setSource end
-	Device begin (toUpper <$> devType) [n] end
-		<$> ( (:[]) <$> hlink)--FIXME
+	Device begin (toUpper <$> devType) [n] end <$> hlink
 
 node :: LDParser Symbol
 node = peek >>= \case
 		Value visited '+'
 			| visited -> getLocs >>= \(loc, _)
-				-> return $ Node loc []
+				-> return $ Node loc [] --XXX XXX XXX maybe 'LooseEnd'?
 			| otherwise
 				-> justEatDontMove --XXX i guess 'eat' would work jsut as good, as pos is forced
 					--XXX only it has to be moved after 'getLocs'

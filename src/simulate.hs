@@ -9,6 +9,7 @@ import Control.Monad.State
 import Control.Monad.Except
 -- import Data.Maybe
 import Data.Char
+import Data.IORef
 -- import Data.List
 --TODO import Data.Vector.Unboxed
 -- import Data.Vector hiding ((++), forM_, modify, sequence_, sequence)
@@ -19,6 +20,7 @@ import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
 -- import Debug.Trace
 -- import Text.Read (readEither)
 -- import qualified Data.Map.Strict as M
+import qualified Data.Map as M
 -- import qualified Data.Set as S
 
 -- import Text.ParserCombinators.ReadP as RP
@@ -45,41 +47,15 @@ lpad filler n str = reverse $ take n $ reverse str ++ repeat filler
 
 --------------------------------------------------------------------------------
 
-preproc :: String -> Either String [String]
-preproc src =
-	case parse test3 "(file)" src of
-		 Left err -> Left $ show err
-		 Right n -> Right $ concat n
-
+--TODO nice leading column
+--maybe parse even rungs, its alphabet is not that big
+test4 = ladder <* eof
 	where
-
-	test3 = test3' <* eof
-
-	test3' = (:[]) <$> do
+	ladder = do
 		white --FIXME this would eat leading column (when implemented)
 		P.many $ (P.many comment) *> eol
 		P.many1 rung
-		where
-		rung =
-			lookAhead (P.oneOf "|+" P.<|> alphaNum)
-			*> manyTill anyChar eol
-		comment =
-			P.string "(*" *> manyTill anyChar (try (P.string "*)"))
-			*> white
-		white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n'))
-		eol = P.char '\n'
 
---------------------------------------------------------------------------------
-
-test4 = test4' <* eof
-
---TODO nice leading column
---maybe parse even rungs, its alphabet is not that big
-test4' = do
-	white --FIXME this would eat leading column (when implemented)
-	P.many $ (P.many comment) *> eol
-	P.many1 rung
-	where
 	rung = do
 		lbl <- optionMaybe (many1 alphaNum <* P.char ':' <* white <* eol)
 		net <-
@@ -93,6 +69,7 @@ test4' = do
 	white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n'))
 	eol = P.char '\n'
 
+
 preproc2 :: String -> Either String [(Maybe String, [String])]
 preproc2 src =
 	case parse test4 "(file)" src of
@@ -104,13 +81,50 @@ preproc2 src =
 xxxx :: Symbol -> IO ()
 xxxx net = undefined
 	where
-	f (Source pos (succs :: [Symbol])) = undefined
+	f (Source pos next) = undefined
 	f (Sink pos) = undefined
 	f (Device pos (body :: String) (options :: [String])
-		(output :: Pos) (succs :: [Symbol]) ) = undefined
+		(output :: Pos) next ) = undefined
 	f (Jump pos target) = undefined
 	f Label{} = error "should not happen"
 	f (Node pos (succs :: [Symbol])) = undefined
+
+
+xxxxX
+	:: M.Map String (IO ())
+	-> M.Map Pos (Pos, IORef Bool)
+	-> Symbol
+	-> IO ()
+xxxxX rungs m' (Source p next) = do
+	pwr <- newIORef True
+	f pwr next
+
+	where
+
+	f
+		:: IORef Bool
+		-> Symbol
+		-> IO ()
+
+	f pwr (Device p (body :: String) (options :: [String])
+		(output :: Pos) next ) = undefined
+
+	f pwr (Jump p target) =
+		readIORef pwr >>= \c -> if c then join (getRung target) else return ()
+
+	f pwr (Node p (succs :: [Symbol])) = undefined
+
+	f _ Sink{} = print (here, "FIXME")
+
+	f _ Source{} = error $ show (here, "should not happen")
+	f _ Label{} = error "should not happen"
+
+	getRung lbl =
+		case M.lookup lbl rungs of
+			 Just r -> return r
+			 Nothing -> error $ show (here, lbl, "not found")
+
+xxxxX _ _ _ = error $ show (here, "should not happen")
 
 --------------------------------------------------------------------------------
 
@@ -204,24 +218,12 @@ compile file = do		 --print (here, start)
 -- 	putStrLn ""
 -- 	putStrLn "---------------------"
 
-	forM nets $ \(lbl, net) -> do
--- 		let n = parseNet net
-
+	forM nets $ \(lbl, net) ->
 		case parseNet net of
 			Left e -> error $ show (here, e)
 			Right ast -> do
-				print (here, ast :: Symbol)
+				print (here, ast)
 				return (lbl, ast)
--- 		case r of
--- 			Left e -> error $ show (here, e)
--- 			Right (ast, PS{..}) -> do
--- 
--- 				putStrLn ""
--- 				print (here, "unparsed:", onlySpaceOrCommentsRemain chars)
--- 				putStrLn ""
--- 
--- 				print (here, ast :: Symbol)
--- 				return (lbl, ast)
 
 --------------------------------------------------------------------------------
 

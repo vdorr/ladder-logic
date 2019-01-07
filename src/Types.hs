@@ -1,5 +1,5 @@
-
 module Types where
+{-
 
 data AST a
 	= Source { ann :: a }
@@ -36,4 +36,4 @@ data AST a
 
 data Network a = Network [(Maybe (String, a), AST a)]
 
-
+-}
