@@ -25,6 +25,7 @@ data Symbol
 	| Jump { location :: Pos, target :: String }
 	| Label { location :: Pos, labelName :: String, nextRung :: Symbol }
 	| Node { location :: Pos, succs :: [Symbol] } --output is implied
+	| Node' { location :: Pos } --already visited Node
 --XXX XXX XXX maybe 'LooseEnd'?
 	deriving Show
 
@@ -111,7 +112,7 @@ node :: LDParser Symbol
 node = peek >>= \case
 		Value visited '+'
 			| visited -> getLocs >>= \(loc, _)
-				-> return $ Node loc [] --XXX XXX XXX maybe 'LooseEnd'?
+				-> return $ Node' loc --XXX is this even allowed?
 			| otherwise
 				-> justEatDontMove --XXX i guess 'eat' would work jsut as good, as pos is forced
 					--XXX only it has to be moved after 'getLocs'

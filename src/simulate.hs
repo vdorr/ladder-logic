@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, FlexibleContexts #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards,
+  FlexibleContexts, RecursiveDo, TupleSections #-}
+
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
                      -fwarn-unused-binds
                      -fwarn-unused-imports #-}
@@ -90,12 +92,13 @@ xxxx net = undefined
 	f (Node pos (succs :: [Symbol])) = undefined
 
 
+
 xxxxX
-	:: M.Map String (IO ())
-	-> M.Map Pos (Pos, IORef Bool)
+	:: M.Map (Maybe String) (IO ())
+	-> M.Map String (IORef Bool) --TODO more types
 	-> Symbol
 	-> IO ()
-xxxxX rungs m' (Source p next) = do
+xxxxX rungs vars (Source p next) = do
 	pwr <- newIORef True
 	f pwr next
 
@@ -113,6 +116,7 @@ xxxxX rungs m' (Source p next) = do
 		readIORef pwr >>= \c -> if c then join (getRung target) else return ()
 
 	f pwr (Node p (succs :: [Symbol])) = undefined
+	f pwr (Node' p) = undefined -- pwr or nodes[p]
 
 	f _ Sink{} = print (here, "FIXME")
 
@@ -120,11 +124,24 @@ xxxxX rungs m' (Source p next) = do
 	f _ Label{} = error "should not happen"
 
 	getRung lbl =
-		case M.lookup lbl rungs of
+		case M.lookup (Just lbl) rungs of
 			 Just r -> return r
 			 Nothing -> error $ show (here, lbl, "not found")
 
 xxxxX _ _ _ = error $ show (here, "should not happen")
+
+
+xxxxY :: [(Maybe String, Symbol)] -> IO ()
+xxxxY rungs = mdo
+	let vars = M.empty
+-- 	rungs <- (\f -> foldM f [] rungs) $ \m (lbl, net) -> do
+	rungs' <- forM rungs $ \(lbl, net) -> do
+-- 		undefined
+		return (lbl, xxxxX rungs'' vars net)
+	let rungs'' = M.fromList rungs'
+	return ()
+-- foldM
+--   :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 
 --------------------------------------------------------------------------------
 
