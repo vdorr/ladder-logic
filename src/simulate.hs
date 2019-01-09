@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards,
-  FlexibleContexts, RecursiveDo, TupleSections #-}
+  FlexibleContexts, RecursiveDo, TupleSections, GADTSyntax #-}
 
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
                      -fwarn-unused-binds
@@ -93,6 +93,12 @@ xxxx net = undefined
 
 
 
+data Pg lbl m a where
+	Do :: m a -> Pg lbl m a
+	Go :: lbl -> Pg lbl m a
+	Br :: lbl -> m Bool -> Pg lbl m a
+
+
 xxxxX
 	:: M.Map (Maybe String) (IO ())
 	-> M.Map String (IORef Bool) --TODO more types
@@ -118,7 +124,7 @@ xxxxX rungs vars (Source p next) = do
 	f pwr (Node p (succs :: [Symbol])) = undefined
 	f pwr (Node' p) = undefined -- pwr or nodes[p]
 
-	f _ Sink{} = print (here, "FIXME")
+	f _ Sink{} = print (here, "FIXME") --right rail
 
 	f _ Source{} = error $ show (here, "should not happen")
 	f _ Label{} = error "should not happen"
