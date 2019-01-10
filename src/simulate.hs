@@ -10,6 +10,7 @@ import System.Environment (getArgs)
 import Control.Monad.State
 import Control.Monad.Except
 -- import Data.Maybe
+import Data.Traversable
 import Data.Char
 import Data.IORef
 -- import Data.List
@@ -103,28 +104,30 @@ xxxxX
 	:: M.Map (Maybe String) (IO ())
 	-> M.Map String (IORef Bool) --TODO more types
 	-> Symbol
-	-> IO ()
+	-> IO [Pg (Maybe String) IO ()]
 xxxxX rungs vars (Source p next) = do
 	pwr <- newIORef True
-	f pwr next
+	fst <$> runStateT (f pwr next) M.empty
 
 	where
 
 	f
-		:: IORef Bool
+		:: (IORef Bool)
 		-> Symbol
-		-> IO ()
+		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
 
-	f pwr (Device p (body :: String) (options :: [String])
-		(output :: Pos) next ) = undefined
+-- 		(body :: String) (options :: [String]) (output :: Pos)
+	f (pwr) (Device p body options output next) =
+		undefined
 
-	f pwr (Jump p target) =
-		readIORef pwr >>= \c -> if c then join (getRung target) else return ()
+	f pwr (Jump _p target) = return [Br (Just target) (readIORef pwr)]
+		--readIORef pwr >>= \c -> if c then join (getRung target) else return ()
 
-	f pwr (Node p (succs :: [Symbol])) = undefined
-	f pwr (Node' p) = undefined -- pwr or nodes[p]
+-- 		succs :: [Symbol]
+	f pwr (Node p succs) = for succs undefined
+	f pwr (Node' p) = [] <$ modify (M.insert p pwr)
 
-	f _ Sink{} = print (here, "FIXME") --right rail
+	f _ Sink{} = error $ show (here, "FIXME") --right rail
 
 	f _ Source{} = error $ show (here, "should not happen")
 	f _ Label{} = error "should not happen"
@@ -142,9 +145,10 @@ xxxxY rungs = mdo
 	let vars = M.empty
 -- 	rungs <- (\f -> foldM f [] rungs) $ \m (lbl, net) -> do
 	rungs' <- forM rungs $ \(lbl, net) -> do
--- 		undefined
-		return (lbl, xxxxX rungs'' vars net)
-	let rungs'' = M.fromList rungs'
+		undefined
+-- 		return (lbl, xxxxX rungs'' vars net)
+
+-- 	let rungs'' = M.fromList rungs'
 	return ()
 -- foldM
 --   :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
