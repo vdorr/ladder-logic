@@ -13,6 +13,7 @@ import Control.Monad.Except
 import Data.Traversable
 import Data.Char
 import Data.IORef
+import Data.Functor.Const
 -- import Data.List
 --TODO import Data.Vector.Unboxed
 -- import Data.Vector hiding ((++), forM_, modify, sequence_, sequence)
@@ -28,6 +29,9 @@ import qualified Data.Map as M
 
 -- import Text.ParserCombinators.ReadP as RP
 import Text.Parsec as P
+
+import Algebra.Graph.AdjacencyMap
+import Algebra.Graph.AdjacencyMap.Algorithm
 
 import DiagramParser
 import LadderParser
@@ -81,16 +85,43 @@ preproc2 src =
 
 --------------------------------------------------------------------------------
 
+-- data V = V Pos (Symbol_ ())
+-- instance Eq V where
+-- 	V a _ == V b _ = a == b
+-- instance Ord V where
+-- 	V a _ <= V b _ = a <= b
+
+-- unFix :: Fix f -> f (Fix f)
+-- unFix (Fx x) = x
+
+unFix :: Cofree f a -> (a, f (Cofree f a))
+unFix (a :< x) = (a, x)
+
+cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
+cata alg = alg . fmap (fmap (cata alg)) . unFix
+
+hhh :: Cofree Symbol_ Pos -> AdjacencyMap (Const Pos Symbol_)
+hhh (p :< Source x) = undefined -- go p x empty
+	where
+
+	go :: AdjacencyMap (Const Pos Symbol_)
+		-> Pos
+		-> Cofree Symbol_ Pos
+		-> AdjacencyMap (Const Pos Symbol_)
+	go = undefined
+
+hhh _ = error here
+
 xxxx :: Symbol -> IO ()
 xxxx net = undefined
-	where
-	f (Source pos next) = undefined
-	f (Sink pos) = undefined
-	f (Device pos (body :: String) (options :: [String])
-		(output :: Pos) next ) = undefined
-	f (Jump pos target) = undefined
-	f Label{} = error "should not happen"
-	f (Node pos (succs :: [Symbol])) = undefined
+-- 	where
+-- 	f (Source pos next) = undefined
+-- 	f (Sink pos) = undefined
+-- 	f (Device pos (body :: String) (options :: [String])
+-- 		(output :: Pos) next ) = undefined
+-- 	f (Jump pos target) = undefined
+-- 	f Label{} = error "should not happen"
+-- 	f (Node pos (succs :: [Symbol])) = undefined
 
 
 
@@ -100,58 +131,58 @@ data Pg lbl m a where
 	Br :: lbl -> m Bool -> Pg lbl m a
 
 
-xxxxX
-	:: M.Map (Maybe String) (IO ())
-	-> M.Map String (IORef Bool) --TODO more types
-	-> Symbol
-	-> IO [Pg (Maybe String) IO ()]
-xxxxX rungs vars (Source p next) = do
-	pwr <- newIORef True
-	fst <$> runStateT (f pwr next) M.empty
-
-	where
-
-	f
-		:: (IORef Bool)
-		-> Symbol
-		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
-
--- 		(body :: String) (options :: [String]) (output :: Pos)
-	f (pwr) (Device p body options output next) =
-		undefined
-
-	f pwr (Jump _p target) = return [Br (Just target) (readIORef pwr)]
-		--readIORef pwr >>= \c -> if c then join (getRung target) else return ()
-
--- 		succs :: [Symbol]
-	f pwr (Node p succs) = for succs undefined
-	f pwr (Node' p) = [] <$ modify (M.insert p pwr)
-
-	f _ Sink{} = error $ show (here, "FIXME") --right rail
-
-	f _ Source{} = error $ show (here, "should not happen")
-	f _ Label{} = error "should not happen"
-
-	getRung lbl =
-		case M.lookup (Just lbl) rungs of
-			 Just r -> return r
-			 Nothing -> error $ show (here, lbl, "not found")
-
-xxxxX _ _ _ = error $ show (here, "should not happen")
-
-
-xxxxY :: [(Maybe String, Symbol)] -> IO ()
-xxxxY rungs = mdo
-	let vars = M.empty
--- 	rungs <- (\f -> foldM f [] rungs) $ \m (lbl, net) -> do
-	rungs' <- forM rungs $ \(lbl, net) -> do
-		undefined
--- 		return (lbl, xxxxX rungs'' vars net)
-
--- 	let rungs'' = M.fromList rungs'
-	return ()
--- foldM
---   :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
+-- xxxxX
+-- 	:: M.Map (Maybe String) (IO ())
+-- 	-> M.Map String (IORef Bool) --TODO more types
+-- 	-> Symbol
+-- 	-> IO [Pg (Maybe String) IO ()]
+-- xxxxX rungs vars (Source p next) = do
+-- 	pwr <- newIORef True
+-- 	fst <$> runStateT (f pwr next) M.empty
+-- 
+-- 	where
+-- 
+-- 	f
+-- 		:: (IORef Bool)
+-- 		-> Symbol
+-- 		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
+-- 
+-- -- 		(body :: String) (options :: [String]) (output :: Pos)
+-- 	f (pwr) (Device p body options output next) =
+-- 		undefined
+-- 
+-- 	f pwr (Jump _p target) = return [Br (Just target) (readIORef pwr)]
+-- 		--readIORef pwr >>= \c -> if c then join (getRung target) else return ()
+-- 
+-- -- 		succs :: [Symbol]
+-- 	f pwr (Node p succs) = for succs undefined
+-- 	f pwr (Node' p) = [] <$ modify (M.insert p pwr)
+-- 
+-- 	f _ Sink{} = error $ show (here, "FIXME") --right rail
+-- 
+-- 	f _ Source{} = error $ show (here, "should not happen")
+-- 	f _ Label{} = error "should not happen"
+-- 
+-- 	getRung lbl =
+-- 		case M.lookup (Just lbl) rungs of
+-- 			 Just r -> return r
+-- 			 Nothing -> error $ show (here, lbl, "not found")
+-- 
+-- xxxxX _ _ _ = error $ show (here, "should not happen")
+-- 
+-- 
+-- xxxxY :: [(Maybe String, Symbol)] -> IO ()
+-- xxxxY rungs = mdo
+-- 	let vars = M.empty
+-- -- 	rungs <- (\f -> foldM f [] rungs) $ \m (lbl, net) -> do
+-- 	rungs' <- forM rungs $ \(lbl, net) -> do
+-- 		undefined
+-- -- 		return (lbl, xxxxX rungs'' vars net)
+-- 
+-- -- 	let rungs'' = M.fromList rungs'
+-- 	return ()
+-- -- foldM
+-- --   :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 
 --------------------------------------------------------------------------------
 

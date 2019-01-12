@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, FlexibleContexts #-}
+{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards
+  , FlexibleContexts, DeriveFunctor, QuantifiedConstraints #-}
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
                      -fwarn-unused-binds
                      -fwarn-unused-imports #-}
@@ -17,17 +18,38 @@ import DiagramParser
 
 --------------------------------------------------------------------------------
 
-data Symbol
-	= Source { location :: Pos, succ :: Symbol }
-	| Sink { location :: Pos }
-	| Device { location :: Pos, body :: String, options :: [String]
-		, output :: Pos, succ :: Symbol }
-	| Jump { location :: Pos, target :: String }
-	| Label { location :: Pos, labelName :: String, nextRung :: Symbol }
-	| Node { location :: Pos, succs :: [Symbol] } --output is implied
-	| Node' { location :: Pos } --already visited Node
---XXX XXX XXX maybe 'LooseEnd'?
-	deriving Show
+-- data Symbol
+-- 	= Source { location :: Pos, succ :: Symbol }
+-- 	| Sink { location :: Pos }
+-- 	| Device { location :: Pos, body :: String, options :: [String]
+-- 		, output :: Pos, succ :: Symbol }
+-- 	| Jump { location :: Pos, target :: String }
+-- 	| Label { location :: Pos, labelName :: String, nextRung :: Symbol }
+-- 	| Node { location :: Pos, succs :: [Symbol] } --output is implied
+-- 	| Node' { location :: Pos } --already visited Node
+-- 	deriving Show
+
+--------------------------------------------------------------------------------
+
+data Symbol_ a
+	= Source a
+	| Sink
+	| Device String [String] a
+	| Jump String
+	| Label String a
+	| Node [a]
+	| Node' --already visited Node
+	deriving (Show, Functor)
+
+data Cofree f a = a :< f (Cofree f a)
+	deriving (Functor)
+
+type Symbol = Cofree Symbol_ Pos
+
+cof a f = (a :<) . f
+
+instance (forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
+	show (a :< as) = show a ++ " :< (" ++ show as ++ ")"
 
 --------------------------------------------------------------------------------
 
@@ -39,7 +61,7 @@ take3 = do
 	setSource begin
 	setDir (Pos (0, 1))
 	char '|'
-	Source begin <$> vlink
+	cof begin Source <$> vlink
 
 --------------------------------------------------------------------------------
 
@@ -73,14 +95,14 @@ label = do
 	lbl <- withDir (Pos(1, 0))
 		$ while isAlpha <* char ':'
 	setPos (Pos(x, y+1))
-	Label begin lbl <$> vlink
+	cof begin (Label lbl) <$> vlink
 
 jump :: LDParser Symbol
 jump = do
 	(begin, _src) <- getLocs
 	void $ string ">>"
 	lbl <- while isAlpha
-	return $ Jump begin lbl --[src]
+	return $ begin :< Jump lbl
 
 varName
 	:: Pos --pos of first char of device body
@@ -106,22 +128,22 @@ device = do
 	n <- varName begin (-1)
 	setPos end --restore position to where parsing should continue
 	setSource end
-	Device begin (toUpper <$> devType) [n] end <$> hlink
+	cof begin (Device (toUpper <$> devType) [n]) <$> hlink
 
 node :: LDParser Symbol
 node = peek >>= \case
 		Value visited '+'
 			| visited -> getLocs >>= \(loc, _)
-				-> return $ Node' loc --XXX is this even allowed?
+				-> return $ loc :< Node' --XXX is this even allowed?
 			| otherwise
 				-> justEatDontMove --XXX i guess 'eat' would work jsut as good, as pos is forced
 					--XXX only it has to be moved after 'getLocs'
 				>> getLocs >>= \(loc@(Pos(x, y)), _)
-					-> Node loc <$> collect
+					-> cof loc Node <$> collect
 						[ setLocs (Pos (x+1, y)) loc >> ( (:[]) <$> hlink)--FIXME
 						, setLocs (Pos (x, y+1)) loc >> ( (:[]) <$> vlink)--FIXME
 						]
-		_ -> getLocs >>= \(loc, _) -> return $ Sink loc
+		_ -> getLocs >>= \(loc, _) -> return $ loc :< Sink
 
 collect :: (Monad m, Alternative m, Foldable t, Monoid a) => t (m a) -> m a
 collect = foldM (\m f -> (flip mappend m <$> f) <|> pure m) mempty
@@ -142,7 +164,3 @@ vlink = setDir topDown
 		<|> lookahead (== '-') *> skip *> vlink --walking over horizontal link
 		<|> label
 		<|> node)
-
---------------------------------------------------------------------------------
-
--- main = print 1
