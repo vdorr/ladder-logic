@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards
-  , FlexibleContexts, DeriveFunctor, QuantifiedConstraints #-}
+  , FlexibleContexts, DeriveFunctor, QuantifiedConstraints
+  , DeriveFoldable, DeriveTraversable #-}
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
                      -fwarn-unused-binds
                      -fwarn-unused-imports #-}
@@ -39,10 +40,10 @@ data Symbol_ a
 	| Label String a
 	| Node [a]
 	| Node' --already visited Node
-	deriving (Show, Functor)
+	deriving (Show, Functor, Foldable, Traversable)
 
 data Cofree f a = a :< f (Cofree f a)
-	deriving (Functor)
+	deriving (Functor, Foldable, Traversable)
 
 type Symbol = Cofree Symbol_ Pos
 

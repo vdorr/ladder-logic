@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards,
-  FlexibleContexts, RecursiveDo, TupleSections, GADTSyntax #-}
+  FlexibleContexts, RecursiveDo, TupleSections, GADTSyntax, DeriveFunctor #-}
 
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
                      -fwarn-unused-binds
@@ -85,44 +85,34 @@ preproc2 src =
 
 --------------------------------------------------------------------------------
 
--- data V = V Pos (Symbol_ ())
--- instance Eq V where
--- 	V a _ == V b _ = a == b
--- instance Ord V where
--- 	V a _ <= V b _ = a <= b
+-- unFix :: Cofree f a -> (a, f (Cofree f a))
+-- unFix (a :< x) = (a, x)
+-- cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
+-- cata alg = alg . fmap (fmap (cata alg)) . unFix
 
--- unFix :: Fix f -> f (Fix f)
--- unFix (Fx x) = x
-
-unFix :: Cofree f a -> (a, f (Cofree f a))
-unFix (a :< x) = (a, x)
-
-cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
-cata alg = alg . fmap (fmap (cata alg)) . unFix
-
-hhh :: Cofree Symbol_ Pos -> AdjacencyMap (Const Pos Symbol_)
-hhh (p :< Source x) = undefined -- go p x empty
+jjj :: Cofree Symbol_ Pos -> AdjacencyMap Pos
+jjj (p :< Source x) = go p x --empty
 	where
-
-	go :: AdjacencyMap (Const Pos Symbol_)
-		-> Pos
+	go
+		:: Pos
 		-> Cofree Symbol_ Pos
-		-> AdjacencyMap (Const Pos Symbol_)
-	go = undefined
-
-hhh _ = error here
+		-> AdjacencyMap Pos
+	go parent (p :< y) = --undefined
+		case y of
+			Source _next -> error here -- should not happen
+			Sink -> edge parent p
+				--this should check if something is not connected to right rail
+			Device body opts next -> edge parent p `overlay` go p next
+			Jump lbl -> edge parent p
+			Label lbl next -> undefined
+			Node next -> overlays (edge parent p : fmap (go p) next)
+			Node' -> edge parent p --already visited Node
+jjj _ = error here --parser should not allow this
 
 xxxx :: Symbol -> IO ()
-xxxx net = undefined
--- 	where
--- 	f (Source pos next) = undefined
--- 	f (Sink pos) = undefined
--- 	f (Device pos (body :: String) (options :: [String])
--- 		(output :: Pos) next ) = undefined
--- 	f (Jump pos target) = undefined
--- 	f Label{} = error "should not happen"
--- 	f (Node pos (succs :: [Symbol])) = undefined
-
+xxxx net = do
+	print (here, "------------------------------")
+	print $ topSort $ jjj net
 
 
 data Pg lbl m a where
@@ -287,7 +277,6 @@ compile file = do		 --print (here, start)
 
 main :: IO ()
 main = do
-
 	print here
 	getArgs >>= \case
 -- 		["run", file] -> compile file >>= runLadder
