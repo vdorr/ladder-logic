@@ -98,15 +98,19 @@ jjj (p :< Source x) = go p x --empty
 		-> Cofree Symbol_ Pos
 		-> AdjacencyMap Pos
 	go parent (p :< y) = --undefined
-		case y of
-			Source _next -> error here -- should not happen
-			Sink -> edge parent p
-				--this should check if something is not connected to right rail
-			Device body opts next -> edge parent p `overlay` go p next
-			Jump lbl -> edge parent p
-			Label lbl next -> undefined
-			Node next -> overlays (edge parent p : fmap (go p) next)
-			Node' -> edge parent p --already visited Node
+--XXX XXX XXX simply fold y with overlays?!?!?!?!
+		testtest
+-- 		case y of
+-- 			Source _next -> error here -- should not happen
+-- 			Sink -> edge parent p
+-- 				--this should check if something is not connected to right rail
+-- 			Device body opts next -> edge parent p `overlay` go p next
+-- 			Jump lbl -> edge parent p
+-- 			Label lbl next -> undefined
+-- 			Node next -> overlays (edge parent p : fmap (go p) next)
+-- 			Node' -> edge parent p --already visited Node
+		where
+		testtest = overlays $ edge parent p : foldMap ((:[]) . go p) y
 jjj _ = error here --parser should not allow this
 
 xxxx :: Symbol -> IO ()
