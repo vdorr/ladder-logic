@@ -30,6 +30,7 @@ import qualified Data.Map as M
 -- import Text.ParserCombinators.ReadP as RP
 import Text.Parsec as P
 
+import Data.Tree as T
 import Algebra.Graph.AdjacencyMap
 import Algebra.Graph.AdjacencyMap.Algorithm
 
@@ -85,10 +86,10 @@ preproc2 src =
 
 --------------------------------------------------------------------------------
 
--- unFix :: Cofree f a -> (a, f (Cofree f a))
--- unFix (a :< x) = (a, x)
--- cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
--- cata alg = alg . fmap (fmap (cata alg)) . unFix
+unFix :: Cofree f a -> (a, f (Cofree f a))
+unFix (a :< x) = (a, x)
+cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
+cata alg = alg . fmap (fmap (cata alg)) . unFix
 
 jjj :: Cofree Symbol_ Pos -> AdjacencyMap Pos
 jjj (p :< Source x) = go p x --empty
@@ -113,10 +114,43 @@ jjj (p :< Source x) = go p x --empty
 		testtest = overlays $ edge parent p : foldMap ((:[]) . go p) y
 jjj _ = error here --parser should not allow this
 
+data Pair a b = Pair a b
+
+instance Eq a => Eq (Pair a b) where
+	Pair x _ == Pair y _ = x == y
+
+instance Ord a => Ord (Pair a b) where
+	Pair x _ <= Pair y _ = x <= y
+
+instance Show a => Show (Pair a b) where
+	show (Pair x _) = show x
+
+jjj_ :: Cofree Symbol_ Pos -> AdjacencyMap (Pair Pos (Symbol_ (Cofree Symbol_ Pos)))
+jjj_ (p :< xx@(Source x)) = go (Pair p xx) x
+	where
+	go parent (p :< y) =
+		overlays
+			$ edge parent (Pair p y)
+			: foldMap ((:[]) . go (Pair p y)) y
+jjj_ _ = error here --parser should not allow this
+
+
+iii :: Cofree Symbol_ Pos -> M.Map Pos (Symbol_ (Cofree Symbol_ Pos))
+iii w = go w
+	where
+	go (p :< y) = M.singleton p y <> foldMap (go) y
+
+-- iii _ = error here --parser should not allow this
+
 xxxx :: Symbol -> IO ()
 xxxx net = do
+	let law = iii net
+	let order =	dfsForest $ jjj net
+	for order $ \(T.Node a forrest) -> do
+-- 		error here
+		return ()
 	print (here, "------------------------------")
-	print $ topSort $ jjj net
+	print $ topSort $ jjj_ net
 
 
 data Pg lbl m a where
