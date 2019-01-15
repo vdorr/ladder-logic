@@ -28,7 +28,8 @@ import qualified Data.Map as M
 -- import qualified Data.Set as S
 
 -- import Text.ParserCombinators.ReadP as RP
-import Text.Parsec as P
+import Text.Megaparsec as P hiding (runParser', Pos)
+import Text.Megaparsec.Char as PC
 
 import Data.Tree as T
 import Algebra.Graph.AdjacencyMap
@@ -57,25 +58,27 @@ lpad filler n str = reverse $ take n $ reverse str ++ repeat filler
 
 --TODO nice leading column
 --maybe parse even rungs, its alphabet is not that big
+type ParseErr = String
+test4 :: Parsec ParseErr String [(Maybe String, [String])]
 test4 = ladder <* eof
 	where
 	ladder = do
 		white --FIXME this would eat leading column (when implemented)
 		P.many $ (P.many comment) *> eol
-		P.many1 rung
+		P.some rung
 
 	rung = do
-		lbl <- optionMaybe (many1 alphaNum <* P.char ':' <* white <* eol)
+		lbl <- (Just <$> (P.some PC.alphaNumChar <* PC.char ':' <* white <* eol)) <|> pure Nothing
 		net <-
-			many1 $
-				lookAhead (P.oneOf "|+" P.<|> alphaNum)
-				*> manyTill anyChar eol
+			some $
+				lookAhead (P.oneOf "|+" P.<|> PC.alphaNumChar)
+				*> manyTill anySingle eol
 		return (lbl, net)
 	comment =
-		P.string "(*" *> manyTill anyChar (try (P.string "*)"))
+		PC.string "(*" *> manyTill anySingle (try (PC.string "*)"))
 		*> white
-	white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n'))
-	eol = P.char '\n'
+	white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n')) --FIXME use eol
+	eol = PC.char '\n'
 
 
 preproc2 :: String -> Either String [(Maybe String, [String])]

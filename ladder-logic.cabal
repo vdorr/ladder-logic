@@ -13,7 +13,7 @@ maintainer:          vdorr.package@gmail.com
 -- copyright:           
 category:            Development
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+--extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
@@ -23,7 +23,7 @@ library
   build-depends:       base >=4.9 && <5
                      , mtl >=2.2
                      , vector >=0.12
-                     , parsec
+                     , megaparsec
                      , algebraic-graphs
   hs-source-dirs:      src
   default-language:    Haskell2010
