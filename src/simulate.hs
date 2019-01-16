@@ -89,32 +89,16 @@ preproc2 src =
 
 --------------------------------------------------------------------------------
 
-unFix :: Cofree f a -> (a, f (Cofree f a))
-unFix (a :< x) = (a, x)
-cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
-cata alg = alg . fmap (fmap (cata alg)) . unFix
+--unFix :: Cofree f a -> (a, f (Cofree f a))
+--unFix (a :< x) = (a, x)
+--cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
+--cata alg = alg . fmap (fmap (cata alg)) . unFix
 
 jjj :: Cofree Symbol_ Pos -> AdjacencyMap Pos
 jjj (p :< Source x) = go p x --empty
 	where
-	go
-		:: Pos
-		-> Cofree Symbol_ Pos
-		-> AdjacencyMap Pos
-	go parent (p :< y) = --undefined
---XXX XXX XXX simply fold y with overlays?!?!?!?!
-		testtest
--- 		case y of
--- 			Source _next -> error here -- should not happen
--- 			Sink -> edge parent p
--- 				--this should check if something is not connected to right rail
--- 			Device body opts next -> edge parent p `overlay` go p next
--- 			Jump lbl -> edge parent p
--- 			Label lbl next -> undefined
--- 			Node next -> overlays (edge parent p : fmap (go p) next)
--- 			Node' -> edge parent p --already visited Node
-		where
-		testtest = overlays $ edge parent p : foldMap ((:[]) . go p) y
+	go :: Pos -> Cofree Symbol_ Pos -> AdjacencyMap Pos
+	go parent (p :< y) = overlays $ edge parent p : foldMap ((:[]) . go p) y
 jjj _ = error here --parser should not allow this
 
 data Pair a b = Pair a b
@@ -128,28 +112,40 @@ instance Ord a => Ord (Pair a b) where
 instance Show a => Show (Pair a b) where
 	show (Pair x _) = show x
 
-jjj_ :: Cofree Symbol_ Pos -> AdjacencyMap (Pair Pos (Symbol_ (Cofree Symbol_ Pos)))
-jjj_ (p :< xx@(Source x)) = go (Pair p xx) x
+--instance Ord a => Semigroup (AdjacencyMap a) where
+--	(<>) = overlay
+--instance Ord a => Monoid (AdjacencyMap a) where
+--	mempty = Algebra.Graph.AdjacencyMap.empty
+
+jjj_ :: Cofree Symbol_ Pos -> AdjacencyMap (Pair Pos (Symbol_ Symbol))
+jjj_ (p :< xx@(Source x))
+	= go (Pair p xx) x
+--foldl :: (b -> a -> b) -> b -> t a -> b 
+--	= fst $ foldl
+--		(\(g, parent) (p :< y) ->
+--			let this = Pair p y
+--			in (overlay (edge parent this) g, this))
+--		(Algebra.Graph.AdjacencyMap.empty, Pair p xx)
+--		x
 	where
-	go parent (p :< y) =
-		overlays
-			$ edge parent (Pair p y)
-			: foldMap ((:[]) . go (Pair p y)) y
+	go parent (p :< y)
+		= overlays $ edge parent this : foldMap ((:[]) . go this) y
+		where
+		this = Pair p y
 jjj_ _ = error here --parser should not allow this
 
 
 iii :: Cofree Symbol_ Pos -> M.Map Pos (Symbol_ (Cofree Symbol_ Pos))
-iii w = go w
+iii = go
 	where
-	go (p :< y) = M.singleton p y <> foldMap (go) y
+	go (p :< y) = M.singleton p y <> foldMap go y
 
--- iii _ = error here --parser should not allow this
 
 xxxx :: Symbol -> IO ()
 xxxx net = do
 	let law = iii net
-	let order =	dfsForest $ jjj net
-	for order $ \(T.Node a forrest) -> do
+	let order = dfsForest $ jjj net
+	for order $ \(T.Node a forest) -> do
 -- 		error here
 		return ()
 	print (here, "------------------------------")
@@ -162,12 +158,18 @@ data Pg lbl m a where
 	Br :: lbl -> m Bool -> Pg lbl m a
 
 
--- xxxxX
--- 	:: M.Map (Maybe String) (IO ())
--- 	-> M.Map String (IORef Bool) --TODO more types
--- 	-> Symbol
--- 	-> IO [Pg (Maybe String) IO ()]
--- xxxxX rungs vars (Source p next) = do
+xxxxX
+	:: M.Map (Maybe String) (IO ())
+	-> M.Map String (IORef Bool) --TODO more types
+	-> Forest (Pair Pos (Symbol_ Symbol))
+	-> IO [Pg (Maybe String) IO ()]
+xxxxX rungs vars nets = do --(Source p next) = do
+	for nets $ \case
+		T.Node (Pair _p Source{}) net' -> do
+			error here
+			return ()
+		_ -> error here --should not happen
+	undefined
 -- 	pwr <- newIORef True
 -- 	fst <$> runStateT (f pwr next) M.empty
 -- 
