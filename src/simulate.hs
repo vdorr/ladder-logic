@@ -164,45 +164,70 @@ xxxxX
 	-> Forest (Pair Pos (Symbol_ Symbol))
 	-> IO [Pg (Maybe String) IO ()]
 xxxxX rungs vars nets = do --(Source p next) = do
-	for nets $ \case
+	nets' <- for nets $ \case
 		T.Node (Pair _p Source{}) net' -> do
-			error here
-			return ()
+			pwr <- newIORef True
+			fst <$> runStateT (g pwr net') M.empty
+-- 			error here
+-- 			return ()
 		_ -> error here --should not happen
-	undefined
--- 	pwr <- newIORef True
--- 	fst <$> runStateT (f pwr next) M.empty
--- 
--- 	where
--- 
--- 	f
--- 		:: (IORef Bool)
--- 		-> Symbol
--- 		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
--- 
--- -- 		(body :: String) (options :: [String]) (output :: Pos)
--- 	f (pwr) (Device p body options output next) =
+	return $ concat nets'
+
+ 	where
+
+	g
+		:: (IORef Bool)
+		-> [Tree (Pair Pos (Symbol_ Symbol))]
+		-> StateT
+			(M.Map Pos (IORef Bool))
+			IO
+			[Pg (Maybe String) IO ()]
+	g pwr net = (\a b -> foldM b [] a) net $ \b (n@(T.Node d net')) -> do
+		(pwr', pg) <- f pwr d
+		((b <> pg) <>) <$> g pwr' net'
 -- 		undefined
+
+	f
+		:: (IORef Bool)
+		-> Pair Pos (Symbol_ Symbol)
+		-> StateT
+			(M.Map Pos (IORef Bool))
+			IO
+			(IORef Bool, [Pg (Maybe String) IO ()])
+	f pwr (Pair _ (Device body options _)) = do
+		args <- for options $ \name -> do
+-- 			(maybe (const $ fail here) id . flip M.lookup vars)
+			case M.lookup name vars of
+				 Nothing -> fail here
+				 Just v -> return v
+		op body args
+		where
+		op "[ ]" [a] = undefined --return [(&&) <$> readIORef pwr <*> readIORef a]
+-- 		op "[/]" _a = (M.empty, pwr && not var)
+-- 		op "( )" _a = (setIo (X' pwr), pwr)
+-- 		op "(S)" _a = (if pwr then setIo (X' True) else M.empty, pwr)
+-- 		op "(R)" _a = (if pwr then setIo (X' False) else M.empty, pwr)
+		op other _a = error $ show (here, other)
+
+	f pwr ((Pair _ (Jump target))) = return (pwr, [Br (Just target) (readIORef pwr)])
+	f pwr (Pair p LadderParser.Node{}) = doNode pwr p
+ 	f pwr (Pair p Node') = doNode pwr p
 -- 
--- 	f pwr (Jump _p target) = return [Br (Just target) (readIORef pwr)]
--- 		--readIORef pwr >>= \c -> if c then join (getRung target) else return ()
+	f pwr (Pair _ Sink) = return (pwr, []) -- error $ show (here, "FIXME") --right rail
 -- 
--- -- 		succs :: [Symbol]
--- 	f pwr (Node p succs) = for succs undefined
--- 	f pwr (Node' p) = [] <$ modify (M.insert p pwr)
--- 
--- 	f _ Sink{} = error $ show (here, "FIXME") --right rail
--- 
--- 	f _ Source{} = error $ show (here, "should not happen")
--- 	f _ Label{} = error "should not happen"
--- 
--- 	getRung lbl =
--- 		case M.lookup (Just lbl) rungs of
--- 			 Just r -> return r
--- 			 Nothing -> error $ show (here, lbl, "not found")
--- 
--- xxxxX _ _ _ = error $ show (here, "should not happen")
--- 
+	f _ (Pair _ Source{}) = error $ show (here, "should not happen")
+	f _ (Pair _ LadderParser.Label{}) = error "should not happen"
+
+	doNode pwr p = do
+		m <- get
+		case M.lookup p m of
+			Nothing -> do
+				nr <- liftIO $ newIORef False
+				put $ M.insert p nr m
+				return (nr, [Do $ readIORef pwr >>= writeIORef nr ])
+			Just nr -> do
+				return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
+
 -- 
 -- xxxxY :: [(Maybe String, Symbol)] -> IO ()
 -- xxxxY rungs = mdo
