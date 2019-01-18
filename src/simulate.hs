@@ -17,6 +17,7 @@ import Data.Functor.Const
 -- import Data.List
 --TODO import Data.Vector.Unboxed
 -- import Data.Vector hiding ((++), forM_, modify, sequence_, sequence)
+import Control.Concurrent
 
 import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
 -- import Control.Applicative hiding (many)
@@ -89,6 +90,59 @@ preproc2 src =
 
 --------------------------------------------------------------------------------
 
+data Pg lbl m a where
+	Do :: m a -> Pg lbl m a
+	Go :: lbl -> Pg lbl m a
+	Br :: lbl -> m Bool -> Pg lbl m a
+
+
+weave1 :: forall lbl m a. (Eq lbl, Monad m) => [(lbl, Pg lbl m a)] -> m a -> m a
+weave1 [] end = end
+weave1 src end = snd $ head program
+	where
+
+	program = f src
+
+	f [(lbl, x)] = [(lbl, h x end)]
+	f ((lbl, x) : xs) = let
+		xs'@((_, xx) : _) = f xs
+		in (lbl,h x xx) : xs'
+
+	h (Do a) next = a >> next
+	h (Go lbl) _ = getLbl lbl
+	h (Br lbl cond) next = let
+		dst = getLbl lbl
+		in cond >>= \flag -> if flag then dst else next
+
+	getLbl lbl = maybe (error "label not found") id $ lookup lbl program
+
+--------------------------------------------------------------------------------
+
+interpret :: [(Maybe String, Symbol)] -> IO ()
+interpret nets = do
+	vars <- M.fromList <$> for
+-- 		["%IX0", "%QX0", "%IX1", "%MX0", "%MX1"]
+		["%MX0", "%MX1"]
+		(\n -> (n,) <$> ((,) <$> newIORef False <*> newIORef False))
+	nets' <- for nets $ \(lbl, net) -> do
+		print (here, lbl, ">>>")
+		net' <- xxxx vars net
+		return $ (lbl, Do $ return ()) : fmap (Nothing,) net'
+	forever $ do
+		threadDelay 50000
+		print "------------------"
+
+-- 		forM_ (M.toList vars) $ \(n, (r, r')) -> do
+-- 			v <- readIORef r
+-- 			print (here, "b", n, v)
+		weave1 (concat nets') (return ())
+-- 		forM_ (M.toList vars) $ \(n, r) -> readIORef r >>= \v -> print (here, n, v)
+		forM_ (M.toList vars) $ \(n, (r, r')) -> do
+			v <- readIORef r'
+			writeIORef r v
+			print (here, "a", n, v)
+	return ()
+
 data Pair a b = Pair a b
 
 instance Eq a => Eq (Pair a b) where
@@ -116,11 +170,14 @@ jjj_ _ = error here --parser should not allow this
 -- 	go (p :< y) = M.singleton p y <> foldMap go y
 
 
-xxxx :: Symbol -> IO ()
-xxxx net = do
+xxxx :: M.Map String (IORef Bool, IORef Bool) --TODO more types
+	-> Symbol -> IO [Pg (Maybe String) IO ()]
+xxxx vars net = do
 
 -- 	let vars = M.empty --FIXME
-	vars <- M.fromList <$> for ["%IX0", "%QX0", "%IX1"] (\n -> (n,) <$> newIORef False)
+-- 	vars <- M.fromList <$> for
+-- 		["%IX0", "%QX0", "%IX1", "%MX0", "%MX1"]
+-- 		(\n -> (n,) <$> newIORef False)
 	p <- xxxxX vars (dfsForest $ jjj_ net)
 
 -- 	for order $ \(T.Node a forest) -> do
@@ -128,16 +185,11 @@ xxxx net = do
 -- 		return ()
 	print (here, "------------------------------")
 	print $ topSort $ jjj_ net
-
-
-data Pg lbl m a where
-	Do :: m a -> Pg lbl m a
-	Go :: lbl -> Pg lbl m a
-	Br :: lbl -> m Bool -> Pg lbl m a
+	return p
 
 
 xxxxX
-	:: M.Map String (IORef Bool) --TODO more types
+	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
 	-> Forest (Pair Pos (Symbol_ Symbol))
 	-> IO [Pg (Maybe String) IO ()]
 xxxxX vars nets = do --(Source p next) = do
@@ -164,22 +216,42 @@ xxxxX vars nets = do --(Source p next) = do
 		args <- for options $ \name -> do
 			case M.lookup name vars of
 				 Nothing -> fail here
-				 Just v -> return v
+				 Just v -> return (name, v)
 		dev body args
 		where
 		dev "[ ]" [a] = op (&&) a
 		dev "[/]" [a] = op (\p v -> p && not v) a
-		dev "( )" [a] = update (\p _ -> p) a
-		dev "(S)" [a] = update (\p v -> if p then True else v) a
-		dev "(R)" [a] = update (\p v -> if p then False else v) a
+		dev "( )" [a] = update (\p _ -> Just p) a
+		dev "(S)" [a] = update (\p _ -> if p then Just True else Nothing) a
+		dev "(R)" [a] = update (\p _ -> if p then Just False else Nothing) a
 		dev other _a = error $ show (here, other)
 
-		op f a = liftIO $ newIORef False
+		op f aa@(_, (a, _a')) = liftIO $ newIORef False
 			>>= \r -> return (r
-				, [Do $ (f <$> readIORef pwr <*> readIORef a) >>= writeIORef r])
+				, [Do $ op' f aa r])
+				
+-- 		op' f a r = (f <$> readIORef pwr <*> readIORef a) >>= writeIORef r
+		op' f (name, (a, _)) r = do
+			va <- readIORef a
+			p <- readIORef pwr
+-- 			print (here, name, va)
+			writeIORef r $ f p va
 
-		update f a =
-			return (pwr, [Do $ (f <$> readIORef pwr <*> readIORef a) >>= writeIORef a])
+		update f a = return (pwr, [Do $ update' f a])
+
+-- 		update' f (name, (a, a')) = (f <$> readIORef pwr <*> readIORef a)
+-- 			>>= \v -> 
+-- 			print (here, name, v) 
+-- -- 				>>
+-- -- 			return v
+-- 			>> writeIORef a' v
+		update' f (name, (a, a')) = do
+			va <- readIORef a
+			p <- readIORef pwr
+-- 			print (here, name, va, f p va)
+			case f p va of
+				 Just v' -> writeIORef a' v'
+				 _ -> return ()
 
 	f pwr ((Pair _ (Jump target))) = return (pwr, [Br (Just target) (readIORef pwr)])
 	f pwr (Pair p LadderParser.Node{}) = doNode pwr p
@@ -223,52 +295,6 @@ parseVarName :: String -> Either String (Section, Size, Int)
 parseVarName ('%' : sect : ty : loc) -- = error here
 	= (,,) <$> readEither [sect] <*> readEither [ty] <*> readEither loc
 parseVarName _ = Left "wrong format"
-
-run :: [(Maybe String, [(Pos, Gizmo)])] -> IO ()
-run net = run' vars M.empty states net'
-	where
-	net' = foldMap snd net
-
- 	run' io out m ((p, x):xs) =
-		let
-			(out', m') = step io m p x
-			out'' = M.union out' out
-		in run' io out'' m' xs
- 	run' io out m [] = do
-		let io' = M.union out io
-		print (here, io')
-		run' io' M.empty m net'
-
-	vars = M.fromList $ zip (gatherVariables net) (repeat $ X' False)
-	states = M.fromList $ zip (foldMap (getTempVars) net) (repeat $ X' False)
-
-	getTempVars :: (Maybe String, [(Pos, Gizmo)]) -> [Pos]
-	getTempVars (_, l) = foldMap getOut l
-
-	gatherInputs m = X' . or . fmap ((\(X' v) -> v) . (m M.!))
-	
-	step io m p Source{} = (io, M.adjust (const $ X' True) p m)
-	step io m _p Device {options=[v], ..} = (io', M.adjust (const $ X' y) output m)
-		where
-		X' pwr = gatherInputs m predecessors
-		X' var = case M.lookup v io of
-			Nothing -> error here
-			Just var' -> var'
-
-		op "[ ]" = (M.empty, pwr && var)
-		op "[/]" = (M.empty, pwr && not var)
-		op "( )" = (setIo (X' pwr), pwr)
-		op "(S)" = (if pwr then setIo (X' True) else M.empty, pwr)
-		op "(R)" = (if pwr then setIo (X' False) else M.empty, pwr)
-		op other = error $ show (here, other)
-
-		(io', y) = op body
-		setIo w = M.fromList [(v, w)]
-
-	step _io _m _p Device{} = error here
-	step _io _m _p Jump{} = error here
-	step _io _m _p Label{} = error here --should not happen
-	step io m p Node{..} = (io, M.adjust (const (gatherInputs m predecessors)) p m)
 #endif
 
 --------------------------------------------------------------------------------
@@ -307,8 +333,9 @@ main = do
 		[file] -> do
 			nets <- compile file
 			print (here, "----------------------------------------")
-			forM_ nets $ \(lbl, net) -> do
-				print (here, lbl, ">>>")
-				xxxx net
+			interpret nets
+-- 			forM_ nets $ \(lbl, net) -> do
+-- 				print (here, lbl, ">>>")
+-- 				xxxx net
 			print (here, "DONE")
 		_ -> error $ show (here, "wrong arguments")
