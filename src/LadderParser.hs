@@ -44,6 +44,10 @@ data Symbol_ a
 
 data Cofree f a = a :< f (Cofree f a)
 	deriving (Functor, Foldable, Traversable)
+--unFix :: Cofree f a -> (a, f (Cofree f a))
+--unFix (a :< x) = (a, x)
+--cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
+--cata alg = alg . fmap (fmap (cata alg)) . unFix
 
 type Symbol = Cofree Symbol_ Pos
 

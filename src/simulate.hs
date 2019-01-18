@@ -89,18 +89,6 @@ preproc2 src =
 
 --------------------------------------------------------------------------------
 
---unFix :: Cofree f a -> (a, f (Cofree f a))
---unFix (a :< x) = (a, x)
---cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
---cata alg = alg . fmap (fmap (cata alg)) . unFix
-
-jjj :: Cofree Symbol_ Pos -> AdjacencyMap Pos
-jjj (p :< Source x) = go p x --empty
-	where
-	go :: Pos -> Cofree Symbol_ Pos -> AdjacencyMap Pos
-	go parent (p :< y) = overlays $ edge parent p : foldMap ((:[]) . go p) y
-jjj _ = error here --parser should not allow this
-
 data Pair a b = Pair a b
 
 instance Eq a => Eq (Pair a b) where
@@ -112,21 +100,8 @@ instance Ord a => Ord (Pair a b) where
 instance Show a => Show (Pair a b) where
 	show (Pair x _) = show x
 
---instance Ord a => Semigroup (AdjacencyMap a) where
---	(<>) = overlay
---instance Ord a => Monoid (AdjacencyMap a) where
---	mempty = Algebra.Graph.AdjacencyMap.empty
-
 jjj_ :: Cofree Symbol_ Pos -> AdjacencyMap (Pair Pos (Symbol_ Symbol))
-jjj_ (p :< xx@(Source x))
-	= go (Pair p xx) x
---foldl :: (b -> a -> b) -> b -> t a -> b 
---	= fst $ foldl
---		(\(g, parent) (p :< y) ->
---			let this = Pair p y
---			in (overlay (edge parent this) g, this))
---		(Algebra.Graph.AdjacencyMap.empty, Pair p xx)
---		x
+jjj_ (p :< xx@(Source x)) = go (Pair p xx) x
 	where
 	go parent (p :< y)
 		= overlays $ edge parent this : foldMap ((:[]) . go this) y
@@ -135,19 +110,22 @@ jjj_ (p :< xx@(Source x))
 jjj_ _ = error here --parser should not allow this
 
 
-iii :: Cofree Symbol_ Pos -> M.Map Pos (Symbol_ (Cofree Symbol_ Pos))
-iii = go
-	where
-	go (p :< y) = M.singleton p y <> foldMap go y
+-- iii :: Cofree Symbol_ Pos -> M.Map Pos (Symbol_ (Cofree Symbol_ Pos))
+-- iii = go
+-- 	where
+-- 	go (p :< y) = M.singleton p y <> foldMap go y
 
 
 xxxx :: Symbol -> IO ()
 xxxx net = do
-	let law = iii net
-	let order = dfsForest $ jjj net
-	for order $ \(T.Node a forest) -> do
--- 		error here
-		return ()
+
+-- 	let vars = M.empty --FIXME
+	vars <- M.fromList <$> for ["%IX0", "%QX0", "%IX1"] (\n -> (n,) <$> newIORef False)
+	p <- xxxxX vars (dfsForest $ jjj_ net)
+
+-- 	for order $ \(T.Node a forest) -> do
+-- -- 		error here
+-- 		return ()
 	print (here, "------------------------------")
 	print $ topSort $ jjj_ net
 
@@ -159,62 +137,54 @@ data Pg lbl m a where
 
 
 xxxxX
-	:: M.Map (Maybe String) (IO ())
-	-> M.Map String (IORef Bool) --TODO more types
+	:: M.Map String (IORef Bool) --TODO more types
 	-> Forest (Pair Pos (Symbol_ Symbol))
 	-> IO [Pg (Maybe String) IO ()]
-xxxxX rungs vars nets = do --(Source p next) = do
+xxxxX vars nets = do --(Source p next) = do
 	nets' <- for nets $ \case
 		T.Node (Pair _p Source{}) net' -> do
 			pwr <- newIORef True
 			fst <$> runStateT (g pwr net') M.empty
--- 			error here
--- 			return ()
 		_ -> error here --should not happen
 	return $ concat nets'
 
  	where
 
-	g
-		:: (IORef Bool)
+	g :: (IORef Bool)
 		-> [Tree (Pair Pos (Symbol_ Symbol))]
-		-> StateT
-			(M.Map Pos (IORef Bool))
-			IO
-			[Pg (Maybe String) IO ()]
+		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
 	g pwr net = (\a b -> foldM b [] a) net $ \b (n@(T.Node d net')) -> do
 		(pwr', pg) <- f pwr d
 		((b <> pg) <>) <$> g pwr' net'
--- 		undefined
 
-	f
-		:: (IORef Bool)
+	f :: (IORef Bool)
 		-> Pair Pos (Symbol_ Symbol)
-		-> StateT
-			(M.Map Pos (IORef Bool))
-			IO
-			(IORef Bool, [Pg (Maybe String) IO ()])
+		-> StateT (M.Map Pos (IORef Bool)) IO (IORef Bool, [Pg (Maybe String) IO ()])
 	f pwr (Pair _ (Device body options _)) = do
 		args <- for options $ \name -> do
--- 			(maybe (const $ fail here) id . flip M.lookup vars)
 			case M.lookup name vars of
 				 Nothing -> fail here
 				 Just v -> return v
-		op body args
+		dev body args
 		where
-		op "[ ]" [a] = undefined --return [(&&) <$> readIORef pwr <*> readIORef a]
--- 		op "[/]" _a = (M.empty, pwr && not var)
--- 		op "( )" _a = (setIo (X' pwr), pwr)
--- 		op "(S)" _a = (if pwr then setIo (X' True) else M.empty, pwr)
--- 		op "(R)" _a = (if pwr then setIo (X' False) else M.empty, pwr)
-		op other _a = error $ show (here, other)
+		dev "[ ]" [a] = op (&&) a
+		dev "[/]" [a] = op (\p v -> p && not v) a
+		dev "( )" [a] = update (\p _ -> p) a
+		dev "(S)" [a] = update (\p v -> if p then True else v) a
+		dev "(R)" [a] = update (\p v -> if p then False else v) a
+		dev other _a = error $ show (here, other)
+
+		op f a = liftIO $ newIORef False
+			>>= \r -> return (r
+				, [Do $ (f <$> readIORef pwr <*> readIORef a) >>= writeIORef r])
+
+		update f a =
+			return (pwr, [Do $ (f <$> readIORef pwr <*> readIORef a) >>= writeIORef a])
 
 	f pwr ((Pair _ (Jump target))) = return (pwr, [Br (Just target) (readIORef pwr)])
 	f pwr (Pair p LadderParser.Node{}) = doNode pwr p
  	f pwr (Pair p Node') = doNode pwr p
--- 
 	f pwr (Pair _ Sink) = return (pwr, []) -- error $ show (here, "FIXME") --right rail
--- 
 	f _ (Pair _ Source{}) = error $ show (here, "should not happen")
 	f _ (Pair _ LadderParser.Label{}) = error "should not happen"
 
@@ -227,20 +197,6 @@ xxxxX rungs vars nets = do --(Source p next) = do
 				return (nr, [Do $ readIORef pwr >>= writeIORef nr ])
 			Just nr -> do
 				return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
-
--- 
--- xxxxY :: [(Maybe String, Symbol)] -> IO ()
--- xxxxY rungs = mdo
--- 	let vars = M.empty
--- -- 	rungs <- (\f -> foldM f [] rungs) $ \m (lbl, net) -> do
--- 	rungs' <- forM rungs $ \(lbl, net) -> do
--- 		undefined
--- -- 		return (lbl, xxxxX rungs'' vars net)
--- 
--- -- 	let rungs'' = M.fromList rungs'
--- 	return ()
--- -- foldM
--- --   :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
 
 --------------------------------------------------------------------------------
 
