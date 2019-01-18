@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards,
+{-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, BangPatterns,
   FlexibleContexts, RecursiveDo, TupleSections, GADTSyntax, DeriveFunctor #-}
 
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
@@ -22,7 +22,7 @@ import Control.Concurrent
 import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
 -- import Control.Applicative hiding (many)
 
--- import Debug.Trace
+import Debug.Trace
 -- import Text.Read (readEither)
 -- import qualified Data.Map.Strict as M
 import qualified Data.Map as M
@@ -128,19 +128,36 @@ interpret nets = do
 		print (here, lbl, ">>>")
 		net' <- xxxx vars net
 		return $ (lbl, Do $ return ()) : fmap (Nothing,) net'
+#if O
+	let !prog = weave1 (concat nets') (return ())
+
 	forever $ do
 		threadDelay 50000
 		print "------------------"
-
 -- 		forM_ (M.toList vars) $ \(n, (r, r')) -> do
 -- 			v <- readIORef r
 -- 			print (here, "b", n, v)
-		weave1 (concat nets') (return ())
+		prog
 -- 		forM_ (M.toList vars) $ \(n, r) -> readIORef r >>= \v -> print (here, n, v)
 		forM_ (M.toList vars) $ \(n, (r, r')) -> do
 			v <- readIORef r'
 			writeIORef r v
 			print (here, "a", n, v)
+#else
+	let !prog = weave1
+		((Just "!!!", Do $ threadDelay 50000>>print "------------------") : concat nets' ++
+			[ (Nothing, Do $ forM_ (M.toList vars) $ \(n, (r, r')) -> do
+				v <- readIORef r'
+				writeIORef r v
+				print (here, "a", n, v))
+			, (Nothing, Go $ Just "!!!")]
+			)
+		(return ())
+
+	prog
+
+
+#endif
 	return ()
 
 data Pair a b = Pair a b
