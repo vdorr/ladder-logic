@@ -32,5 +32,10 @@ library
                      , vector >=0.12
                      , megaparsec
                      , algebraic-graphs
+                     , containers
   hs-source-dirs:      src
   default-language:    Haskell2010
+  options-ghc:        -fno-warn-tabs
+                      -fwarn-incomplete-patterns
+                      -fwarn-unused-binds
+                      -fwarn-unused-imports
