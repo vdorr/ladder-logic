@@ -17,7 +17,14 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Eval, Ladder, CodeGen, Types, DiagramParser, LadderParser
+  exposed-modules:     Eval
+                     , Ladder
+                     , CodeGen
+                     , Types
+                     , Preprocess
+                     , DiagramParser
+                     , LadderParser
+                     , Compile
   -- other-modules:       
   other-extensions:    CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, FlexibleContexts
   build-depends:       base >=4.9 && <5

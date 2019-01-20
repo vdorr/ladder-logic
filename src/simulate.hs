@@ -28,16 +28,14 @@ import Debug.Trace
 import qualified Data.Map as M
 -- import qualified Data.Set as S
 
--- import Text.ParserCombinators.ReadP as RP
-import Text.Megaparsec as P hiding (runParser', Pos)
-import Text.Megaparsec.Char as PC
-
 import Data.Tree as T
 import Algebra.Graph.AdjacencyMap
 import Algebra.Graph.AdjacencyMap.Algorithm
 
+import Preprocess
 import DiagramParser
 import LadderParser
+import Compile
 
 --------------------------------------------------------------------------------
 
@@ -54,67 +52,6 @@ onlySpaceOrCommentsRemain c =
 
 lpad :: a -> Int -> [a] -> [a]
 lpad filler n str = reverse $ take n $ reverse str ++ repeat filler
-
---------------------------------------------------------------------------------
-
---TODO nice leading column
---maybe parse even rungs, its alphabet is not that big
-type ParseErr = String
-test4 :: Parsec ParseErr String [(Maybe String, [String])]
-test4 = ladder <* eof
-	where
-	ladder = do
-		white --FIXME this would eat leading column (when implemented)
-		P.many $ (P.many comment) *> eol
-		P.some rung
-
-	rung = do
-		lbl <- (Just <$> (P.some PC.alphaNumChar <* PC.char ':' <* white <* eol)) <|> pure Nothing
-		net <-
-			some $
-				lookAhead (P.oneOf "|+" P.<|> PC.alphaNumChar)
-				*> manyTill anySingle eol
-		return (lbl, net)
-	comment =
-		PC.string "(*" *> manyTill anySingle (try (PC.string "*)"))
-		*> white
-	white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n')) --FIXME use eol
-	eol = PC.char '\n'
-
-
-preproc2 :: String -> Either String [(Maybe String, [String])]
-preproc2 src =
-	case parse test4 "(file)" src of
-		 Left err -> Left $ show err
-		 Right n -> Right n
-
---------------------------------------------------------------------------------
-
-data Pg lbl m a where
-	Do :: m a -> Pg lbl m a
-	Go :: lbl -> Pg lbl m a
-	Br :: lbl -> m Bool -> Pg lbl m a
-
-
-weave1 :: forall lbl m a. (Eq lbl, Monad m) => [(lbl, Pg lbl m a)] -> m a -> m a
-weave1 [] end = end
-weave1 src end = snd $ head program
-	where
-
-	program = f src
-
-	f [(lbl, x)] = [(lbl, h x end)]
-	f ((lbl, x) : xs) = let
-		xs'@((_, xx) : _) = f xs
-		in (lbl,h x xx) : xs'
-
-	h (Do a) next = a >> next
-	h (Go lbl) _ = getLbl lbl
-	h (Br lbl cond) next = let
-		dst = getLbl lbl
-		in cond >>= \flag -> if flag then dst else next
-
-	getLbl lbl = maybe (error "label not found") id $ lookup lbl program
 
 --------------------------------------------------------------------------------
 
@@ -247,25 +184,16 @@ xxxxX vars nets = do --(Source p next) = do
 			>>= \r -> return (r
 				, [Do $ op' f aa r])
 				
--- 		op' f a r = (f <$> readIORef pwr <*> readIORef a) >>= writeIORef r
 		op' f (name, (a, _)) r = do
 			va <- readIORef a
 			p <- readIORef pwr
--- 			print (here, name, va)
 			writeIORef r $ f p va
 
 		update f a = return (pwr, [Do $ update' f a])
 
--- 		update' f (name, (a, a')) = (f <$> readIORef pwr <*> readIORef a)
--- 			>>= \v -> 
--- 			print (here, name, v) 
--- -- 				>>
--- -- 			return v
--- 			>> writeIORef a' v
 		update' f (name, (a, a')) = do
 			va <- readIORef a
 			p <- readIORef pwr
--- 			print (here, name, va, f p va)
 			case f p va of
 				 Just v' -> writeIORef a' v'
 				 _ -> return ()
