@@ -87,8 +87,8 @@ compile'
 compile' vars nets =
 	fmap concat $ for nets $ \(lbl, net) -> do
 		
-		let nodes = gatherNodes net
-		let nodes' = undefined
+		let nodes = toList $ gatherNodes net
+		nodes' <- M.fromList <$> for nodes (\n -> (n,) <$> newIORef False)
 
 		print (here, lbl, ">>>")
 		net' <- xxxx vars nodes' net
@@ -134,7 +134,7 @@ xxxx vars nodes net = do
 -- 	vars <- M.fromList <$> for
 -- 		["%IX0", "%QX0", "%IX1", "%MX0", "%MX1"]
 -- 		(\n -> (n,) <$> newIORef False)
-	p <- xxxxX vars (dfsForest $ jjj_ net)
+	p <- xxxxX vars nodes (dfsForest $ jjj_ net)
 
 -- 	for order $ \(T.Node a forest) -> do
 -- -- 		error here
@@ -167,17 +167,16 @@ gatherNodes = cata' node
 
 xxxxX
 	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
+	-> M.Map Pos (IORef Bool) --nodes
 	-> Forest (Pair Pos (Symbol_ Symbol))
 	-> IO [Pg (Maybe String) IO ()]
-xxxxX vars nets = do
+xxxxX vars nodes nets = do
 	nets' <- for nets doNet
 	return $ concat nets'
 
  	where
 
  	doNet (T.Node (Pair _p Source{}) net') = do
-		
--- 		let nodes = gatherNodes
 		
 		pwr <- newIORef True
 		fst <$> runStateT (g pwr net') M.empty
