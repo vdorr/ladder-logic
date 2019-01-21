@@ -149,7 +149,7 @@ compile file = do		 --print (here, start)
 		case parseNet net of
 			Left e -> error $ show (here, e)
 			Right ast -> do
-				print (here, ast)
+-- 				print (here, ast)
 				return (lbl, ast)
 
 --------------------------------------------------------------------------------

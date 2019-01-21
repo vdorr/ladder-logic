@@ -80,6 +80,14 @@ tojs program = loop $ foldMap (h . snd) program
 
 --------------------------------------------------------------------------------
 
+gatherNodes :: Symbol -> S.Set Pos
+gatherNodes = cata' node
+-- gatherNodes :: [ (a0, Cofree Symbol_ Pos)] -> S.Set Pos
+-- gatherNodes = foldMap (cata' node . snd)
+	where
+	node (p, LadderParser.Node x) = S.singleton p <> fold x
+	node (_, x) = fold x
+
 compile'
 	:: M.Map String (IORef Bool, IORef Bool)
 	-> [(Maybe String, Symbol)]
@@ -134,6 +142,7 @@ xxxx vars nodes net = do
 -- 	vars <- M.fromList <$> for
 -- 		["%IX0", "%QX0", "%IX1", "%MX0", "%MX1"]
 -- 		(\n -> (n,) <$> newIORef False)
+
 	p <- xxxxX vars nodes (dfsForest $ jjj_ net)
 
 -- 	for order $ \(T.Node a forest) -> do
@@ -156,14 +165,6 @@ devices =
 	op = undefined
 	update = undefined
 #endif
-
-gatherNodes :: Symbol -> S.Set Pos
-gatherNodes = cata' node
--- gatherNodes :: [ (a0, Cofree Symbol_ Pos)] -> S.Set Pos
--- gatherNodes = foldMap (cata' node . snd)
-	where
-	node (p, LadderParser.Node{}) = S.singleton p
-	node (_, x) = fold x
 
 xxxxX
 	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
@@ -240,13 +241,18 @@ xxxxX vars nodes nets = do
 	f _ (Pair _ LadderParser.Label{}) = error "should not happen"
 
 	doNode pwr p = do
-		m <- get
-		case M.lookup p m of
-			Nothing -> do
-				nr <- liftIO $ newIORef False
-				put $ M.insert p nr m
-				return (nr, [Do $ readIORef pwr >>= writeIORef nr ])
+		case M.lookup p nodes of
+			Nothing -> error here -- should not happen
 			Just nr -> do
 				return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
+-- 	doNode pwr p = do
+-- 		m <- get
+-- 		case M.lookup p m of
+-- 			Nothing -> do
+-- 				nr <- liftIO $ newIORef False
+-- 				put $ M.insert p nr m
+-- 				return (nr, [Do $ readIORef pwr >>= writeIORef nr ])
+-- 			Just nr -> do
+-- 				return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
 
 --------------------------------------------------------------------------------
