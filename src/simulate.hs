@@ -8,6 +8,7 @@ import Control.Monad.State
 import Control.Monad.Except
 -- import Data.Maybe
 import Data.Traversable
+import Data.Foldable
 import Data.Char
 import Data.IORef
 import Data.Functor.Const
@@ -20,10 +21,10 @@ import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
 -- import Control.Applicative hiding (many)
 
 import Debug.Trace
--- import Text.Read (readEither)
+import Text.Read (readEither)
 -- import qualified Data.Map.Strict as M
 import qualified Data.Map as M
--- import qualified Data.Set as S
+import qualified Data.Set as S
 
 import Data.Tree as T
 import Algebra.Graph.AdjacencyMap
@@ -54,6 +55,9 @@ lpad filler n str = reverse $ take n $ reverse str ++ repeat filler
 
 interpret :: [(Maybe String, Symbol)] -> IO ()
 interpret nets = do
+
+	print (here, toList $ gatherVariables nets)
+
 	vars <- M.fromList <$> for
 -- 		["%IX0", "%QX0", "%IX1", "%MX0", "%MX1"]
 		["%MX0", "%MX1"]
@@ -67,7 +71,7 @@ interpret nets = do
 
 #if O
 	let !prog = weave1 (nets') (return ())
-
+--FIXME init outputs at beginning of scan
 	forever $ do
 		threadDelay 50000
 		print "------------------"
@@ -77,6 +81,7 @@ interpret nets = do
 			writeIORef r v
 			print (here, "a", n, v)
 #else
+--FIXME init outputs at beginning of scan
 	let !prog = weave1
 		((Just "!!!", Do $ threadDelay 50000>>print "------------------") : nets' ++
 			[ (Nothing, Do $ forM_ (M.toList vars) $ \(n, (r, r')) -> do
@@ -101,12 +106,11 @@ parseNet net = do
 
 --------------------------------------------------------------------------------
 
-#if 0
-gatherVariables :: [(Maybe String, [(Pos, Gizmo)])] -> [String]
-gatherVariables = nub . foldMap (foldMap (variables . snd) . snd)
+gatherVariables :: [(Maybe String, Symbol)] -> S.Set String
+gatherVariables = foldMap (cata variables . snd)
 	where
-	variables Device { options = vars } = vars
-	variables _ = []
+	variables (Device _ v _) = S.fromList v
+	variables x = fold x
 
 data Size = X | B | W | D | L deriving (Show, Read) -- 1 8 16 32 64
 data Value = X' Bool | W' Int deriving Show
@@ -116,7 +120,6 @@ parseVarName :: String -> Either String (Section, Size, Int)
 parseVarName ('%' : sect : ty : loc) -- = error here
 	= (,,) <$> readEither [sect] <*> readEither [ty] <*> readEither loc
 parseVarName _ = Left "wrong format"
-#endif
 
 --------------------------------------------------------------------------------
 
@@ -129,6 +132,11 @@ compile file = do		 --print (here, start)
 	nets <- case preproc2 s of
 		Left err -> error $ show (here, err) --TODO fail properly
 		Right l -> return l
+
+	forM_ nets $ \(lbl, net) -> do
+		print ("*****", lbl, "*****")
+		forM_ net $ \n -> do
+			print n
 
 -- 	let nrW = 1 + length (show (length lines'))
 -- 	putStrLn ""

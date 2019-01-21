@@ -10,7 +10,8 @@ import qualified Data.Map as M
 import Control.Monad.State
 import Data.Tree as T
 import Data.Traversable
-
+import qualified Data.Set as S
+import Data.Foldable
 
 import Algebra.Graph.AdjacencyMap
 import Algebra.Graph.AdjacencyMap.Algorithm
@@ -60,18 +61,18 @@ tojs program = loop $ foldMap (h . snd) program
 	h (Go lbl) = ["target = " ++ show lbl ++ ";", "continue;"]
 	h (Br lbl (Js c)) =
 		[ "if ( " ++ c ++ " ) {"
-		, "\ttarget = " ++ show lbl ++ ";"
-		, "\tcontinue;"
+		, "  target = " ++ show lbl ++ ";"
+		, "  continue;"
 		, "}"
 		]
 	loop stmts = unlines
 		["{"
-		, "\tvar target = \"!start\";"
-		, "\t\twhile (?) {"
-		, "\t\t\tswitch (?) {"
-		, unlines $ fmap ("\t\t\t\t"++) stmts
-		, "\t\t\t}"
-		, "\t\t}"
+		, "  var target = \"!start\";"
+		, "    while (?) {"
+		, "      switch (?) {"
+		, unlines $ fmap ("        " ++) stmts
+		, "      }"
+		, "    }"
 		, "}"
 		]
 
@@ -85,8 +86,12 @@ compile'
 	-> IO [(Maybe String, Pg (Maybe String) IO ())]
 compile' vars nets =
 	fmap concat $ for nets $ \(lbl, net) -> do
+		
+		let nodes = gatherNodes net
+		let nodes' = undefined
+
 		print (here, lbl, ">>>")
-		net' <- xxxx vars net
+		net' <- xxxx vars nodes' net
 		return $ (lbl, Do $ return ()) : fmap (Nothing,) net'
 
 --------------------------------------------------------------------------------
@@ -118,9 +123,12 @@ jjj_ _ = error here --parser should not allow this
 -- 	go (p :< y) = M.singleton p y <> foldMap go y
 
 
-xxxx :: M.Map String (IORef Bool, IORef Bool) --TODO more types
-	-> Symbol -> IO [Pg (Maybe String) IO ()]
-xxxx vars net = do
+xxxx
+	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
+	-> M.Map Pos (IORef Bool) --nodes
+	-> Symbol
+	-> IO [Pg (Maybe String) IO ()]
+xxxx vars nodes net = do
 
 -- 	let vars = M.empty --FIXME
 -- 	vars <- M.fromList <$> for
@@ -135,21 +143,46 @@ xxxx vars net = do
 	print $ topSort $ jjj_ net
 	return p
 
+#if 1
+devices =
+	[ dev "[ ]" 1 $ \[a] -> op (&&) a
+	, dev "[/]" 1 $ \[a] -> op (\p v -> p && not v) a
+	, dev "( )" 1 $ \[a] -> update (\p _ -> Just p) a
+	, dev "(S)" 1 $ \[a] -> update (\p _ -> if p then Just True else Nothing) a
+	, dev "(R)" 1 $ \[a] -> update (\p _ -> if p then Just False else Nothing) a
+	]
+	where
+	dev n na f = (n, na, f)
+	op = undefined
+	update = undefined
+#endif
+
+gatherNodes :: Symbol -> S.Set Pos
+gatherNodes = cata' node
+-- gatherNodes :: [ (a0, Cofree Symbol_ Pos)] -> S.Set Pos
+-- gatherNodes = foldMap (cata' node . snd)
+	where
+	node (p, LadderParser.Node{}) = S.singleton p
+	node (_, x) = fold x
 
 xxxxX
 	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
 	-> Forest (Pair Pos (Symbol_ Symbol))
 	-> IO [Pg (Maybe String) IO ()]
-xxxxX vars nets = do --(Source p next) = do
-	nets' <- for nets $ \case
-		T.Node (Pair _p Source{}) net' -> do
-			pwr <- newIORef True
-			fst <$> runStateT (g pwr net') M.empty
-		_ -> error here --should not happen
+xxxxX vars nets = do
+	nets' <- for nets doNet
 	return $ concat nets'
 
  	where
 
+ 	doNet (T.Node (Pair _p Source{}) net') = do
+		
+-- 		let nodes = gatherNodes
+		
+		pwr <- newIORef True
+		fst <$> runStateT (g pwr net') M.empty
+	doNet _ = error here --should not happen
+ 	
 	g :: (IORef Bool)
 		-> [Tree (Pair Pos (Symbol_ Symbol))]
 		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
@@ -157,13 +190,13 @@ xxxxX vars nets = do --(Source p next) = do
 		(pwr', pg) <- f pwr d
 		((b <> pg) <>) <$> g pwr' net'
 
-	f :: (IORef Bool)
+	f :: IORef Bool
 		-> Pair Pos (Symbol_ Symbol)
 		-> StateT (M.Map Pos (IORef Bool)) IO (IORef Bool, [Pg (Maybe String) IO ()])
 	f pwr (Pair _ (Device body options _)) = do
 		args <- for options $ \name -> do
 			case M.lookup name vars of
-				 Nothing -> fail here
+				 Nothing -> fail $ show (here, "variable not found", name)
 				 Just v -> return (name, v)
 		dev body args
 		where
@@ -194,7 +227,7 @@ xxxxX vars nets = do --(Source p next) = do
 
 	f pwr ((Pair _ (Jump target))) = return (pwr, [Br (Just target) (readIORef pwr)])
 	f pwr (Pair p LadderParser.Node{}) = doNode pwr p
- 	f pwr (Pair p Node') = doNode pwr p
+--  	f pwr (Pair p Node') = doNode pwr p
 	f pwr (Pair _ Sink) = return (pwr, []) -- error $ show (here, "FIXME") --right rail
 	f _ (Pair _ Source{}) = error $ show (here, "should not happen")
 	f _ (Pair _ LadderParser.Label{}) = error "should not happen"

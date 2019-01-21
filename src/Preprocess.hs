@@ -3,35 +3,33 @@ module Preprocess where
 
 import Data.Char
 
--- import Text.ParserCombinators.ReadP as RP
-import Text.Megaparsec as P hiding (runParser', Pos)
-import Text.Megaparsec.Char as PC
+import Text.Megaparsec --as P hiding (runParser', Pos)
+import Text.Megaparsec.Char --as PC
 
 --------------------------------------------------------------------------------
 
+--FIXME FIXME add some positional info (at least line numbers)
+
 --TODO nice leading column
---maybe parse even rungs, its alphabet is not that big
+--maybe parse even rungs
 type ParseErr = String
+
 test4 :: Parsec ParseErr String [(Maybe String, [String])]
 test4 = ladder <* eof
 	where
-	ladder = do
-		white --FIXME this would eat leading column (when implemented)
-		P.many $ (P.many comment) *> eol
-		P.some rung
-
-	rung = do
-		lbl <- (Just <$> (P.some PC.alphaNumChar <* PC.char ':' <* white <* eol)) <|> pure Nothing
-		net <-
-			some $
-				lookAhead (P.oneOf "|+" P.<|> PC.alphaNumChar)
-				*> manyTill anySingle eol
-		return (lbl, net)
-	comment =
-		PC.string "(*" *> manyTill anySingle (try (PC.string "*)"))
-		*> white
-	white = skipMany (P.satisfy (\c -> isSpace c && c /= '\n')) --FIXME use eol
-	eol = PC.char '\n'
+	ladder
+		= white --FIXME this would eat leading column (when implemented)
+		*> many (many comment *> eol)
+		*> some rung
+	rung = (,) <$> optional label <*> some network
+	label = some alphaNumChar <* char ':' <* white <* eol
+	network --TODO erase comments
+		= lookAhead (oneOf "|+") -- <|> alphaNumChar)
+		*> manyTill anySingle eol
+	comment = comment' *> white
+	comment' = string "(*" *> manyTill anySingle (try (string "*)"))
+	white = skipMany (satisfy (\c -> isSpace c && c /= '\n')) --FIXME use eol
+	eol = char '\n' --FIXME use parsec
 
 
 preproc2 :: String -> Either String [(Maybe String, [String])]
