@@ -7,7 +7,8 @@ module Compile where
 
 import Data.IORef
 import qualified Data.Map as M
-import Control.Monad.State
+-- import Control.Monad.State
+import Control.Monad
 import Data.Tree as T
 import Data.Traversable
 import qualified Data.Set as S
@@ -39,6 +40,7 @@ weave1 src end = snd $ head program
 	f ((lbl, x) : xs) = let
 		xs'@((_, xx) : _) = f xs
 		in (lbl,h x xx) : xs'
+	f _ = error here --should not happen
 
 	h (Do a) next = a >> next
 	h (Go lbl) _ = getLbl lbl
@@ -54,8 +56,9 @@ data Js a where
 	Js :: String -> Js a
 -- 	JsC :: String -> Js Bool
 
-tojs :: (Eq lbl, Show lbl) => [(lbl, Pg lbl Js ())] -> String
-tojs program = loop $ foldMap (h . snd) program
+-- tojs :: (Eq lbl, Show lbl) => [(lbl, Pg lbl Js ())] -> String
+tojs :: (Show lbl) => [Pg lbl Js ()] -> String
+tojs = loop . foldMap h
 	where
 	h (Do (Js c)) = [c]
 	h (Go lbl) = ["target = " ++ show lbl ++ ";", "continue;"]
@@ -75,8 +78,7 @@ tojs program = loop $ foldMap (h . snd) program
 		, "    }"
 		, "}"
 		]
-
-	getLbl lbl = maybe (error "label not found") id $ lookup lbl program
+-- 	getLbl lbl = maybe (error "label not found") id $ lookup lbl program
 
 --------------------------------------------------------------------------------
 
@@ -180,27 +182,21 @@ xxxxX vars nodes nets = do
  	doNet (T.Node (Pair _p Source{}) net') = do
 		
 		pwr <- newIORef True
-		fst <$> runStateT (g pwr net') M.empty
+		g pwr net'
 	doNet _ = error here --should not happen
 
 	g :: (IORef Bool)
 		-> [Tree (Pair Pos (Symbol_ Symbol))]
-		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
+		-> IO [Pg (Maybe String) IO ()]
 	g pwr net = foldM (h pwr) [] net 
--- 	g pwr net = (\a b -> foldM b [] a) net $ \b (n@(T.Node d net')) -> do
--- 		(pwr', pg) <- f pwr d
--- 		((b <> pg) <>) <$> g pwr' net'
 
--- 	h :: (IORef Bool)
--- 		-> [Tree (Pair Pos (Symbol_ Symbol))]
--- 		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
 	h pwr = \b (n@(T.Node d net')) -> do
 		(pwr', pg) <- f pwr d
 		((b <> pg) <>) <$> g pwr' net'
 
-	f :: IORef Bool
-		-> Pair Pos (Symbol_ Symbol)
-		-> StateT (M.Map Pos (IORef Bool)) IO (IORef Bool, [Pg (Maybe String) IO ()])
+-- 	f :: IORef Bool
+-- 		-> Pair Pos (Symbol_ Symbol)
+-- 		-> IO (IORef Bool, [Pg (Maybe String) IO ()])
 	f pwr (Pair _ (Device body options _)) = do
 		args <- for options $ \name -> do
 			case M.lookup name vars of
@@ -215,7 +211,7 @@ xxxxX vars nodes nets = do
 		dev "(R)" [a] = update (\p _ -> if p then Just False else Nothing) a
 		dev other _a = error $ show (here, other)
 
-		op f aa@(_, (a, _a')) = liftIO $ newIORef False
+		op f aa@(_, (a, _a')) = newIORef False
 			>>= \r -> return (r
 				, [Do $ op' f aa r])
 
@@ -240,11 +236,10 @@ xxxxX vars nodes nets = do
 	f _ (Pair _ Source{}) = error $ show (here, "should not happen")
 	f _ (Pair _ LadderParser.Label{}) = error "should not happen"
 
-	doNode pwr p = do
-		case M.lookup p nodes of
+	doNode pwr p
+		= case M.lookup p nodes of
 			Nothing -> error here -- should not happen
-			Just nr -> do
-				return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
+			Just nr -> return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
 -- 	doNode pwr p = do
 -- 		m <- get
 -- 		case M.lookup p m of
