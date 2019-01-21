@@ -182,11 +182,19 @@ xxxxX vars nets = do
 		pwr <- newIORef True
 		fst <$> runStateT (g pwr net') M.empty
 	doNet _ = error here --should not happen
- 	
+
 	g :: (IORef Bool)
 		-> [Tree (Pair Pos (Symbol_ Symbol))]
 		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
-	g pwr net = (\a b -> foldM b [] a) net $ \b (n@(T.Node d net')) -> do
+	g pwr net = foldM (h pwr) [] net 
+-- 	g pwr net = (\a b -> foldM b [] a) net $ \b (n@(T.Node d net')) -> do
+-- 		(pwr', pg) <- f pwr d
+-- 		((b <> pg) <>) <$> g pwr' net'
+
+-- 	h :: (IORef Bool)
+-- 		-> [Tree (Pair Pos (Symbol_ Symbol))]
+-- 		-> StateT (M.Map Pos (IORef Bool)) IO [Pg (Maybe String) IO ()]
+	h pwr = \b (n@(T.Node d net')) -> do
 		(pwr', pg) <- f pwr d
 		((b <> pg) <>) <$> g pwr' net'
 
