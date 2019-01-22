@@ -13,6 +13,7 @@ import Data.Tree as T
 import Data.Traversable
 import qualified Data.Set as S
 import Data.Foldable
+import Data.List
 
 import Algebra.Graph.AdjacencyMap
 import Algebra.Graph.AdjacencyMap.Algorithm
@@ -52,33 +53,32 @@ weave1 src end = snd $ head program
 
 --------------------------------------------------------------------------------
 
-data Js a where
-	Js :: String -> Js a
--- 	JsC :: String -> Js Bool
-
 -- tojs :: (Eq lbl, Show lbl) => [(lbl, Pg lbl Js ())] -> String
-tojs :: (Show lbl) => [Pg lbl Js ()] -> String
-tojs = loop . foldMap h
+tojs :: Eq lbl => [(lbl, [Pg lbl JS ()])] -> String
+tojs program = loop $ foldMap f program
 	where
-	h (Do (Js c)) = [c]
-	h (Go lbl) = ["target = " ++ show lbl ++ ";", "continue;"]
-	h (Br lbl (Js c)) =
+	f (lbl, a) = ("case " ++ show (getLbl lbl) ++ ":") : foldMap (fmap ("  " ++) . h) a
+	h (Do (JS c)) = [c ++ ";"]
+	h (Go lbl) = ["target = " ++ show (getLbl lbl) ++ ";", "continue;"]
+	h (Br lbl (JS c)) =
 		[ "if ( " ++ c ++ " ) {"
-		, "  target = " ++ show lbl ++ ";"
+		, "  target = " ++ show (getLbl lbl) ++ ";"
 		, "  continue;"
 		, "}"
 		]
 	loop stmts = unlines
 		["{"
-		, "  var target = \"!start\";"
-		, "    while (?) {"
-		, "      switch (?) {"
-		, unlines $ fmap ("        " ++) stmts
-		, "      }"
+		, "  var target = 0;"
+		, "  while ( env.run() ) {"
+		, "    env.scan_begin();"
+		, "    switch ( target ) {"
+		, unlines $ fmap ("      " ++) stmts
 		, "    }"
+		, "    env.scan_end();"
+		, "  }"
 		, "}"
 		]
--- 	getLbl lbl = maybe (error "label not found") id $ lookup lbl program
+	getLbl lbl = maybe (error "label not found") id $ findIndex ((lbl==).fst) program
 
 --------------------------------------------------------------------------------
 
@@ -89,6 +89,15 @@ gatherNodes = cata' node
 	where
 	node (p, LadderParser.Node x) = S.singleton p <> fold x
 	node (_, x) = fold x
+
+gatherVariables :: [(Maybe String, Symbol)] -> S.Set String
+gatherVariables = foldMap (cata variables . snd)
+	where
+	variables x@(Device _ v _) = S.fromList v <> (fold x)
+	variables x = fold x
+--  S.singleton p <> fold x
+
+--------------------------------------------------------------------------------
 
 compile'
 	:: M.Map String (IORef Bool, IORef Bool)
@@ -158,6 +167,38 @@ xxxx vars nodes net = do
 	print $ topSort $ jjj_ net
 	return p
 
+generatejs :: [(Maybe String, Symbol)] -> IO String
+generatejs nets = do
+
+	print (here, toList $ gatherVariables nets)
+	
+	let vars =
+		fmap (\v -> (v, (JSRef $ "\"in " ++ v ++ "\"", JSRef $ "\"out " ++ v ++ "\"")))
+		$ toList $ gatherVariables nets
+	print (here, vars)
+
+	let nodes =
+		fmap (\p -> (p, JSRef $ "\"node " ++ show p ++ "\""))
+		$ toList
+		$ foldMap (gatherNodes . snd) nets
+
+-- 	let ff = fmap (\net -> (JSRef "pwr -- FIXME", net)) $ dfsForest $ jjj_ nets
+	q <- forM nets $ \(lbl, net) -> do
+		let ff = fmap (\net -> (JSRef "\"pwr\"", net)) $ dfsForest $ jjj_ net
+
+		(lbl,) <$> xxxxXxx jsdevices (M.fromList vars) (M.fromList nodes) ff
+
+	let env = makeJSEnv vars nodes
+	print (here)
+	return $ env ++ tojs q
+
+makeJSEnv vars nodes = unlines $ prologue ++ e
+	where
+	prologue = ["env.m[\"pwr\"] = true;"]
+	e = fmap ((++";") . f)
+		(let (a, b) = unzip (fmap snd vars) in (a++b) ++ fmap snd nodes)
+	f (JSRef v) = "env.m[" ++ v ++ "] = false"
+
 testillytest = q M.empty M.empty []
 	where
 	q
@@ -168,27 +209,71 @@ testillytest = q M.empty M.empty []
 		-> IO [Pg (Maybe String) JS ()]
 	q = xxxxXxx jsdevices
 
+	
+jsget (JSRef r) = "env.get("++ r ++ ")"
+jsset (JSRef r) v = "env.set("++ r ++ ", " ++ v ++ ")"
+jsif pwr a
+	= "if ( " ++ jsget pwr ++ " ) { "
+	++ a --"env.set(" ++ a' ++ ", " ++ f pwr ++ "); "
+	++ "}"
+{-
+
+class Environment {
+	constructor() {
+		this.m = {};
+	}
+	run() {
+		return true;
+	}
+	get(name) {
+		console.log("1");
+	}
+	set(name, value) {
+		console.log("2");
+	}
+	scan_begin() {
+//TODO copy values from ins to outs
+		console.log("3");
+	}
+	scan_end() {
+//TODO copy values from outs to ins
+		console.log("4");
+	}
+}
+
+env = new Environment();
+-}
 jsdevices :: [(String,
                         (Int,
                          [(a, (JSRef Bool, JSRef Bool))]
                          -> JSRef Bool -> IO (JSRef Bool, [Pg lbl JS ()])))]
 jsdevices =
-	[ dev "[ ]" 1 $ \[a] -> op (&&) a
-	, dev "[/]" 1 $ \[a] -> op (\p v -> p && not v) a
-	, dev "( )" 1 $ \[a] -> update (\p _ -> Just p) a
-	, dev "(S)" 1 $ \[a] -> update (\p _ -> if p then Just True else Nothing) a
-	, dev "(R)" 1 $ \[a] -> update (\p _ -> if p then Just False else Nothing) a
+-- 	[ dev "[ ]" 1 $ \[a] -> op "and" a
+--  	, dev "[/]" 1 $ \[a] -> op "andn" a
+	[ dev "[ ]" 1 $ \[(_, (a, _))] -> update
+		(\pwr -> jsset pwr $ jsget pwr ++ " && " ++ jsget a)
+ 	, dev "[/]" 1 $ \[(_, (a, _))] -> update
+		(\pwr -> jsset pwr $ jsget pwr ++ " && !(" ++ jsget a ++ ")")
+	, dev "( )" 1 $ \[a] -> update (\pwr -> jsset pwr (jsget pwr))
+	, dev "(S)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "true") )
+	, dev "(R)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "false") )
 	]
 	where
 	dev n na f = (n, (na, f))
 
-	op f aa@(_, (a, _a')) pwr = return (JSRef "?!?!?!", [Do $ JS "---!!!???" undefined])
+-- 	op f aa@(_, (JSRef a, _a')) pwr'@(JSRef pwr) = return (pwr',
+-- -- 		[Do $ JS $ pwr ++ ".set(" ++ f ++ "(" ++ pwr ++ ".get(), " ++ a ++ ".get()))"])
+-- 		[Do $ JS $ "env.set(" ++ pwr ++ ", " ++ f ++ "(env.get("++ pwr ++ "), env.get("++ a ++")))"])
 
 -- 	op' pwr f (name, (a, _)) r = undefined
 
-	update f a pwr = return (pwr, [Do $ update' pwr f a])
+	update f pwr = return (pwr, [Do $ JS $ f pwr])
 
-	update' pwr f (name, (a, a')) = JS "***?!?!?!***" undefined
+-- 	update' (pwr) f = JS $ f pwr
+-- 		$ "env.set(env.get(" ++ a' ++ "), " ++ f ++ "(" ++ pwr ++ ", env.get(" ++ a ++ ")))"
+-- 		$ "if ( " ++ jsget pwr ++ " ) { "
+-- 		++ "env.set(" ++ a' ++ ", " ++ f pwr ++ "); "
+-- 		++ "}"
 
 
 #if 1
@@ -244,11 +329,14 @@ instance Ref IORef IO where
 	joinWires pwr nr = readIORef pwr >>= \v -> modifyIORef nr (||v)
 
 data JSRef a = JSRef String
-data JS a = JS String (JSRef a)
+	deriving Show
+data JS a = JS String --(JSRef a)
+	deriving Show
 
 instance Ref JSRef JS where
-	readRef r = JS "" r
- 	joinWires pwr nr = JS "???" (JSRef "??!?")
+	readRef (JSRef r) = JS $ "env.get(" ++ r ++ ")"
+	joinWires (JSRef pwr) (JSRef nr) = JS
+		$ "env.set(" ++ nr ++ ", " ++ "env.get(" ++ pwr ++ ") || env.get(" ++ nr ++ "))"
 
 -- xxxxXxx
 -- 	:: 

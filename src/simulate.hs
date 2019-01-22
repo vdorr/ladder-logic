@@ -56,6 +56,9 @@ lpad filler n str = reverse $ take n $ reverse str ++ repeat filler
 interpret :: [(Maybe String, Symbol)] -> IO ()
 interpret nets = do
 
+	generatejs nets
+		>>= putStrLn
+
 	print (here, toList $ gatherVariables nets)
 
 	vars <- M.fromList <$> for
@@ -105,12 +108,6 @@ parseNet net = do
 	return ast
 
 --------------------------------------------------------------------------------
-
-gatherVariables :: [(Maybe String, Symbol)] -> S.Set String
-gatherVariables = foldMap (cata variables . snd)
-	where
-	variables (Device _ v _) = S.fromList v
-	variables x = fold x
 
 data Size = X | B | W | D | L deriving (Show, Read) -- 1 8 16 32 64
 data Value = X' Bool | W' Int deriving Show
