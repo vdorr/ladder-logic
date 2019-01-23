@@ -1,0 +1,54 @@
+<html>
+<head>
+<meta charset="utf-8"/>
+	<script type="text/javascript">
+
+
+
+function compile() {
+	const src = document.getElementById("tasrc").value;
+	const escaped_src = encodeURIComponent(src);
+	console.log(escaped_src);
+
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET', 'http://localhost:3000/compile?src=' + escaped_src, true);
+
+	xhr.onload = function () {
+	// Request finished. Do processing here.
+		console.log("done");
+		console.log(this.responseText);
+//		eval(this.responseText);
+	};
+
+	console.log("sending");
+	xhr.send();
+
+}
+
+    </script>
+</head>
+<body>
+    <div>
+
+<textarea rows="24" cols="48" id="tasrc">
+(* --- test 04 --- *)
+
+| %MX0  %MX1        %MX1
++--[/]---[/]---------(S)-
+| %MX0  %MX1  %MX0  %MX1
++--[/]---[ ]---(S)---(R)-
+| %MX0  %MX1        %MX1
++--[ ]---[/]---------(S)-
+| %MX0  %MX1  %MX0  %MX1
++--[ ]---[ ]---(R)---(R)-
+|
+</textarea>
+
+<textarea rows="24" cols="48" id="response">
+</textarea>
+    </div>
+
+<button onclick="compile();">hello</button>
+
+</body>
+

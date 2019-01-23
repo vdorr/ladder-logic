@@ -9,15 +9,20 @@ import Data.IORef
 import qualified Data.Map as M
 -- import Control.Monad.State
 import Control.Monad
-import Data.Tree as T
+import Data.Tree as TR
 import Data.Traversable
 import qualified Data.Set as S
 import Data.Foldable
 import Data.List
+import qualified Data.Text as T
+import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
+import Control.Monad.Except
+import Data.Char
 
 import Algebra.Graph.AdjacencyMap
 import Algebra.Graph.AdjacencyMap.Algorithm
 
+import Preprocess
 import LadderParser
 import DiagramParser
 
@@ -192,6 +197,7 @@ generatejs nets = do
 	print (here)
 	return $ env ++ tojs q
 
+
 makeJSEnv vars nodes = unlines $ prologue ++ e
 	where
 	prologue = ["env.m[\"pwr\"] = true;"]
@@ -216,8 +222,8 @@ jsif pwr a
 	= "if ( " ++ jsget pwr ++ " ) { "
 	++ a --"env.set(" ++ a' ++ ", " ++ f pwr ++ "); "
 	++ "}"
-{-
 
+{-
 class Environment {
 	constructor() {
 		this.m = {};
@@ -243,6 +249,7 @@ class Environment {
 
 env = new Environment();
 -}
+
 jsdevices :: [(String,
                         (Int,
                          [(a, (JSRef Bool, JSRef Bool))]
@@ -352,12 +359,12 @@ xxxxXxx devs vars nodes nets = do
 
  	where
 
- 	doNet (pwr, T.Node (Pair _p Source{}) net') = g pwr net'
+ 	doNet (pwr, TR.Node (Pair _p Source{}) net') = g pwr net'
 	doNet _ = error here --should not happen
 
 	g pwr net = foldM (h pwr) [] net 
 
-	h pwr = \b (n@(T.Node d net')) -> do
+	h pwr = \b (n@(TR.Node d net')) -> do
 		(pwr', pg) <- f pwr d
 		((b <> pg) <>) <$> g pwr' net'
 
@@ -392,7 +399,7 @@ xxxxX vars nodes nets = do
 
  	where
 
- 	doNet (T.Node (Pair _p Source{}) net') = do
+ 	doNet (TR.Node (Pair _p Source{}) net') = do
 		
 		pwr <- newIORef True
 		g pwr net'
@@ -403,7 +410,7 @@ xxxxX vars nodes nets = do
 		-> IO [Pg (Maybe String) IO ()]
 	g pwr net = foldM (h pwr) [] net 
 
-	h pwr = \b (n@(T.Node d net')) -> do
+	h pwr = \b (n@(TR.Node d net')) -> do
 		(pwr', pg) <- f pwr d
 		((b <> pg) <>) <$> g pwr' net'
 
@@ -459,5 +466,50 @@ xxxxX vars nodes nets = do
 -- 				return (nr, [Do $ readIORef pwr >>= writeIORef nr ])
 -- 			Just nr -> do
 -- 				return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
+
+--------------------------------------------------------------------------------
+
+compile :: T.Text -> IO [(Maybe String, Symbol)]
+compile s = do		 --print (here, start)
+
+	nets <- case preproc3 s of
+		Left err -> error $ show (here, err) --TODO fail properly
+		Right l -> return l
+
+	forM_ nets $ \(lbl, net) -> do
+		print ("*****", lbl, "*****")
+		forM_ net $ \n -> do
+			print n
+
+-- 	let nrW = 1 + length (show (length lines'))
+-- 	putStrLn ""
+-- 	forM_ (zip [0..] lines') $ \(n::Int, l) ->
+-- 		putStrLn $ lpad ' ' nrW (show n) ++ ": " ++ l
+-- 	putStrLn ""
+-- 	putStrLn "---------------------"
+
+	forM nets $ \(lbl, net) ->
+		case parseNet net of
+			Left e -> error $ show (here, e)
+			Right ast -> do
+-- 				print (here, ast)
+				return (lbl, ast)
+
+--------------------------------------------------------------------------------
+
+parseNet :: [String] -> Either String Symbol --(b, PS st Char)
+parseNet net = do
+	(ast, PS{..}) <- runParser' 0 0 net take3 (Pos(0,0), [])
+	onlySpaceOrCommentsRemain chars
+	return ast
+
+onlySpaceOrCommentsRemain :: Vector (Vector (Bool, Char)) -> Either String ()
+onlySpaceOrCommentsRemain c = 
+	do
+		forM_ (indexed c) $ \(y, row) -> do
+--TODO comments
+			forM_ (indexed row) $ \(x, (visited, c')) -> do
+				unless (visited || isSpace c') $
+					throwError $ show (here, (x, y), c')
 
 --------------------------------------------------------------------------------

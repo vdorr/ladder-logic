@@ -4,8 +4,8 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import System.Environment (getArgs)
-import Control.Monad.State
-import Control.Monad.Except
+-- import Control.Monad.State
+-- import Control.Monad.Except
 -- import Data.Maybe
 import Data.Traversable
 import Data.Foldable
@@ -17,34 +17,23 @@ import Data.Functor.Const
 -- import Data.Vector hiding ((++), forM_, modify, sequence_, sequence)
 import Control.Concurrent
 
-import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
 -- import Control.Applicative hiding (many)
 
 import Debug.Trace
 import Text.Read (readEither)
 -- import qualified Data.Map.Strict as M
 import qualified Data.Map as M
-import qualified Data.Set as S
+-- import qualified Data.Set as S
+-- import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
-import Data.Tree as T
-import Algebra.Graph.AdjacencyMap
-import Algebra.Graph.AdjacencyMap.Algorithm
+-- import Algebra.Graph.AdjacencyMap
+-- import Algebra.Graph.AdjacencyMap.Algorithm
 
 import Preprocess
 import DiagramParser
 import LadderParser
 import Compile
-
---------------------------------------------------------------------------------
-
-onlySpaceOrCommentsRemain :: Vector (Vector (Bool, Char)) -> Either String ()
-onlySpaceOrCommentsRemain c = 
-	do
-		forM_ (indexed c) $ \(y, row) -> do
---TODO comments
-			forM_ (indexed row) $ \(x, (visited, c')) -> do
-				unless (visited || isSpace c') $
-					throwError $ show (here, (x, y), c')
 
 --------------------------------------------------------------------------------
 
@@ -101,14 +90,6 @@ interpret nets = do
 
 --------------------------------------------------------------------------------
 
-parseNet :: [String] -> Either String Symbol --(b, PS st Char)
-parseNet net = do
-	(ast, PS{..}) <- runParser' 0 0 net take3 (Pos(0,0), [])
-	onlySpaceOrCommentsRemain chars
-	return ast
-
---------------------------------------------------------------------------------
-
 data Size = X | B | W | D | L deriving (Show, Read) -- 1 8 16 32 64
 data Value = X' Bool | W' Int deriving Show
 data Section = I | Q | M deriving (Show, Read)
@@ -120,36 +101,9 @@ parseVarName _ = Left "wrong format"
 
 --------------------------------------------------------------------------------
 
-compile :: FilePath -> IO [(Maybe String, Symbol)]
-compile file = do		 --print (here, start)
-
+compile'' file = do
 	print (here, file)
-	s <- readFile file
-
-	nets <- case preproc2 s of
-		Left err -> error $ show (here, err) --TODO fail properly
-		Right l -> return l
-
-	forM_ nets $ \(lbl, net) -> do
-		print ("*****", lbl, "*****")
-		forM_ net $ \n -> do
-			print n
-
--- 	let nrW = 1 + length (show (length lines'))
--- 	putStrLn ""
--- 	forM_ (zip [0..] lines') $ \(n::Int, l) ->
--- 		putStrLn $ lpad ' ' nrW (show n) ++ ": " ++ l
--- 	putStrLn ""
--- 	putStrLn "---------------------"
-
-	forM nets $ \(lbl, net) ->
-		case parseNet net of
-			Left e -> error $ show (here, e)
-			Right ast -> do
--- 				print (here, ast)
-				return (lbl, ast)
-
---------------------------------------------------------------------------------
+	TIO.readFile file >>= compile
 
 main :: IO ()
 main = do
@@ -157,7 +111,7 @@ main = do
 	getArgs >>= \case
 -- 		["run", file] -> compile file >>= runLadder
 		[file] -> do
-			nets <- compile file
+			nets <- compile'' file
 			print (here, "----------------------------------------")
 			interpret nets
 -- 			forM_ nets $ \(lbl, net) -> do
