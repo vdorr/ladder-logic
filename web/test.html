@@ -4,6 +4,28 @@
 	<script type="text/javascript">
 
 
+class Environment {
+	constructor() {
+		this.m = {};
+	}
+	run() {
+		return true;
+	}
+	get(name) {
+		console.log("1");
+	}
+	set(name, value) {
+		console.log("2");
+	}
+	scan_begin() {
+//TODO copy values from ins to outs
+		console.log("3");
+	}
+	scan_end() {
+//TODO copy values from outs to ins
+		console.log("4");
+	}
+}
 
 function compile() {
 	const src = document.getElementById("tasrc").value;
@@ -16,7 +38,12 @@ function compile() {
 	xhr.onload = function () {
 	// Request finished. Do processing here.
 		console.log("done");
-		console.log(this.responseText);
+        var rsp = JSON.parse(this.responseText);
+        console.log(rsp.artifact);
+
+//just test it, store it somewhere... later
+env = new Environment();
+
 //		eval(this.responseText);
 	};
 

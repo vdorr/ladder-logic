@@ -225,33 +225,6 @@ jsif pwr a
 	<> a --"env.set(" <> a' <> ", " <> f pwr <> "); "
 	<> "}"
 
-{-
-class Environment {
-	constructor() {
-		this.m = {};
-	}
-	run() {
-		return true;
-	}
-	get(name) {
-		console.log("1");
-	}
-	set(name, value) {
-		console.log("2");
-	}
-	scan_begin() {
-//TODO copy values from ins to outs
-		console.log("3");
-	}
-	scan_end() {
-//TODO copy values from outs to ins
-		console.log("4");
-	}
-}
-
-env = new Environment();
--}
-
 jsdevices :: [(String,
                         (Int,
                          [(a, (JSRef Bool, JSRef Bool))]
