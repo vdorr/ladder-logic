@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, BangPatterns,
-  FlexibleContexts, RecursiveDo, TupleSections, GADTSyntax, DeriveFunctor #-}
+  FlexibleContexts, OverloadedStrings, TupleSections, GADTSyntax, DeriveFunctor #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -24,7 +24,7 @@ import Text.Read (readEither)
 -- import qualified Data.Map.Strict as M
 import qualified Data.Map as M
 -- import qualified Data.Set as S
--- import qualified Data.Text as T
+import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
 -- import Algebra.Graph.AdjacencyMap
@@ -44,9 +44,6 @@ lpad filler n str = reverse $ take n $ reverse str ++ repeat filler
 
 interpret :: [(Maybe String, Symbol)] -> IO ()
 interpret nets = do
-
-	generatejs nets
-		>>= putStrLn
 
 	print (here, toList $ gatherVariables nets)
 
@@ -103,7 +100,7 @@ parseVarName _ = Left "wrong format"
 
 compile'' file = do
 	print (here, file)
-	TIO.readFile file >>= compile
+	TIO.readFile file >>= parseLadder
 
 main :: IO ()
 main = do
@@ -113,7 +110,14 @@ main = do
 		[file] -> do
 			nets <- compile'' file
 			print (here, "----------------------------------------")
+			
+			generatejs nets
+				>>= TIO.putStrLn
+
+			print (here, "----------------------------------------")
+
 			interpret nets
+
 -- 			forM_ nets $ \(lbl, net) -> do
 -- 				print (here, lbl, ">>>")
 -- 				xxxx net

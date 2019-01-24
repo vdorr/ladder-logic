@@ -20,8 +20,13 @@ import Compile
 
 eeek :: B.ByteString -> IO ResponseData
 eeek s = do
-	putStrLn $ T.unpack $ E.decodeUtf8 s
-	undefined
+	let s' = E.decodeUtf8 s
+	putStrLn $ T.unpack s'
+	nets <- parseLadder s' -- T.Text -> IO [(Maybe String, Symbol)]
+	js <- generatejs nets
+-- 	putStrLn js
+
+	return $ ResponseData Nothing [] js
 
 --------------------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, BangPatterns,
-  FlexibleContexts, MultiParamTypeClasses, TupleSections, GADTs, DeriveFunctor #-}
+  FlexibleContexts, MultiParamTypeClasses, OverloadedStrings, TupleSections, GADTs, DeriveFunctor #-}
 
-#define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
+#define here (__FILE__ <> ":" <> show (__LINE__ :: Integer) <> " ")
 
 module Compile where
 
@@ -15,6 +15,7 @@ import qualified Data.Set as S
 import Data.Foldable
 import Data.List
 import qualified Data.Text as T
+import Data.Text (Text, append, pack)
 import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
 import Control.Monad.Except
 import Data.Char
@@ -59,25 +60,26 @@ weave1 src end = snd $ head program
 --------------------------------------------------------------------------------
 
 -- tojs :: (Eq lbl, Show lbl) => [(lbl, Pg lbl Js ())] -> String
-tojs :: Eq lbl => [(lbl, [Pg lbl JS ()])] -> String
+tojs :: Eq lbl => [(lbl, [Pg lbl JS ()])] -> Text
 tojs program = loop $ foldMap f program
 	where
-	f (lbl, a) = ("case " ++ show (getLbl lbl) ++ ":") : foldMap (fmap ("  " ++) . h) a
-	h (Do (JS c)) = [c ++ ";"]
-	h (Go lbl) = ["target = " ++ show (getLbl lbl) ++ ";", "continue;"]
+	f (lbl, a) = (T.concat ["case ", pack $ show (getLbl lbl), ":"])
+								  : foldMap (fmap (append "  ") . h) a
+	h (Do (JS c)) = [c <> ";"]
+	h (Go lbl) = ["target = " <> pack (show (getLbl lbl)) <> ";", "continue;"]
 	h (Br lbl (JS c)) =
-		[ "if ( " ++ c ++ " ) {"
-		, "  target = " ++ show (getLbl lbl) ++ ";"
+		[ "if ( " <> c <> " ) {"
+		, "  target = " <> pack (show (getLbl lbl)) <> ";"
 		, "  continue;"
 		, "}"
 		]
-	loop stmts = unlines
+	loop stmts = T.unlines
 		["{"
 		, "  var target = 0;"
 		, "  while ( env.run() ) {"
 		, "    env.scan_begin();"
 		, "    switch ( target ) {"
-		, unlines $ fmap ("      " ++) stmts
+		, T.unlines $ fmap (append "      ") stmts
 		, "    }"
 		, "    env.scan_end();"
 		, "  }"
@@ -95,17 +97,17 @@ gatherNodes = cata' node
 	node (p, LadderParser.Node x) = S.singleton p <> fold x
 	node (_, x) = fold x
 
-gatherVariables :: [(Maybe String, Symbol)] -> S.Set String
+gatherVariables :: [(Maybe String, Symbol)] -> S.Set Text
 gatherVariables = foldMap (cata variables . snd)
 	where
-	variables x@(Device _ v _) = S.fromList v <> (fold x)
+	variables x@(Device _ v _) = S.fromList (fmap pack v) <> (fold x)
 	variables x = fold x
 --  S.singleton p <> fold x
 
 --------------------------------------------------------------------------------
 
 compile'
-	:: M.Map String (IORef Bool, IORef Bool)
+	:: M.Map Text (IORef Bool, IORef Bool)
 	-> [(Maybe String, Symbol)]
 	-> IO [(Maybe String, Pg (Maybe String) IO ())]
 compile' vars nets =
@@ -148,7 +150,7 @@ jjj_ _ = error here --parser should not allow this
 
 
 xxxx
-	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
+	:: M.Map Text (IORef Bool, IORef Bool) --TODO more types
 	-> M.Map Pos (IORef Bool) --nodes
 	-> Symbol
 	-> IO [Pg (Maybe String) IO ()]
@@ -172,18 +174,18 @@ xxxx vars nodes net = do
 	print $ topSort $ jjj_ net
 	return p
 
-generatejs :: [(Maybe String, Symbol)] -> IO String
+generatejs :: [(Maybe String, Symbol)] -> IO Text
 generatejs nets = do
 
 	print (here, toList $ gatherVariables nets)
 	
 	let vars =
-		fmap (\v -> (v, (JSRef $ "\"in " ++ v ++ "\"", JSRef $ "\"out " ++ v ++ "\"")))
+		fmap (\v -> (v, (JSRef $ "\"in " <> v <> "\"", JSRef $ "\"out " <> v <> "\"")))
 		$ toList $ gatherVariables nets
 	print (here, vars)
 
 	let nodes =
-		fmap (\p -> (p, JSRef $ "\"node " ++ show p ++ "\""))
+		fmap (\p -> (p, JSRef $ "\"node " <> pack (show p) <> "\""))
 		$ toList
 		$ foldMap (gatherNodes . snd) nets
 
@@ -195,33 +197,33 @@ generatejs nets = do
 
 	let env = makeJSEnv vars nodes
 	print (here)
-	return $ env ++ tojs q
+	return $ env <> tojs q
 
 
-makeJSEnv vars nodes = unlines $ prologue ++ e
+makeJSEnv vars nodes = T.unlines $ prologue <> e
 	where
 	prologue = ["env.m[\"pwr\"] = true;"]
-	e = fmap ((++";") . f)
-		(let (a, b) = unzip (fmap snd vars) in (a++b) ++ fmap snd nodes)
-	f (JSRef v) = "env.m[" ++ v ++ "] = false"
+	e = fmap ((<>";") . f)
+		(let (a, b) = unzip (fmap snd vars) in (a<>b) <> fmap snd nodes)
+	f (JSRef v) = "env.m[" <> v <> "] = false"
 
-testillytest = q M.empty M.empty []
-	where
-	q
-		:: 
-		M.Map String (JSRef Bool, JSRef Bool) --TODO more types
-		-> M.Map Pos (JSRef Bool) --nodes
-		-> [(JSRef Bool, Tree (Pair Pos (Symbol_ Symbol)))]
-		-> IO [Pg (Maybe String) JS ()]
-	q = xxxxXxx jsdevices
+-- testillytest = q M.empty M.empty []
+-- 	where
+-- 	q
+-- 		:: 
+-- 		M.Map String (JSRef Bool, JSRef Bool) --TODO more types
+-- 		-> M.Map Pos (JSRef Bool) --nodes
+-- 		-> [(JSRef Bool, Tree (Pair Pos (Symbol_ Symbol)))]
+-- 		-> IO [Pg (Maybe String) JS ()]
+-- 	q = xxxxXxx jsdevices
 
 	
-jsget (JSRef r) = "env.get("++ r ++ ")"
-jsset (JSRef r) v = "env.set("++ r ++ ", " ++ v ++ ")"
+jsget (JSRef r) = "env.get("<> r <> ")"
+jsset (JSRef r) v = "env.set("<> r <> ", " <> v <> ")"
 jsif pwr a
-	= "if ( " ++ jsget pwr ++ " ) { "
-	++ a --"env.set(" ++ a' ++ ", " ++ f pwr ++ "); "
-	++ "}"
+	= "if ( " <> jsget pwr <> " ) { "
+	<> a --"env.set(" <> a' <> ", " <> f pwr <> "); "
+	<> "}"
 
 {-
 class Environment {
@@ -258,9 +260,9 @@ jsdevices =
 -- 	[ dev "[ ]" 1 $ \[a] -> op "and" a
 --  	, dev "[/]" 1 $ \[a] -> op "andn" a
 	[ dev "[ ]" 1 $ \[(_, (a, _))] -> update
-		(\pwr -> jsset pwr $ jsget pwr ++ " && " ++ jsget a)
+		(\pwr -> jsset pwr $ jsget pwr <> " && " <> jsget a)
  	, dev "[/]" 1 $ \[(_, (a, _))] -> update
-		(\pwr -> jsset pwr $ jsget pwr ++ " && !(" ++ jsget a ++ ")")
+		(\pwr -> jsset pwr $ jsget pwr <> " && !(" <> jsget a <> ")")
 	, dev "( )" 1 $ \[a] -> update (\pwr -> jsset pwr (jsget pwr))
 	, dev "(S)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "true") )
 	, dev "(R)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "false") )
@@ -269,18 +271,18 @@ jsdevices =
 	dev n na f = (n, (na, f))
 
 -- 	op f aa@(_, (JSRef a, _a')) pwr'@(JSRef pwr) = return (pwr',
--- -- 		[Do $ JS $ pwr ++ ".set(" ++ f ++ "(" ++ pwr ++ ".get(), " ++ a ++ ".get()))"])
--- 		[Do $ JS $ "env.set(" ++ pwr ++ ", " ++ f ++ "(env.get("++ pwr ++ "), env.get("++ a ++")))"])
+-- -- 		[Do $ JS $ pwr <> ".set(" <> f <> "(" <> pwr <> ".get(), " <> a <> ".get()))"])
+-- 		[Do $ JS $ "env.set(" <> pwr <> ", " <> f <> "(env.get("<> pwr <> "), env.get("<> a <>")))"])
 
 -- 	op' pwr f (name, (a, _)) r = undefined
 
 	update f pwr = return (pwr, [Do $ JS $ f pwr])
 
 -- 	update' (pwr) f = JS $ f pwr
--- 		$ "env.set(env.get(" ++ a' ++ "), " ++ f ++ "(" ++ pwr ++ ", env.get(" ++ a ++ ")))"
--- 		$ "if ( " ++ jsget pwr ++ " ) { "
--- 		++ "env.set(" ++ a' ++ ", " ++ f pwr ++ "); "
--- 		++ "}"
+-- 		$ "env.set(env.get(" <> a' <> "), " <> f <> "(" <> pwr <> ", env.get(" <> a <> ")))"
+-- 		$ "if ( " <> jsget pwr <> " ) { "
+-- 		<> "env.set(" <> a' <> ", " <> f pwr <> "); "
+-- 		<> "}"
 
 
 #if 1
@@ -335,15 +337,15 @@ instance Ref IORef IO where
 --  	modifyRef = modifyIORef
 	joinWires pwr nr = readIORef pwr >>= \v -> modifyIORef nr (||v)
 
-data JSRef a = JSRef String
+data JSRef a = JSRef Text
 	deriving Show
-data JS a = JS String --(JSRef a)
+data JS a = JS Text --(JSRef a)
 	deriving Show
 
 instance Ref JSRef JS where
-	readRef (JSRef r) = JS $ "env.get(" ++ r ++ ")"
+	readRef (JSRef r) = JS $ "env.get(" <> r <> ")"
 	joinWires (JSRef pwr) (JSRef nr) = JS
-		$ "env.set(" ++ nr ++ ", " ++ "env.get(" ++ pwr ++ ") || env.get(" ++ nr ++ "))"
+		$ "env.set(" <> nr <> ", " <> "env.get(" <> pwr <> ") || env.get(" <> nr <> "))"
 
 -- xxxxXxx
 -- 	:: 
@@ -370,7 +372,7 @@ xxxxXxx devs vars nodes nets = do
 
 	f pwr (Pair _ (Device body options _)) = do
 		args <- for options $ \name -> do
-			case M.lookup name vars of
+			case M.lookup (pack name) vars of
 				 Nothing -> error $ show (here, "variable not found", name)
 				 Just v -> return (name, v)
 		doDev devs body args pwr
@@ -469,8 +471,8 @@ xxxxX vars nodes nets = do
 
 --------------------------------------------------------------------------------
 
-compile :: T.Text -> IO [(Maybe String, Symbol)]
-compile s = do		 --print (here, start)
+parseLadder :: Text -> IO [(Maybe String, Symbol)]
+parseLadder s = do
 
 	nets <- case preproc3 s of
 		Left err -> error $ show (here, err) --TODO fail properly
@@ -484,7 +486,7 @@ compile s = do		 --print (here, start)
 -- 	let nrW = 1 + length (show (length lines'))
 -- 	putStrLn ""
 -- 	forM_ (zip [0..] lines') $ \(n::Int, l) ->
--- 		putStrLn $ lpad ' ' nrW (show n) ++ ": " ++ l
+-- 		putStrLn $ lpad ' ' nrW (show n) <> ": " <> l
 -- 	putStrLn ""
 -- 	putStrLn "---------------------"
 
