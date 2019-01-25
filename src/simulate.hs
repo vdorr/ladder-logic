@@ -112,8 +112,9 @@ main = do
 			nets <- compile'' file
 			print (here, "----------------------------------------")
 			
-			generatejs nets
-				>>= TIO.putStrLn
+			case generatejs nets of
+				 Right js -> TIO.putStrLn js
+				 Left err -> print (here, err)
 
 			print (here, "----------------------------------------")
 

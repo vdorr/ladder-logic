@@ -21,13 +21,16 @@ import LadderParser
 
 data JSRef a = JSRef Text
 	deriving Show
-data JS a = JS Text --(JSRef a)
+
+data JS a = JS Text
 	deriving Show
 
 instance Ref JSRef JS where
 	readRef (JSRef r) = JS $ "env.get(" <> r <> ")"
 	joinWires (JSRef pwr) (JSRef nr) = JS
 		$ "env.set(" <> nr <> ", " <> "env.get(" <> pwr <> ") || env.get(" <> nr <> "))"
+
+--------------------------------------------------------------------------------
 
 jsget (JSRef r) = "env.get("<> r <> ")"
 jsset (JSRef r) v = "env.set("<> r <> ", " <> v <> ")"
@@ -36,10 +39,12 @@ jsif pwr a
 	<> a --"env.set(" <> a' <> ", " <> f pwr <> "); "
 	<> "}"
 
-jsdevices :: [(String,
-                        (Int,
-                         [(a, (JSRef Bool, JSRef Bool))]
-                         -> JSRef Bool -> IO (JSRef Bool, [Pg lbl JS ()])))]
+jsdevices :: DeviceTable lbl JS JSRef (Either Text) xx
+
+-- jsdevices :: [(String,
+--                         (Int,
+--                          [(a, (JSRef Bool, JSRef Bool))]
+--                          -> JSRef Bool -> m (JSRef Bool, [Pg lbl JS ()])))]
 jsdevices =
 	[ dev "[ ]" 1 $ \[(_, (a, _))] -> update
 		(\pwr -> jsset pwr $ jsget pwr <> " && " <> jsget a)
@@ -51,34 +56,33 @@ jsdevices =
 	]
 	where
 	dev n na f = (n, (na, f))
-
 	update f pwr = return (pwr, [Do $ JS $ f pwr])
 
 
-generatejs :: [(Maybe String, Symbol)] -> IO Text
+generatejs :: [(Maybe String, Symbol)] -> Either Text Text
 generatejs nets = do
 
-	print (here, toList $ gatherVariables nets)
-	
+-- 	print (here, toList $ gatherVariables nets)
+
 	let vars =
 		fmap (\v -> (v, (JSRef $ "\"in " <> v <> "\"", JSRef $ "\"out " <> v <> "\"")))
 		$ toList $ gatherVariables nets
-	print (here, vars)
+-- 	print (here, vars)
 
 	let nodes =
 		fmap (\p -> (p, JSRef $ "\"node " <> pack (show p) <> "\""))
 		$ toList
 		$ foldMap (gatherNodes . snd) nets
 
--- 	let ff = fmap (\net -> (JSRef "pwr -- FIXME", net)) $ dfsForest $ jjj_ nets
-	q <- forM nets $ \(lbl, net) -> do
+	jsAL <- forM nets $ \(lbl, net) -> do
 		let ff = fmap (\net -> (JSRef "\"pwr\"", net)) $ dfsForest $ jjj_ net
 
 		(lbl,) <$> xxxxXxx jsdevices (M.fromList vars) (M.fromList nodes) ff
 
 	let env = makeJSEnv vars nodes
-	print (here)
-	return $ env <> tojs q
+-- 	print (here)
+	(env <>) <$> tojs jsAL
+-- 	error here
 
 
 makeJSEnv vars nodes = T.unlines $ prologue <> e
@@ -90,9 +94,10 @@ makeJSEnv vars nodes = T.unlines $ prologue <> e
 
 --------------------------------------------------------------------------------
 
--- tojs :: (Eq lbl, Show lbl) => [(lbl, Pg lbl Js ())] -> String
-tojs :: Eq lbl => [(lbl, [Pg lbl JS ()])] -> Text
-tojs program = loop $ foldMap f program
+-- | turn list of JS action to actual JS source text fragment
+tojs :: Eq lbl => [(lbl, [Pg lbl JS ()])] -> Either Text Text
+tojs program = do
+	return $ loop $ foldMap f program
 	where
 	f (lbl, a) = (T.concat ["case ", pack $ show (getLbl lbl), ":"])
 								  : foldMap (fmap (append "  ") . h) a

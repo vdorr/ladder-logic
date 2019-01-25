@@ -16,10 +16,10 @@ import Data.Char
 import qualified Data.Map as M
 import Data.Tree as TR
 import qualified Data.Set as S
-import Data.List
-import qualified Data.Text as T
-import Data.Text (Text, append, pack)
-import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
+-- import Data.List
+-- import qualified Data.Text as T
+import Data.Text (Text, pack)
+import Data.Vector (Vector, indexed)--, fromList, (!?), (//), (!))
 
 import Algebra.Graph.AdjacencyMap
 import Algebra.Graph.AdjacencyMap.Algorithm
@@ -136,38 +136,11 @@ xxxx vars nodes net = do
 -- 	print $ topSort $ jjj_ net
 	return p
 
-
-devices :: [(String,
+type DeviceTable lbl a r m xx = [] (String,
                         (Int,
-                         [(a, (IORef Bool, IORef Bool))]
-                         -> IORef Bool -> IO (IORef Bool, [Pg lbl IO ()])))]
-devices =
-	[ dev "[ ]" 1 $ \[a] -> op (&&) a
-	, dev "[/]" 1 $ \[a] -> op (\p v -> p && not v) a
-	, dev "( )" 1 $ \[a] -> update (\p _ -> Just p) a
-	, dev "(S)" 1 $ \[a] -> update (\p _ -> if p then Just True else Nothing) a
-	, dev "(R)" 1 $ \[a] -> update (\p _ -> if p then Just False else Nothing) a
-	]
-	where
-	dev n na f = (n, (na, f))
-
-	op f aa@(_, (a, _a')) pwr = newIORef False
-		>>= \r -> return (r
-			, [Do $ op' pwr f aa r])
-
-	op' pwr f (name, (a, _)) r = do
-		va <- readIORef a
-		p <- readIORef pwr
-		writeIORef r $ f p va
-
-	update f a pwr = return (pwr, [Do $ update' pwr f a])
-
-	update' pwr f (name, (a, a')) = do
-		va <- readIORef a
-		p <- readIORef pwr
-		case f p va of
-				Just v' -> writeIORef a' v'
-				_ -> return ()
+                         [(xx, (r Bool, r Bool))]
+                         -> r Bool
+                         -> m (r Bool, [Pg lbl a ()])))
 
 doDev devs body args
 	= case lookup body devs of
@@ -179,18 +152,13 @@ class Ref r m where
 	readRef :: r a -> m a
 	joinWires :: r Bool -> r Bool -> m ()
 
-instance Ref IORef IO where
-	readRef = readIORef
-	joinWires pwr nr = readIORef pwr >>= \v -> modifyIORef nr (||v)
-
--- xxxxXxx
--- 	:: 
--- -- 	IO (IO ((Bool -> Bool) -> IO Bool)) -> 
--- 	M.Map String (IORef Bool, IORef Bool) --TODO more types
--- 	-> M.Map Pos (IORef Bool) --nodes
--- 	-> [(IORef Bool, Tree (Pair Pos (Symbol_ Symbol)))]
--- 	-> IO [Pg (Maybe String) IO ()]
--- xxxxXxx :: _
+xxxxXxx :: (Ref ref action, Monad compMo) =>
+	DeviceTable (Maybe String) action ref compMo String
+                                 -> M.Map Text (ref Bool, ref Bool)
+                                 -> M.Map Pos (ref Bool)
+                                 -> [(ref Bool,
+                                      TR.Tree (Pair Pos (Symbol_ a)))]
+                                 -> compMo [Pg (Maybe String) action ()]
 xxxxXxx devs vars nodes nets = do
 	nets' <- for nets doNet
 	return $ concat nets'
@@ -226,75 +194,75 @@ xxxxXxx devs vars nodes nets = do
 
 --------------------------------------------------------------------------------
 
-xxxxX
-	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
-	-> M.Map Pos (IORef Bool) --nodes
-	-> Forest (Pair Pos (Symbol_ Symbol))
-	-> IO [Pg (Maybe String) IO ()]
-xxxxX vars nodes nets = do
-	nets' <- for nets doNet
-	return $ concat nets'
-
- 	where
-
- 	doNet (TR.Node (Pair _p Source{}) net') = do
-		
-		pwr <- newIORef True
-		g pwr net'
-	doNet _ = error here --should not happen
-
-	g :: (IORef Bool)
-		-> [Tree (Pair Pos (Symbol_ Symbol))]
-		-> IO [Pg (Maybe String) IO ()]
-	g pwr net = foldM (h pwr) [] net 
-
-	h pwr = \b (n@(TR.Node d net')) -> do
-		(pwr', pg) <- f pwr d
-		((b <> pg) <>) <$> g pwr' net'
-
-	f pwr (Pair _ (Device body options _)) = do
-		args <- for options $ \name -> do
-			case M.lookup name vars of
-				 Nothing -> fail $ show (here, "variable not found", name)
-				 Just v -> return (name, v)
-		dev body args
-		where
-		dev "[ ]" [a] = op (&&) a
-		dev "[/]" [a] = op (\p v -> p && not v) a
-		dev "( )" [a] = update (\p _ -> Just p) a
-		dev "(S)" [a] = update (\p _ -> if p then Just True else Nothing) a
-		dev "(R)" [a] = update (\p _ -> if p then Just False else Nothing) a
-		dev other _a = error $ show (here, other)
-
-		op f aa@(_, (a, _a')) = newIORef False
-			>>= \r -> return (r
-				, [Do $ op' f aa r])
-
-		op' f (name, (a, _)) r = do
-			va <- readIORef a
-			p <- readIORef pwr
-			writeIORef r $ f p va
-
-		update f a = return (pwr, [Do $ update' f a])
-
-		update' f (name, (a, a')) = do
-			va <- readIORef a
-			p <- readIORef pwr
-			case f p va of
-				 Just v' -> writeIORef a' v'
-				 _ -> return ()
-
-	f pwr ((Pair _ (Jump target))) = return (pwr, [Br (Just target) (readIORef pwr)])
-	f pwr (Pair p LadderParser.Node{}) = doNode pwr p
---  	f pwr (Pair p Node') = doNode pwr p
-	f pwr (Pair _ Sink) = return (pwr, []) -- error $ show (here, "FIXME") --right rail
-	f _ (Pair _ Source{}) = error $ show (here, "should not happen")
-	f _ (Pair _ LadderParser.Label{}) = error "should not happen"
-
-	doNode pwr p
-		= case M.lookup p nodes of
-			Nothing -> error here -- should not happen
-			Just nr -> return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
+-- xxxxX
+-- 	:: M.Map String (IORef Bool, IORef Bool) --TODO more types
+-- 	-> M.Map Pos (IORef Bool) --nodes
+-- 	-> Forest (Pair Pos (Symbol_ Symbol))
+-- 	-> IO [Pg (Maybe String) IO ()]
+-- xxxxX vars nodes nets = do
+-- 	nets' <- for nets doNet
+-- 	return $ concat nets'
+-- 
+--  	where
+-- 
+--  	doNet (TR.Node (Pair _p Source{}) net') = do
+-- 		
+-- 		pwr <- newIORef True
+-- 		g pwr net'
+-- 	doNet _ = error here --should not happen
+-- 
+-- 	g :: (IORef Bool)
+-- 		-> [Tree (Pair Pos (Symbol_ Symbol))]
+-- 		-> IO [Pg (Maybe String) IO ()]
+-- 	g pwr net = foldM (h pwr) [] net 
+-- 
+-- 	h pwr = \b (n@(TR.Node d net')) -> do
+-- 		(pwr', pg) <- f pwr d
+-- 		((b <> pg) <>) <$> g pwr' net'
+-- 
+-- 	f pwr (Pair _ (Device body options _)) = do
+-- 		args <- for options $ \name -> do
+-- 			case M.lookup name vars of
+-- 				 Nothing -> fail $ show (here, "variable not found", name)
+-- 				 Just v -> return (name, v)
+-- 		dev body args
+-- 		where
+-- 		dev "[ ]" [a] = op (&&) a
+-- 		dev "[/]" [a] = op (\p v -> p && not v) a
+-- 		dev "( )" [a] = update (\p _ -> Just p) a
+-- 		dev "(S)" [a] = update (\p _ -> if p then Just True else Nothing) a
+-- 		dev "(R)" [a] = update (\p _ -> if p then Just False else Nothing) a
+-- 		dev other _a = error $ show (here, other)
+-- 
+-- 		op f aa@(_, (a, _a')) = newIORef False
+-- 			>>= \r -> return (r
+-- 				, [Do $ op' f aa r])
+-- 
+-- 		op' f (name, (a, _)) r = do
+-- 			va <- readIORef a
+-- 			p <- readIORef pwr
+-- 			writeIORef r $ f p va
+-- 
+-- 		update f a = return (pwr, [Do $ update' f a])
+-- 
+-- 		update' f (name, (a, a')) = do
+-- 			va <- readIORef a
+-- 			p <- readIORef pwr
+-- 			case f p va of
+-- 				 Just v' -> writeIORef a' v'
+-- 				 _ -> return ()
+-- 
+-- 	f pwr ((Pair _ (Jump target))) = return (pwr, [Br (Just target) (readIORef pwr)])
+-- 	f pwr (Pair p LadderParser.Node{}) = doNode pwr p
+-- --  	f pwr (Pair p Node') = doNode pwr p
+-- 	f pwr (Pair _ Sink) = return (pwr, []) -- error $ show (here, "FIXME") --right rail
+-- 	f _ (Pair _ Source{}) = error $ show (here, "should not happen")
+-- 	f _ (Pair _ LadderParser.Label{}) = error "should not happen"
+-- 
+-- 	doNode pwr p
+-- 		= case M.lookup p nodes of
+-- 			Nothing -> error here -- should not happen
+-- 			Just nr -> return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
 
 --------------------------------------------------------------------------------
 
@@ -340,5 +308,40 @@ onlySpaceOrCommentsRemain c =
 			forM_ (indexed row) $ \(x, (visited, c')) -> do
 				unless (visited || isSpace c') $
 					throwError $ show (here, (x, y), c')
+
+--------------------------------------------------------------------------------
+
+instance Ref IORef IO where
+	readRef = readIORef
+	joinWires pwr nr = readIORef pwr >>= \v -> modifyIORef nr (||v)
+
+devices :: DeviceTable lbl IO IORef IO xx
+devices =
+	[ dev "[ ]" 1 $ \[a] -> op (&&) a
+	, dev "[/]" 1 $ \[a] -> op (\p v -> p && not v) a
+	, dev "( )" 1 $ \[a] -> update (\p _ -> Just p) a
+	, dev "(S)" 1 $ \[a] -> update (\p _ -> if p then Just True else Nothing) a
+	, dev "(R)" 1 $ \[a] -> update (\p _ -> if p then Just False else Nothing) a
+	]
+	where
+	dev n na f = (n, (na, f))
+
+	op f aa@(_, (a, _a')) pwr = newIORef False
+		>>= \r -> return (r
+			, [Do $ op' pwr f aa r])
+
+	op' pwr f (name, (a, _)) r = do
+		va <- readIORef a
+		p <- readIORef pwr
+		writeIORef r $ f p va
+
+	update f a pwr = return (pwr, [Do $ update' pwr f a])
+
+	update' pwr f (name, (a, a')) = do
+		va <- readIORef a
+		p <- readIORef pwr
+		case f p va of
+				Just v' -> writeIORef a' v'
+				_ -> return ()
 
 --------------------------------------------------------------------------------
