@@ -7,14 +7,17 @@
 class Environment {
 	constructor() {
 		this.m = {};
+		this.states = [];
 	}
 	run() {
 		return true;
 	}
 	get(name) {
 		console.log("1");
+		return this.m[name];
 	}
 	set(name, value) {
+		this.m[name] = value;
 		console.log("2");
 	}
 	scan_begin() {
@@ -25,11 +28,15 @@ class Environment {
 //TODO copy values from outs to ins
 		console.log("4");
 	}
-	add_st() {
-		console.log("5");
+	add_st(name, value) {
+		this.states.push(name);
+		this.m["in " + name] = value;
+		this.m["out " + name] = value;
+		console.log("5 " + name);
 	}
-	add_tmp() {
-		console.log("6");
+	add_tmp(name, value) {
+		this.m[name] = value;
+		console.log("6 " + name);
 	}
 }
 
