@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -fwarn-unused-imports -fwarn-incomplete-patterns -fno-warn-tabs #-}
-{-# LANGUAGE CPP, OverloadedStrings, DeriveGeneric, RecordWildCards, TupleSections,
-	BangPatterns, ScopedTypeVariables, LambdaCase, FlexibleContexts, TypeSynonymInstances #-}
+{-# LANGUAGE CPP, OverloadedStrings, DeriveGeneric #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import System.Environment
@@ -16,6 +15,7 @@ import GHC.Generics
 import qualified Data.ByteString as B
 import Data.Text.Encoding as E
 import Text.Read
+import Control.Monad
 
 import Compile
 import Ladder.Javascript
@@ -25,9 +25,8 @@ import Ladder.Javascript
 eeek :: B.ByteString -> IO ResponseData
 eeek s = do
 	let s' = E.decodeUtf8 s
-	putStrLn $ T.unpack s'
-	nets <- parseLadder s' -- T.Text -> IO [(Maybe String, Symbol)]
-	case generatejs nets of
+-- 	putStrLn $ T.unpack s'
+	case (parseLadder >=> generatejs) s' of
 		Right js -> return $ ResponseData Nothing [] js
 		Left err -> return $ ResponseData (Just err) [] ""
 

@@ -101,7 +101,10 @@ parseVarName _ = Left "wrong format"
 
 compile'' file = do
 	print (here, file)
-	TIO.readFile file >>= parseLadder
+	parseLadder <$> TIO.readFile file
+	>>= \case
+		Left err -> error $ show (here, err)
+		Right x -> return x
 
 main :: IO ()
 main = do

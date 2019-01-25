@@ -1,6 +1,9 @@
 <html>
 <head>
+
+<meta name="robots" content="noindex">
 <meta charset="utf-8"/>
+
 	<script type="text/javascript">
 
 // ----------------------------- !!! -------------------------------------------
@@ -16,7 +19,7 @@ class Environment {
 		this.tmr = null;
 		this.scan_count = 0;
 	}
-	run() {  //FIXME remove
+	run() { //FIXME remove
 		return this.running;
 	}
 	get(name) {
@@ -73,7 +76,7 @@ function run_checkbox() {
 	const period = parseInt(txt_period.value);
 
 	if ( chk_run.checked && period != NaN ) {
-		clear_output();
+// 		clear_output();
 		env.start(period);
 	} else {
 		chk_run.checked = false;
@@ -86,11 +89,12 @@ function compile() {
 	const src = document.getElementById("tasrc").value;
 	const escaped_src = encodeURIComponent(src);
 
-	const compiler_address = "http://localhost:3000/";
-// 	const compiler_address = "http://excellentlizard.herokuapp.com/";
+	const compiler_address = document.getElementById("id_compiler_address").value;
+// 	const compiler_address = "localhost:3000";
+// 	const compiler_address = "excellentlizard.herokuapp.com";
 
 	var xhr = new XMLHttpRequest();
-	xhr.open("GET", compiler_address + "compile?src=" + escaped_src, true);
+	xhr.open("GET", "http://" + compiler_address + "/compile?src=" + escaped_src, true);
 
 	xhr.onload = function () {
 
@@ -99,11 +103,10 @@ function compile() {
         if ( rsp.failure != null || null == rsp.artifact ) {
 			output_line("compilation failed :-(\n");
 			output_line("error response:\n");
-			output_line("" + rsp.failure);
+			output_line(rsp.failure + "\n");
         } else {
 			output_line("compiled, got " + rsp.artifact.length + " bytes of javascript\n");
         }
-//         console.log(rsp.artifact);
 
 		if ( null != env ) {
 			env.stop();
@@ -118,6 +121,10 @@ function compile() {
 			console.log("done");
 		}
 
+	};
+
+	xhr.onerror = function () {
+		output_line("failed to invoke compiler (" + xhr.status +")\n");
 	};
 
 	clear_output();
@@ -144,6 +151,11 @@ function clear_output() {
 </head>
 <body>
 
+<select id="id_compiler_address">
+<option value="localhost:3000">localhost:3000</option>
+<option value="excellentlizard.herokuapp.com">excellentlizard.herokuapp.com</option>
+</select>
+
 <button onclick="compile();">compile</button>
 <input type="checkbox" id="id_sim_run" value="" onclick="run_checkbox();">run</input>
 <input type="text" id="id_sim_period" value="500">ms
@@ -151,7 +163,7 @@ function clear_output() {
 
 <div>
 
-<textarea rows="24" cols="48" id="tasrc">
+<textarea rows="32" cols="64" id="tasrc">
 (* --- test 04 --- *)
 
 | %MX0  %MX1        %MX1
@@ -165,7 +177,7 @@ function clear_output() {
 |
 </textarea>
 
-<textarea rows="24" cols="48" id="id_output"></textarea>
+<textarea rows="32" cols="64" id="id_output"></textarea>
     </div>
 
 </body>

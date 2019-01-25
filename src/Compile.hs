@@ -266,17 +266,17 @@ xxxxXxx devs vars nodes nets = do
 
 --------------------------------------------------------------------------------
 
-parseLadder :: Text -> IO [(Maybe String, Symbol)]
+parseLadder :: Text -> Either Text [(Maybe String, Symbol)]
 parseLadder s = do
 
 	nets <- case preproc3 s of
-		Left err -> error $ show (here, err) --TODO fail properly
+		Left err -> Left err
 		Right l -> return l
 
-	forM_ nets $ \(lbl, net) -> do
-		print ("*****", lbl, "*****")
-		forM_ net $ \n -> do
-			print n
+-- 	forM_ nets $ \(lbl, net) -> do
+-- 		print ("*****", lbl, "*****")
+-- 		forM_ net $ \n -> do
+-- 			print n
 
 -- 	let nrW = 1 + length (show (length lines'))
 -- 	putStrLn ""
@@ -287,10 +287,8 @@ parseLadder s = do
 
 	forM nets $ \(lbl, net) ->
 		case parseNet net of
-			Left e -> error $ show (here, e)
-			Right ast -> do
--- 				print (here, ast)
-				return (lbl, ast)
+			Left e -> Left $ pack e
+			Right ast -> return (lbl, ast)
 
 --------------------------------------------------------------------------------
 

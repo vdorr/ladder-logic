@@ -66,8 +66,8 @@ test5 = ladder <* eof
 	eol = char '\n' --FIXME use parsec
 
 
-preproc3 :: T.Text -> Either String [(Maybe String, [String])]
+preproc3 :: T.Text -> Either Text [(Maybe String, [String])]
 preproc3 src =
 	case parse test5 "(file)" src of
-		 Left err -> Left $ show err
+		 Left err -> Left $ T.pack $ show err
 		 Right n -> Right n
