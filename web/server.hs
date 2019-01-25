@@ -3,6 +3,8 @@
 	BangPatterns, ScopedTypeVariables, LambdaCase, FlexibleContexts, TypeSynonymInstances #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
+import System.Environment
+
 import Network.Wai --(responseLBS, Application)
 import Network.Wai.Handler.Warp (run)
 import Network.HTTP.Types -- (status200)
@@ -13,6 +15,7 @@ import Data.Aeson
 import GHC.Generics
 import qualified Data.ByteString as B
 import Data.Text.Encoding as E
+import Text.Read
 
 import Compile
 
@@ -74,7 +77,11 @@ instance ToJSON ResponseData
 --------------------------------------------------------------------------------
 
 main = do
-    let port = 3000
+--     let port = 3000
+    portVar <- lookupEnv "PORT"
+    let port = case portVar of
+		 Just p | Just p' <- readMaybe p -> p'
+		 _ -> 3000
     putStrLn $ "Listening on port " ++ show port
     run port app
 

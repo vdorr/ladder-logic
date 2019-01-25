@@ -34,6 +34,7 @@ function compile() {
 
 	var xhr = new XMLHttpRequest();
 	xhr.open('GET', 'http://localhost:3000/compile?src=' + escaped_src, true);
+// 	xhr.open('GET', 'http://excellentlizard.herokuapp.com/compile?src=' + escaped_src, true);
 
 	xhr.onload = function () {
 	// Request finished. Do processing here.

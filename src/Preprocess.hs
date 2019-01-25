@@ -55,6 +55,8 @@ test5 = ladder <* eof
 		*> some rung
 	rung = (,) <$> optional label <*> some network
 	label = some alphaNumChar <* char ':' <* white <* eol
+--TODO 	label = takeWhile1P Nothing isAlphaNum
+
 	network --TODO erase comments
 		= lookAhead (oneOf ("|+")) -- <|> alphaNumChar)
 		*> manyTill anySingle eol

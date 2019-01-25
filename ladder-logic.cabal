@@ -25,6 +25,7 @@ library
                      , DiagramParser
                      , LadderParser
                      , Compile
+                     , Ladder.Javascript
   -- other-modules:       
   other-extensions:    CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, FlexibleContexts
   build-depends:       base >=4.9 && <5
