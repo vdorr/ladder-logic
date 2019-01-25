@@ -3,22 +3,27 @@
 <meta charset="utf-8"/>
 	<script type="text/javascript">
 
+// ----------------------------- !!! -------------------------------------------
+	env = null;
+// ----------------------------- !!! -------------------------------------------
 
 class Environment {
 	constructor() {
 		this.m = {};
 		this.states = [];
+		this.running = false; //FIXME remove
+		this.tmr = null;
 	}
-	run() {
-		return true;
+	run() {  //FIXME remove
+		return this.running;
 	}
 	get(name) {
-		console.log("1");
+// 		console.log("1");
 		return this.m[name];
 	}
 	set(name, value) {
 		this.m[name] = value;
-		console.log("2");
+// 		console.log("2");
 	}
 	scan_begin() {
 //TODO copy values from ins to outs
@@ -36,7 +41,33 @@ class Environment {
 	}
 	add_tmp(name, value) {
 		this.m[name] = value;
-		console.log("6 " + name);
+		//console.log("6 " + name);
+	}
+	start (period) {
+		console.log(["start", period, this.body]);
+		this.tmr = setInterval(this.body, period)
+	}
+	stop () {
+		console.log(["stop"]);
+		clearInterval(this.tmr);
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+function run_checkbox() {
+	if ( null == env ) {
+		return;
+	}
+	var chk_run = document.getElementById("id_sim_run");
+	var txt_period = document.getElementById("id_sim_period");
+	const period = parseInt(txt_period.value);
+
+	if ( chk_run.checked && period != NaN ) {
+		env.start(period);
+	} else {
+		chk_run.checked = false;
+		env.stop();
 	}
 }
 
@@ -57,17 +88,27 @@ function compile() {
         console.log(rsp.artifact);
 
 //just test it, store it somewhere... later
-		env = new Environment();
-        eval(rsp.artifact)
+		if ( null != env ) {
+			env.stop();
+			env = null;
+		}
+        const p = eval(rsp.artifact)
+		console.log(p);
+		if ( typeof p === "function" ) {
+			env = new Environment();
+			console.log("invoking");
+			p(env);
+			console.log("done");
+		}
 
-
-//		eval(this.responseText);
 	};
 
 	console.log("sending");
 	xhr.send();
 
 }
+
+// -----------------------------------------------------------------------------
 
     </script>
 </head>
@@ -92,8 +133,8 @@ function compile() {
 </textarea>
     </div>
 
-<button onclick="compile();">hello</button>
-<input type="checkbox" name="id_sim_run" value="">run</input>
+<button onclick="compile();">compile</button>
+<input type="checkbox" id="id_sim_run" value="" onclick="run_checkbox();">run</input>
+<input type="text" id="id_sim_period" value="500">ms
 
 </body>
-

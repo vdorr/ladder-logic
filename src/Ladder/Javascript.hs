@@ -32,7 +32,6 @@ instance Ref JSRef JS where
 
 --------------------------------------------------------------------------------
 
-
 generatejs :: [(Maybe String, Symbol)] -> Either Text Text
 generatejs nets = do
 
@@ -55,10 +54,11 @@ generatejs nets = do
 
 	let env = makeJSEnv vars nodes
 -- 	print (here)
-	(env <>) <$> tojs jsAL
+	wrap <$> (env <>) <$> tojs jsAL
 -- 	error here
 
 	where
+	wrap frag =  T.unlines ["var f = function (env) {", frag, "}; f"] --whats the scope??
 
 	jsget (JSRef r) = "env.get(" <> r <> ")"
 	jsset (JSRef r) v = "env.set(" <> r <> ", " <> v <> ")"
@@ -82,12 +82,7 @@ generatejs nets = do
 makeJSEnv vars nodes = T.unlines $ prologue <> fmap st vars <> fmap tmp nodes
 	where
 	prologue = ["env.add_tmp(\"pwr\", true)"]
--- 	e = fmap ((<>";") . f)
--- 		(let (a, b) = unzip (fmap snd vars) in (a<>b) <> fmap snd nodes)
 	st (v, _) = "env.add_st(\"" <> v <> "\", false);"
-
--- 	e = fmap ((<>";") . f)
--- 		(let (a, b) = unzip (fmap snd vars) in (a<>b) <> fmap snd nodes)
 	tmp (_, JSRef v) = "env.add_tmp(" <> v <> ", false);"
 
 --------------------------------------------------------------------------------
@@ -98,6 +93,7 @@ tojs program = do
 	program' <- forM program $ \(lbl, as) -> (,) <$> getLbl lbl <*> forM as fillLabel
 	return $ loop $ foldMap f program'
 	where
+		
 	f (lbl, a) = ("case " <> lbl <> ":")
 								  : foldMap (fmap (append "  ") . h) a
 	h (Do (JS c)) = [c <> ";"]
@@ -112,13 +108,13 @@ tojs program = do
 	loop stmts = T.unlines
 		["env.body = function () {"
 		, "  var target = 0;"
-		, "  while ( this.run() ) {"
-		, "    this.scan_begin();"
+--		, "  while ( env.run() ) {"
+		, "    env.scan_begin();"
 		, "    switch ( target ) {"
 		, T.unlines $ fmap (append "      ") stmts
 		, "    }"
-		, "    this.scan_end();"
-		, "  }"
+		, "    env.scan_end();"
+--		, "  }"
 		, "}"
 		]
 	fillLabel (Do a) = pure $ Do a
