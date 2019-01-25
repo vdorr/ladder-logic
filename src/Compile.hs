@@ -5,20 +5,21 @@
 
 module Compile where
 
-import Data.IORef
-import qualified Data.Map as M
--- import Control.Monad.State
 import Control.Monad
-import Data.Tree as TR
+import Control.Monad.Except
 import Data.Traversable
-import qualified Data.Set as S
 import Data.Foldable
+
+import Data.IORef
+import Data.Char
+
+import qualified Data.Map as M
+import Data.Tree as TR
+import qualified Data.Set as S
 import Data.List
 import qualified Data.Text as T
 import Data.Text (Text, append, pack)
 import Data.Vector (Vector, indexed, fromList, (!?), (//), (!))
-import Control.Monad.Except
-import Data.Char
 
 import Algebra.Graph.AdjacencyMap
 import Algebra.Graph.AdjacencyMap.Algorithm
@@ -56,36 +57,6 @@ weave1 src end = snd $ head program
 		in cond >>= \flag -> if flag then dst else next
 
 	getLbl lbl = maybe (error "label not found") id $ lookup lbl program
-
---------------------------------------------------------------------------------
-
--- tojs :: (Eq lbl, Show lbl) => [(lbl, Pg lbl Js ())] -> String
-tojs :: Eq lbl => [(lbl, [Pg lbl JS ()])] -> Text
-tojs program = loop $ foldMap f program
-	where
-	f (lbl, a) = (T.concat ["case ", pack $ show (getLbl lbl), ":"])
-								  : foldMap (fmap (append "  ") . h) a
-	h (Do (JS c)) = [c <> ";"]
-	h (Go lbl) = ["target = " <> pack (show (getLbl lbl)) <> ";", "continue;"]
-	h (Br lbl (JS c)) =
-		[ "if ( " <> c <> " ) {"
-		, "  target = " <> pack (show (getLbl lbl)) <> ";"
-		, "  continue;"
-		, "}"
-		]
-	loop stmts = T.unlines
-		["{"
-		, "  var target = 0;"
-		, "  while ( env.run() ) {"
-		, "    env.scan_begin();"
-		, "    switch ( target ) {"
-		, T.unlines $ fmap (append "      ") stmts
-		, "    }"
-		, "    env.scan_end();"
-		, "  }"
-		, "}"
-		]
-	getLbl lbl = maybe (error "label not found") id $ findIndex ((lbl==).fst) program
 
 --------------------------------------------------------------------------------
 
@@ -156,109 +127,16 @@ xxxx
 	-> IO [Pg (Maybe String) IO ()]
 xxxx vars nodes net = do
 
--- 	let vars = M.empty --FIXME
--- 	vars <- M.fromList <$> for
--- 		["%IX0", "%QX0", "%IX1", "%MX0", "%MX1"]
--- 		(\n -> (n,) <$> newIORef False)
-
--- 	let forest = dfsForest $ jjj_ net
 	ff <- forM (dfsForest $ jjj_ net) $ \f -> (,f) <$> newIORef True
 
 -- 	p <- xxxxX vars nodes (dfsForest $ jjj_ net)
 	p <- xxxxXxx devices vars nodes ff
 
--- 	for order $ \(T.Node a forest) -> do
--- -- 		error here
--- 		return ()
-	print (here, "------------------------------")
-	print $ topSort $ jjj_ net
+-- 	print (here, "------------------------------")
+-- 	print $ topSort $ jjj_ net
 	return p
 
-generatejs :: [(Maybe String, Symbol)] -> IO Text
-generatejs nets = do
 
-	print (here, toList $ gatherVariables nets)
-	
-	let vars =
-		fmap (\v -> (v, (JSRef $ "\"in " <> v <> "\"", JSRef $ "\"out " <> v <> "\"")))
-		$ toList $ gatherVariables nets
-	print (here, vars)
-
-	let nodes =
-		fmap (\p -> (p, JSRef $ "\"node " <> pack (show p) <> "\""))
-		$ toList
-		$ foldMap (gatherNodes . snd) nets
-
--- 	let ff = fmap (\net -> (JSRef "pwr -- FIXME", net)) $ dfsForest $ jjj_ nets
-	q <- forM nets $ \(lbl, net) -> do
-		let ff = fmap (\net -> (JSRef "\"pwr\"", net)) $ dfsForest $ jjj_ net
-
-		(lbl,) <$> xxxxXxx jsdevices (M.fromList vars) (M.fromList nodes) ff
-
-	let env = makeJSEnv vars nodes
-	print (here)
-	return $ env <> tojs q
-
-
-makeJSEnv vars nodes = T.unlines $ prologue <> e
-	where
-	prologue = ["env.m[\"pwr\"] = true;"]
-	e = fmap ((<>";") . f)
-		(let (a, b) = unzip (fmap snd vars) in (a<>b) <> fmap snd nodes)
-	f (JSRef v) = "env.m[" <> v <> "] = false"
-
--- testillytest = q M.empty M.empty []
--- 	where
--- 	q
--- 		:: 
--- 		M.Map String (JSRef Bool, JSRef Bool) --TODO more types
--- 		-> M.Map Pos (JSRef Bool) --nodes
--- 		-> [(JSRef Bool, Tree (Pair Pos (Symbol_ Symbol)))]
--- 		-> IO [Pg (Maybe String) JS ()]
--- 	q = xxxxXxx jsdevices
-
-	
-jsget (JSRef r) = "env.get("<> r <> ")"
-jsset (JSRef r) v = "env.set("<> r <> ", " <> v <> ")"
-jsif pwr a
-	= "if ( " <> jsget pwr <> " ) { "
-	<> a --"env.set(" <> a' <> ", " <> f pwr <> "); "
-	<> "}"
-
-jsdevices :: [(String,
-                        (Int,
-                         [(a, (JSRef Bool, JSRef Bool))]
-                         -> JSRef Bool -> IO (JSRef Bool, [Pg lbl JS ()])))]
-jsdevices =
--- 	[ dev "[ ]" 1 $ \[a] -> op "and" a
---  	, dev "[/]" 1 $ \[a] -> op "andn" a
-	[ dev "[ ]" 1 $ \[(_, (a, _))] -> update
-		(\pwr -> jsset pwr $ jsget pwr <> " && " <> jsget a)
- 	, dev "[/]" 1 $ \[(_, (a, _))] -> update
-		(\pwr -> jsset pwr $ jsget pwr <> " && !(" <> jsget a <> ")")
-	, dev "( )" 1 $ \[a] -> update (\pwr -> jsset pwr (jsget pwr))
-	, dev "(S)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "true") )
-	, dev "(R)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "false") )
-	]
-	where
-	dev n na f = (n, (na, f))
-
--- 	op f aa@(_, (JSRef a, _a')) pwr'@(JSRef pwr) = return (pwr',
--- -- 		[Do $ JS $ pwr <> ".set(" <> f <> "(" <> pwr <> ".get(), " <> a <> ".get()))"])
--- 		[Do $ JS $ "env.set(" <> pwr <> ", " <> f <> "(env.get("<> pwr <> "), env.get("<> a <>")))"])
-
--- 	op' pwr f (name, (a, _)) r = undefined
-
-	update f pwr = return (pwr, [Do $ JS $ f pwr])
-
--- 	update' (pwr) f = JS $ f pwr
--- 		$ "env.set(env.get(" <> a' <> "), " <> f <> "(" <> pwr <> ", env.get(" <> a <> ")))"
--- 		$ "if ( " <> jsget pwr <> " ) { "
--- 		<> "env.set(" <> a' <> ", " <> f pwr <> "); "
--- 		<> "}"
-
-
-#if 1
 devices :: [(String,
                         (Int,
                          [(a, (IORef Bool, IORef Bool))]
@@ -290,7 +168,6 @@ devices =
 		case f p va of
 				Just v' -> writeIORef a' v'
 				_ -> return ()
-#endif
 
 doDev devs body args
 	= case lookup body devs of
@@ -300,25 +177,11 @@ doDev devs body args
 
 class Ref r m where
 	readRef :: r a -> m a
--- 	newRef :: a -> m (r a)
--- 	modifyRef :: r a -> (a -> a) -> m ()
 	joinWires :: r Bool -> r Bool -> m ()
 
 instance Ref IORef IO where
 	readRef = readIORef
---  	newRef = newIORef
---  	modifyRef = modifyIORef
 	joinWires pwr nr = readIORef pwr >>= \v -> modifyIORef nr (||v)
-
-data JSRef a = JSRef Text
-	deriving Show
-data JS a = JS Text --(JSRef a)
-	deriving Show
-
-instance Ref JSRef JS where
-	readRef (JSRef r) = JS $ "env.get(" <> r <> ")"
-	joinWires (JSRef pwr) (JSRef nr) = JS
-		$ "env.set(" <> nr <> ", " <> "env.get(" <> pwr <> ") || env.get(" <> nr <> "))"
 
 -- xxxxXxx
 -- 	:: 
@@ -432,15 +295,6 @@ xxxxX vars nodes nets = do
 		= case M.lookup p nodes of
 			Nothing -> error here -- should not happen
 			Just nr -> return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
--- 	doNode pwr p = do
--- 		m <- get
--- 		case M.lookup p m of
--- 			Nothing -> do
--- 				nr <- liftIO $ newIORef False
--- 				put $ M.insert p nr m
--- 				return (nr, [Do $ readIORef pwr >>= writeIORef nr ])
--- 			Just nr -> do
--- 				return (nr, [Do $ readIORef pwr >>= \v -> modifyIORef nr (||v) ])
 
 --------------------------------------------------------------------------------
 

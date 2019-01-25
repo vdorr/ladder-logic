@@ -34,6 +34,7 @@ import Preprocess
 import DiagramParser
 import LadderParser
 import Compile
+import Ladder.Javascript
 
 --------------------------------------------------------------------------------
 
