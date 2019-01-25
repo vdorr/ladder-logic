@@ -145,11 +145,21 @@ function clear_output() {
 	document.getElementById("id_output").value = "";
 }
 
+function load_example() {
+	document.getElementById("tasrc").value
+		= document.getElementById("id_examples").value;
+}
+
+function loaded() {
+	document.getElementById("id_examples").selectedIndex = 1;
+	load_example();
+}
+
 // -----------------------------------------------------------------------------
 
     </script>
 </head>
-<body>
+<body onload="loaded();">
 
 <select id="id_compiler_address">
 <option value="localhost:3000">localhost:3000</option>
@@ -164,7 +174,16 @@ function clear_output() {
 <div>
 
 <textarea rows="32" cols="64" id="tasrc">
-(* --- test 04 --- *)
+</textarea>
+
+<textarea rows="32" cols="64" id="id_output"></textarea>
+    </div>
+
+examples:
+<select id="id_examples" onchange="load_example();">
+<option value="">empty</option>
+<option value=
+"(* --- test 04 --- *)
 
 | %MX0  %MX1        %MX1
 +--[/]---[/]---------(S)-
@@ -175,9 +194,7 @@ function clear_output() {
 | %MX0  %MX1  %MX0  %MX1
 +--[ ]---[ ]---(R)---(R)-
 |
-</textarea>
-
-<textarea rows="32" cols="64" id="id_output"></textarea>
-    </div>
+">two bit counter</option>
+</select>
 
 </body>
