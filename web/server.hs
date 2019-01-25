@@ -18,6 +18,7 @@ import Data.Text.Encoding as E
 import Text.Read
 
 import Compile
+import Ladder.Javascript
 
 --------------------------------------------------------------------------------
 
@@ -26,10 +27,9 @@ eeek s = do
 	let s' = E.decodeUtf8 s
 	putStrLn $ T.unpack s'
 	nets <- parseLadder s' -- T.Text -> IO [(Maybe String, Symbol)]
-	js <- generatejs nets
--- 	putStrLn js
-
-	return $ ResponseData Nothing [] js
+	case generatejs nets of
+		Right js -> return $ ResponseData Nothing [] js
+		Left err -> return $ ResponseData (Just err) [] ""
 
 --------------------------------------------------------------------------------
 

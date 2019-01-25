@@ -32,32 +32,6 @@ instance Ref JSRef JS where
 
 --------------------------------------------------------------------------------
 
-jsget (JSRef r) = "env.get("<> r <> ")"
-jsset (JSRef r) v = "env.set("<> r <> ", " <> v <> ")"
-jsif pwr a
-	= "if ( " <> jsget pwr <> " ) { "
-	<> a --"env.set(" <> a' <> ", " <> f pwr <> "); "
-	<> "}"
-
-jsdevices :: DeviceTable lbl JS JSRef (Either Text) xx
-
--- jsdevices :: [(String,
---                         (Int,
---                          [(a, (JSRef Bool, JSRef Bool))]
---                          -> JSRef Bool -> m (JSRef Bool, [Pg lbl JS ()])))]
-jsdevices =
-	[ dev "[ ]" 1 $ \[(_, (a, _))] -> update
-		(\pwr -> jsset pwr $ jsget pwr <> " && " <> jsget a)
- 	, dev "[/]" 1 $ \[(_, (a, _))] -> update
-		(\pwr -> jsset pwr $ jsget pwr <> " && !(" <> jsget a <> ")")
-	, dev "( )" 1 $ \[a] -> update (\pwr -> jsset pwr (jsget pwr))
-	, dev "(S)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "true") )
-	, dev "(R)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "false") )
-	]
-	where
-	dev n na f = (n, (na, f))
-	update f pwr = return (pwr, [Do $ JS $ f pwr])
-
 
 generatejs :: [(Maybe String, Symbol)] -> Either Text Text
 generatejs nets = do
@@ -84,43 +58,75 @@ generatejs nets = do
 	(env <>) <$> tojs jsAL
 -- 	error here
 
-
-makeJSEnv vars nodes = T.unlines $ prologue <> e
 	where
-	prologue = ["env.m[\"pwr\"] = true;"]
-	e = fmap ((<>";") . f)
-		(let (a, b) = unzip (fmap snd vars) in (a<>b) <> fmap snd nodes)
-	f (JSRef v) = "env.m[" <> v <> "] = false"
+
+	jsget (JSRef r) = "env.get(" <> r <> ")"
+	jsset (JSRef r) v = "env.set(" <> r <> ", " <> v <> ")"
+	jsif pwr a = "if ( " <> jsget pwr <> " ) { " <> a <> "}"
+
+	jsdevices :: DeviceTable lbl JS JSRef (Either Text) xx
+	jsdevices =
+		[ dev "[ ]" 1 $ \[(_, (a, _))] -> update
+			(\pwr -> jsset pwr $ jsget pwr <> " && " <> jsget a)
+		, dev "[/]" 1 $ \[(_, (a, _))] -> update
+			(\pwr -> jsset pwr $ jsget pwr <> " && !(" <> jsget a <> ")")
+		, dev "( )" 1 $ \[a] -> update (\pwr -> jsset pwr (jsget pwr))
+		, dev "(S)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "true") )
+		, dev "(R)" 1 $ \[(_, (_, a'))] -> update (\pwr -> jsif pwr (jsset a' "false") )
+		]
+-- 		where
+	dev n na f = (n, (na, f))
+	update f pwr = return (pwr, [Do $ JS $ f pwr])
+
+
+makeJSEnv vars nodes = T.unlines $ prologue <> fmap st vars <> fmap tmp nodes
+	where
+	prologue = ["env.add_tmp(\"pwr\", true)"]
+-- 	e = fmap ((<>";") . f)
+-- 		(let (a, b) = unzip (fmap snd vars) in (a<>b) <> fmap snd nodes)
+	st (v, _) = "env.add_st(\"" <> v <> "\", false);"
+
+-- 	e = fmap ((<>";") . f)
+-- 		(let (a, b) = unzip (fmap snd vars) in (a<>b) <> fmap snd nodes)
+	tmp (_, JSRef v) = "env.add_tmp(" <> v <> ", false);"
 
 --------------------------------------------------------------------------------
 
 -- | turn list of JS action to actual JS source text fragment
 tojs :: Eq lbl => [(lbl, [Pg lbl JS ()])] -> Either Text Text
 tojs program = do
-	return $ loop $ foldMap f program
+	program' <- forM program $ \(lbl, as) -> (,) <$> getLbl lbl <*> forM as fillLabel
+	return $ loop $ foldMap f program'
 	where
-	f (lbl, a) = (T.concat ["case ", pack $ show (getLbl lbl), ":"])
+	f (lbl, a) = ("case " <> lbl <> ":")
 								  : foldMap (fmap (append "  ") . h) a
 	h (Do (JS c)) = [c <> ";"]
-	h (Go lbl) = ["target = " <> pack (show (getLbl lbl)) <> ";", "continue;"]
+	h (Go lbl) = ["target = " <> lbl <> ";", "continue;"]
 	h (Br lbl (JS c)) =
 		[ "if ( " <> c <> " ) {"
-		, "  target = " <> pack (show (getLbl lbl)) <> ";"
+		, "  target = " <> lbl <> ";"
 		, "  continue;"
 		, "}"
 		]
+--XXX i guess i want to implement loop control logic outside generated code
 	loop stmts = T.unlines
-		["{"
+		["env.body = function () {"
 		, "  var target = 0;"
-		, "  while ( env.run() ) {"
-		, "    env.scan_begin();"
+		, "  while ( this.run() ) {"
+		, "    this.scan_begin();"
 		, "    switch ( target ) {"
 		, T.unlines $ fmap (append "      ") stmts
 		, "    }"
-		, "    env.scan_end();"
+		, "    this.scan_end();"
 		, "  }"
 		, "}"
 		]
-	getLbl lbl = maybe (error "label not found") id $ findIndex ((lbl==).fst) program
+	fillLabel (Do a) = pure $ Do a
+	fillLabel (Go lbl) = Go <$> getLbl lbl
+	fillLabel (Br lbl c) = Br <$> getLbl lbl <*> pure c
+	getLbl lbl = maybe
+		(Left $ "label not found")
+		(Right . pack . show)
+		$ findIndex ((lbl==).fst) program
 
 --------------------------------------------------------------------------------

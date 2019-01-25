@@ -25,6 +25,12 @@ class Environment {
 //TODO copy values from outs to ins
 		console.log("4");
 	}
+	add_st() {
+		console.log("5");
+	}
+	add_tmp() {
+		console.log("6");
+	}
 }
 
 function compile() {
@@ -40,10 +46,13 @@ function compile() {
 	// Request finished. Do processing here.
 		console.log("done");
         var rsp = JSON.parse(this.responseText);
+        console.log(rsp.failure);
         console.log(rsp.artifact);
 
 //just test it, store it somewhere... later
-env = new Environment();
+		env = new Environment();
+        eval(rsp.artifact)
+
 
 //		eval(this.responseText);
 	};
@@ -77,6 +86,7 @@ env = new Environment();
     </div>
 
 <button onclick="compile();">hello</button>
+<input type="checkbox" name="id_sim_run" value="">run</input>
 
 </body>
 
