@@ -8,11 +8,13 @@
 // ----------------------------- !!! -------------------------------------------
 
 class Environment {
-	constructor() {
+	constructor(logger) {
+		this.out = logger
 		this.m = {};
 		this.states = [];
 		this.running = false; //FIXME remove
 		this.tmr = null;
+		this.scan_count = 0;
 	}
 	run() {  //FIXME remove
 		return this.running;
@@ -26,24 +28,31 @@ class Environment {
 // 		console.log("2");
 	}
 	scan_begin() {
-//TODO copy values from ins to outs
-		console.log("3");
 	}
 	scan_end() {
 //TODO copy values from outs to ins
-		console.log("4");
+// 		console.log("scan_end");
+		this.out("scan nr. " + this.scan_count + " ----------------\n");
+		this.scan_count += 1;
+		for (var v in this.states) {
+			const name = this.states[v];
+			const value = this.m["out " + name];
+			this.m["in " + name] = value;
+
+			this.out(name + ": " + value + "\n");//sad!!!
+		}
 	}
 	add_st(name, value) {
 		this.states.push(name);
 		this.m["in " + name] = value;
 		this.m["out " + name] = value;
-		console.log("5 " + name);
+		console.log(["add_st: ", this.states]);
 	}
 	add_tmp(name, value) {
 		this.m[name] = value;
-		//console.log("6 " + name);
 	}
 	start (period) {
+		this.scan_count = 0;
 		console.log(["start", period, this.body]);
 		this.tmr = setInterval(this.body, period)
 	}
@@ -64,6 +73,7 @@ function run_checkbox() {
 	const period = parseInt(txt_period.value);
 
 	if ( chk_run.checked && period != NaN ) {
+		clear_output();
 		env.start(period);
 	} else {
 		chk_run.checked = false;
@@ -72,22 +82,29 @@ function run_checkbox() {
 }
 
 function compile() {
+
 	const src = document.getElementById("tasrc").value;
 	const escaped_src = encodeURIComponent(src);
-	console.log(escaped_src);
+
+	const compiler_address = "http://localhost:3000/";
+// 	const compiler_address = "http://excellentlizard.herokuapp.com/";
 
 	var xhr = new XMLHttpRequest();
-	xhr.open('GET', 'http://localhost:3000/compile?src=' + escaped_src, true);
-// 	xhr.open('GET', 'http://excellentlizard.herokuapp.com/compile?src=' + escaped_src, true);
+	xhr.open("GET", compiler_address + "compile?src=" + escaped_src, true);
 
 	xhr.onload = function () {
-	// Request finished. Do processing here.
-		console.log("done");
-        var rsp = JSON.parse(this.responseText);
-        console.log(rsp.failure);
-        console.log(rsp.artifact);
 
-//just test it, store it somewhere... later
+		var rsp = JSON.parse(this.responseText);
+        console.log(rsp.failure);
+        if ( rsp.failure != null || null == rsp.artifact ) {
+			output_line("compilation failed :-(\n");
+			output_line("error response:\n");
+			output_line("" + rsp.failure);
+        } else {
+			output_line("compiled, got " + rsp.artifact.length + " bytes of javascript\n");
+        }
+//         console.log(rsp.artifact);
+
 		if ( null != env ) {
 			env.stop();
 			env = null;
@@ -95,7 +112,7 @@ function compile() {
         const p = eval(rsp.artifact)
 		console.log(p);
 		if ( typeof p === "function" ) {
-			env = new Environment();
+			env = new Environment(output_line);
 			console.log("invoking");
 			p(env);
 			console.log("done");
@@ -103,9 +120,22 @@ function compile() {
 
 	};
 
+	clear_output();
+	output_line("invoking compiler at " + compiler_address + "\n");
+
 	console.log("sending");
 	xhr.send();
 
+}
+
+function output_line(s) {
+	var textarea = document.getElementById("id_output");
+	textarea.value += s;
+	textarea.scrollTop = textarea.scrollHeight;
+}
+
+function clear_output() {
+	document.getElementById("id_output").value = "";
 }
 
 // -----------------------------------------------------------------------------
@@ -113,7 +143,13 @@ function compile() {
     </script>
 </head>
 <body>
-    <div>
+
+<button onclick="compile();">compile</button>
+<input type="checkbox" id="id_sim_run" value="" onclick="run_checkbox();">run</input>
+<input type="text" id="id_sim_period" value="500">ms
+<button onclick="clear_output();">clear output</button>
+
+<div>
 
 <textarea rows="24" cols="48" id="tasrc">
 (* --- test 04 --- *)
@@ -129,12 +165,7 @@ function compile() {
 |
 </textarea>
 
-<textarea rows="24" cols="48" id="response">
-</textarea>
+<textarea rows="24" cols="48" id="id_output"></textarea>
     </div>
-
-<button onclick="compile();">compile</button>
-<input type="checkbox" id="id_sim_run" value="" onclick="run_checkbox();">run</input>
-<input type="text" id="id_sim_period" value="500">ms
 
 </body>
