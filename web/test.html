@@ -173,11 +173,16 @@ function loaded() {
 
 <div>
 
-<textarea rows="32" cols="64" id="tasrc">
-</textarea>
+	<textarea style="margin: 0; float: left;" rows="32" cols="64" id="tasrc"></textarea>
 
-<textarea rows="32" cols="64" id="id_output"></textarea>
-    </div>
+	<textarea style="margin: 0; float: left;" rows="32" cols="64" id="id_output"></textarea>
+
+	<table style="margin: 0; float: left;" id="id_stuff">
+		<tr> <td>0</td> <td> <input type="text" id="" value="0"> </td> </tr>
+		<tr> <td>1</td> <td> <input type="text" id="" value="0"> </td> </tr>
+	</table>
+
+</div>
 
 examples:
 <select id="id_examples" onchange="load_example();">

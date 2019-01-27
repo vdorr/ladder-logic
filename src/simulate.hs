@@ -4,31 +4,18 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import System.Environment (getArgs)
--- import Control.Monad.State
--- import Control.Monad.Except
--- import Data.Maybe
 import Data.Traversable
 import Data.Foldable
 import Data.Char
 import Data.IORef
 import Data.Functor.Const
--- import Data.List
---TODO import Data.Vector.Unboxed
--- import Data.Vector hiding ((++), forM_, modify, sequence_, sequence)
 import Control.Concurrent
-
--- import Control.Applicative hiding (many)
 
 import Debug.Trace
 import Text.Read (readEither)
--- import qualified Data.Map.Strict as M
 import qualified Data.Map as M
--- import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-
--- import Algebra.Graph.AdjacencyMap
--- import Algebra.Graph.AdjacencyMap.Algorithm
 
 import Preprocess
 import DiagramParser
