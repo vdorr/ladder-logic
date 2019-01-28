@@ -11,41 +11,47 @@
 // ----------------------------- !!! -------------------------------------------
 
 class Environment {
-	constructor(logger) {
-		this.out = logger
+	constructor(view) {
+		view.set_env(this);
+		this.view = view;
+		this.out = view.logger
 		this.m = {};
 		this.states = [];
-		this.running = false; //FIXME remove
+		this.user_forced = {};
 		this.tmr = null;
 		this.scan_count = 0;
-	}
-	run() { //FIXME remove
-		return this.running;
+		this.view.new_env();
 	}
 	get(name) {
-// 		console.log("1");
 		return this.m[name];
 	}
 	set(name, value) {
 		this.m[name] = value;
-// 		console.log("2");
 	}
 	scan_begin() {
+		for (var name in this.user_forced) {
+			const new_val = this.user_forced[name];
+			this.m["in " + name] = new_val;
+			this.m["out " + name] = new_val;
+			console.log(name + " forced " + new_val);
+		}
+		this.user_forced = {};
+	}
+	set_user_state(name, new_val) {
+		this.user_forced[name] = new_val && true;
 	}
 	scan_end() {
-//TODO copy values from outs to ins
-// 		console.log("scan_end");
-		this.out("scan nr. " + this.scan_count + " ----------------\n");
+		this.view.scan_end(this);
 		this.scan_count += 1;
 		for (var v in this.states) {
 			const name = this.states[v];
 			const value = this.m["out " + name];
 			this.m["in " + name] = value;
-
-			this.out(name + ": " + value + "\n");//sad!!!
+			this.view.set_st(name, value);
 		}
 	}
 	add_st(name, value) {
+		this.view.add_st(name, value);
 		this.states.push(name);
 		this.m["in " + name] = value;
 		this.m["out " + name] = value;
@@ -55,7 +61,7 @@ class Environment {
 		this.m[name] = value;
 	}
 	start (period) {
-		this.scan_count = 0;
+// 		this.scan_count = 0;
 		console.log(["start", period, this.body]);
 		this.tmr = setInterval(this.body, period)
 	}
@@ -64,6 +70,61 @@ class Environment {
 		clearInterval(this.tmr);
 	}
 }
+
+// -----------------------------------------------------------------------------
+
+class SimWindow {
+	constructor() {
+		this.state_tab = {};
+
+		this.logger = output_line;
+		this.chk_run = document.getElementById("id_sim_run");
+		this.txt_period = document.getElementById("id_sim_period");
+		this.ta_out = document.getElementById("id_output");
+		this.ta_src = document.getElementById("tasrc");
+		this.cbo_ex = document.getElementById("id_examples");
+		this.tbl_state = document.getElementById("id_states");
+
+		this.cbo_ex.selectedIndex = 1;
+	}
+	set_env(env) { //callled by newly created env
+		this.env = env;
+	}
+	new_env() {
+		this.state_tab = {};
+		this.tbl_state.innerHTML = "";
+	}
+	add_st(name, value) {
+		var row = this.tbl_state.insertRow(0);
+		var cell1 = row.insertCell(0);
+		var cell2 = row.insertCell(1);
+		cell1.innerHTML = name;
+		
+		var input = document.createElement("input");
+		input.type = "text";
+		input.value = value;
+		cell2.appendChild(input);
+		var target = this;
+		input.onchange = function () { target.user_st_change(name, input.value); };
+
+		this.state_tab[name] = input;
+	}
+	user_st_change(state, new_val) {
+		console.log(state + " eeek " + new_val);
+		this.env.set_user_state(state, new_val);
+	}
+	scan_end(view) {
+ 		this.out("scan number " + view.scan_count + " ----------------\n");
+	}
+	set_st(name, value) {
+ 		this.out(name + ": " + value + "\n");
+		this.state_tab[name].value = value;
+	}
+	out(s) {
+		this.ta_out.value += s;
+		this.ta_out.scrollTop = this.ta_out.scrollHeight;
+	}
+};
 
 // -----------------------------------------------------------------------------
 
@@ -83,6 +144,8 @@ function run_checkbox() {
 		env.stop();
 	}
 }
+
+// -----------------------------------------------------------------------------
 
 function compile() {
 
@@ -115,12 +178,11 @@ function compile() {
         const p = eval(rsp.artifact)
 		console.log(p);
 		if ( typeof p === "function" ) {
-			env = new Environment(output_line);
+			env = new Environment(sw);
 			console.log("invoking");
 			p(env);
 			console.log("done");
 		}
-
 	};
 
 	xhr.onerror = function () {
@@ -134,6 +196,8 @@ function compile() {
 	xhr.send();
 
 }
+
+// -----------------------------------------------------------------------------
 
 function output_line(s) {
 	var textarea = document.getElementById("id_output");
@@ -151,6 +215,8 @@ function load_example() {
 }
 
 function loaded() {
+	sw = new SimWindow();
+
 	document.getElementById("id_examples").selectedIndex = 1;
 	load_example();
 }
@@ -158,6 +224,7 @@ function loaded() {
 // -----------------------------------------------------------------------------
 
     </script>
+
 </head>
 <body onload="loaded();">
 
@@ -172,16 +239,10 @@ function loaded() {
 <button onclick="clear_output();">clear output</button>
 
 <div>
-
 	<textarea style="margin: 0; float: left;" rows="32" cols="64" id="tasrc"></textarea>
-
 	<textarea style="margin: 0; float: left;" rows="32" cols="64" id="id_output"></textarea>
-
-	<table style="margin: 0; float: left;" id="id_stuff">
-		<tr> <td>0</td> <td> <input type="text" id="" value="0"> </td> </tr>
-		<tr> <td>1</td> <td> <input type="text" id="" value="0"> </td> </tr>
+	<table style="margin: 0; float: left;" id="id_states">
 	</table>
-
 </div>
 
 examples:
