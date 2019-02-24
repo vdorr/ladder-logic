@@ -71,3 +71,26 @@ preproc3 src =
 	case parse test5 "(file)" src of
 		 Left err -> Left $ T.pack $ show err
 		 Right n -> Right n
+
+--------------------------------------------------------------------------------
+
+data Tok device
+	= Node
+	| VLine
+	| HLine -- Int --repetitions
+	| REdge
+	| FEdge
+	| Negate
+-- 	| Device device
+	| Device' T.Text
+	| Label T.Text
+	| Jump' T.Text
+	| BlockWall -- when HLine hit VLine without intermediate Node
+
+--TODO should also work for FBD
+--preproc4 :: -> m [[((Int,Int) Token)]]
+preproc4 = undefined
+
+--now with columns stored i can eat tokens almost randomly
+
+--------------------------------------------------------------------------------

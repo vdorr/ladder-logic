@@ -1,0 +1,1 @@
+au BufRead,BufNewFile *.ladder setf iec_ladder
