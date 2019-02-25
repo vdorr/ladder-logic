@@ -74,22 +74,28 @@ preproc3 src =
 
 --------------------------------------------------------------------------------
 
-data Tok device
+data Tok
 	= Node
 	| VLine
 	| HLine -- Int --repetitions
-	| REdge
-	| FEdge
-	| Negate
--- 	| Device device
-	| Device' T.Text
-	| Label T.Text
-	| Jump' T.Text
-	| BlockWall -- when HLine hit VLine without intermediate Node
+	| REdge -- as block input "--->"
+	| FEdge -- as block input "---<"
+	| Negated -- on block i/o "---0|" or "|0---"
+	| Contact T.Text -- "---[OP]---"
+	| Coil T.Text -- "---(OP)---"
+	| Label T.Text -- "LABEL:"
+	| Jump' T.Text -- "--->>LABEL"
+	| Connector T.Text -- "--->NAME>"
+	| Continuation T.Text -- ">NAME>---"
+-- 	| BlockWall -- not possible, same as crossing
+	| Return -- "---<RETURN>"
+	| Store T.Text -- FBD only "---VARIABLE"
 
 --TODO should also work for FBD
---preproc4 :: -> m [[((Int,Int) Token)]]
+preproc4 :: T.Text -> Either T.Text [ (Int, [((Int, Int), Tok)]) ]
 preproc4 = undefined
+-- getSourcePos :: MonadParsec e s m => m SourcePos 
+-- SourcePos name line col
 
 --now with columns stored i can eat tokens almost randomly
 
