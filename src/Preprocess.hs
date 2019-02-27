@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP, OverloadedStrings #-}
 
 module Preprocess where
 
@@ -58,12 +59,13 @@ test5 = ladder <* eof
 --TODO 	label = takeWhile1P Nothing isAlphaNum
 
 	network --TODO erase comments
-		= lookAhead (oneOf ("|+")) -- <|> alphaNumChar)
+		= lookAhead (oneOf [ '|', '+' ]) -- <|> alphaNumChar)
 		*> manyTill anySingle eol
 	comment = comment' *> white
-	comment' = chunk (T.pack "(*") *> manyTill anySingle (try (chunk (T.pack "*)")))
+	comment' = chunk "(*" *> manyTill anySingle (try (chunk "*)"))
 	white = skipMany (satisfy (\c -> isSpace c && c /= '\n')) --FIXME use eol
-	eol = char '\n' --FIXME use parsec
+
+-- 	eol = char '\n' --FIXME use parsec
 
 
 preproc3 :: T.Text -> Either Text [(Maybe String, [String])]
@@ -77,26 +79,75 @@ preproc3 src =
 data Tok
 	= Node
 	| VLine
+
+	| Label T.Text -- "LABEL:"
+
 	| HLine -- Int --repetitions
 	| REdge -- as block input "--->"
 	| FEdge -- as block input "---<"
 	| Negated -- on block i/o "---0|" or "|0---"
 	| Contact T.Text -- "---[OP]---"
 	| Coil T.Text -- "---(OP)---"
-	| Label T.Text -- "LABEL:"
 	| Jump' T.Text -- "--->>LABEL"
 	| Connector T.Text -- "--->NAME>"
 	| Continuation T.Text -- ">NAME>---"
--- 	| BlockWall -- not possible, same as crossing
 	| Return -- "---<RETURN>"
 	| Store T.Text -- FBD only "---VARIABLE"
 
---TODO should also work for FBD
-preproc4 :: T.Text -> Either T.Text [ (Int, [((Int, Int), Tok)]) ]
-preproc4 = undefined
+test6 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
+test6 = many ln <* eof
+	where
+	ln
+		= white
+		*> many (comments *> eol)
+		*> ((,) <$> getSourcePos <*> tokens)
+-- 		<* eol
+	--ehm "not cheap"
+-- 	tok = (\a b c -> ((a, c), b)) <$> getSourcePos <*> tok' <*> getSourcePos
+	tok t p = ((,t)) <$> ((,) <$> getSourcePos <*> (p *> getSourcePos))
+	tokens = undefined
+	ln'
+		=   tok Node (char '+')
+		<|> tok VLine (char '|')
+		<|> (tok Label (some alphaNumChar <* char ':') <* comments <* eol)
+		<|> hline
+
+	hline
+		=   HLine <$ many (char '-')
+		<|> REdge <$ char '>'
+		<|> FEdge <$ char '<'
+		<|> Negated <$ char '0'
+-- 	tok'
+-- 		=   Node <$ char '+'
+-- 		<|> VLine <$ char '|'
+-- 		<|> HLine <$ many (char '-')
+-- 		<|> REdge <$ char '>'
+-- 		<|> FEdge <$ char '<'
+-- 		<|> Negated <$ char '0'
+#if 0
+	rung = (,) <$> optional label <*> some network
+	label = some alphaNumChar <* char ':' <* white <* eol
+--TODO 	label = takeWhile1P Nothing isAlphaNum
+#endif
+	comments = many $ comment' *> white --should be called whitespace
+	comment' = chunk "(*" *> manyTill anySingle (try (chunk "*)"))
+	spaceButNotEOL = satisfy (\c -> isSpace c && c /= '\n')
+	white = skipMany spaceButNotEOL
+	somewhite = () <$ some spaceButNotEOL
+	
+
+
+
 -- getSourcePos :: MonadParsec e s m => m SourcePos 
 -- SourcePos name line col
 
 --now with columns stored i can eat tokens almost randomly
+
+--TODO should also work for FBD
+preproc4 :: Text -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
+preproc4 src =
+	case parse test6 "(file)" src of
+		 Left err -> Left $ T.pack $ show err
+		 Right n -> Right n
 
 --------------------------------------------------------------------------------

@@ -27,7 +27,8 @@ library
                      , Compile
                      , Ladder.Javascript
   -- other-modules:       
-  other-extensions:    CPP, ScopedTypeVariables, LambdaCase, RecordWildCards, FlexibleContexts
+  other-extensions:    CPP, ScopedTypeVariables
+                     , LambdaCase, RecordWildCards, FlexibleContexts
   build-depends:       base >=4.9 && <5
                      , mtl >=2.2
                      , vector >=0.12
