@@ -7,7 +7,7 @@
 
 module Ladder where
 
-import DiagramParser
+-- import DiagramParser
 
 main = do
 	print here
