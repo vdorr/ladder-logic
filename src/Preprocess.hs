@@ -176,7 +176,7 @@ test6 = many ln <* eof
 				<* whitespace <* eol)
 -- 		=   (:[]) <$> (tok_ (try (Label' <$> labelName)) <* whitespace <* eol)
 		<|> tok' (Contact <$> (between (chunk "[") (chunk "]") innards)) hline
-		<|> tok' (Coil <$> (between (chunk "(") (chunk ")") innards)) hline
+		<|> tok' (Coil <$> (between (chunk "(") (chunk ")") innards)) hline --FIXME do not require continuation of hline here
 		<|> tok' (Connector <$> (between (char '>') (char '>') name)) (whitespace *> ln')
 
 -- 		<|> tok REdge (char '>') hline'
