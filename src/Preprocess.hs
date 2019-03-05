@@ -124,13 +124,13 @@ test6 = many ln <* eof
 
 	--ehm "not cheap"
 -- 	tok_ :: Parsec ParseErr Text p -> Parsec ParseErr Text ((SourcePos, SourcePos), p)
-	tok_ p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> dbg here p <*> getSourcePos
+	tok_ p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
 	tok' p px
-		= (:) <$> tok_ (dbg here p) <*> px
+		= (:) <$> tok_ ( p) <*> px
 	tok t p px
 		= (:)
-		<$> ((,t) <$> ((,) <$> getSourcePos <*> (dbg here p *> getSourcePos)))
-		<*> dbg here px
+		<$> ((,t) <$> ((,) <$> getSourcePos <*> ( p *> getSourcePos)))
+		<*> px
 
 	ln'' :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok)]
 	ln''
@@ -172,7 +172,7 @@ test6 = many ln <* eof
 	hline'
 		=   (tok' (try (chunk ">>") *> (Label' <$> labelName)) (ln'') <* whitespace <* eol)
 		<|> (tok' (Return <$ (try (between (chunk "<") (chunk ">") labelName)))
-				(traceShowM here >> ln'')
+				(ln'')
 				<* whitespace <* eol)
 -- 		=   (:[]) <$> (tok_ (try (Label' <$> labelName)) <* whitespace <* eol)
 		<|> tok' (Contact <$> (between (chunk "[") (chunk "]") innards)) hline

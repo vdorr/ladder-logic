@@ -29,6 +29,7 @@ library
   -- other-modules:       
   other-extensions:    CPP, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
+                     , PatternSynonyms
   build-depends:       base >=4.9 && <5
                      , mtl >=2.2
                      , vector >=0.12

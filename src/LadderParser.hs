@@ -148,7 +148,6 @@ node :: LDParser Symbol
 node = peek >>= \case
 		Value visited '+'
 			| visited -> getLocs >>= \(loc, _)
--- 				-> return $ loc :< Node' --XXX is this even allowed?
 				-> return $ loc :< Node [] --XXX is this even allowed?
 			| otherwise
 				-> justEatDontMove --XXX i guess 'eat' would work jsut as good, as pos is forced
