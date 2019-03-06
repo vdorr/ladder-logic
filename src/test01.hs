@@ -1,8 +1,9 @@
 {-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
-	PatternSynonyms #-}
+	PatternSynonyms, DeriveFunctor #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
+import Prelude hiding (fail)
 import System.Environment (getArgs)
 import qualified Data.Text.IO as TIO
 import Control.Monad hiding (fail)
@@ -10,11 +11,11 @@ import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 
 import Preprocess
-import LadderParser
+import LadderParser hiding (node, hline)
 import DiagramParser (Pos)
 
 data Zp a = Zp [a] [a]
-	deriving Show
+	deriving (Show, Functor)
 
 -- instance Functor Zp where
 -- 	fmap f (Zp l r) = Zp (fmap f l) (fmap f r)
@@ -31,7 +32,11 @@ right = undefined
 peek :: Dg a -> Maybe a
 eat :: Dg a -> Maybe (a, Dg a)
 
-newtype DgP a = DgP { dgp :: Dg Tok -> Either String (a, Dg Tok) }
+type DgPSt = ([(Int, Int)], (), Dg Tok)
+
+applyDgp p dg = dgp p ([], (), dg)
+
+newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
 instance Functor DgP where
 	fmap = ap . return
@@ -51,16 +56,59 @@ instance Alternative DgP where
 
 test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
-	VLine <- eat'
+	down'
+	VLine <- eat' --down vline
+-- 	down vline <|> (node *> (++) <$> right hline <*> down vline)
+	vline
+		<|> fromHere (right' *> node *>
+			((++) <$> hline <*> (down' *> restorePos *> vline)))
 	return ()
+
+-- |push current position, apply parser and restore it to the next from stored
+fromHere p = do
+	(a, b, c) <- get
+	pp <- pos'
+	put (pp:a, b, c)
+	x <- p
+	put (a, b, c)
+	return x
+
+--move in some direction from provided origin
+type Next = (Int, Int) -> Dg Tok -> Either String (Dg Tok)
+
+restorePos = undefined
+
+get = DgP $ \s -> return (s, s)
+put s = DgP $ \_ -> return ((), s)
+
+-- |
+from :: DgP a -> DgP a
+from = undefined
+
+hline = undefined
+down' = return ()
+right' = return ()
+
 vline = do
+-- 	p <- pos'
 	VLine <- eat'
-	return ()
+	return []
+
 node = do
+-- 	p <- pos'
 	Preprocess.Node <- eat'
 	return ()
 
-eat' = DgP ((maybe (Left "empty") Right) . eat)
+-- variant of eat that check position of next token
+eat'' = undefined
+
+eat' :: DgP Tok
+eat' = undefined --DgP ((maybe (Left "empty") Right) . eat)
+pos' = do
+	(_, _, zp) <- get
+	Just p <- return $ pos zp
+	return p
+-- 	maybe (fail "empty") (return . (,zp)) (pos zp)
 
 pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 pattern DgH' ln x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
@@ -78,6 +126,9 @@ eat _ = Nothing
 pos :: Dg a -> Maybe (Int, Int)
 pos (DgPos ln cl _) = Just (ln, cl)
 pos _ = Nothing
+-- pos dg = do
+-- 	DgPos ln cl _ <- return dg
+-- 	return (ln, cl)
 
 move :: Int -> Int -> Zp a -> Maybe (Zp a)
 move line col (Zp{}) = undefined
@@ -125,7 +176,7 @@ main = do
 		Left err -> TIO.putStrLn err
 		Right x -> do
 -- 			print $ stripPos x
-			print $ dgp test001 $ mkDgZp x
+			print $ applyDgp test001 $ mkDgZp x
 			forM_ x $ \(l,c) -> do
 				print l
 				print c
