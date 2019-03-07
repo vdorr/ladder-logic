@@ -32,9 +32,9 @@ right = undefined
 peek :: Dg a -> Maybe a
 eat :: Dg a -> Maybe (a, Dg a)
 
-type DgPSt = ([(Int, Int)], (), Dg Tok)
+type DgPSt = ([(Int, Int)], Next, Dg Tok)
 
-applyDgp p dg = dgp p ([], (), dg)
+applyDgp p dg = dgp p ([], goRight, dg)
 
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
@@ -68,13 +68,19 @@ test001 = do
 fromHere p = do
 	(a, b, c) <- get
 	pp <- pos'
-	put (pp:a, b, c)
+	put (pp:a, b, c) --can i just keep position in local var?
 	x <- p
 	put (a, b, c)
 	return x
 
 --move in some direction from provided origin
 type Next = (Int, Int) -> Dg Tok -> Either String (Dg Tok)
+
+goRight :: Next
+goRight (ln, co) dg
+	= case move ln (co+1) dg of
+		Just _ -> undefined
+		Nothing -> undefined
 
 restorePos = undefined
 
@@ -103,7 +109,16 @@ node = do
 eat'' = undefined
 
 eat' :: DgP Tok
-eat' = undefined --DgP ((maybe (Left "empty") Right) . eat)
+eat' = do --DgP ((maybe (Left "empty") Right) . eat)
+	(stk, nx, dg) <- get
+	case eat''' dg of
+		 Just (v, (ln, (co, _)), dg') -> do
+-- 			 (stk, nx, dg)
+			Right dg'' <- return $ nx (ln, co) dg'
+			put (stk, nx, dg'')
+			return v
+		 Nothing -> undefined
+
 pos' = do
 	(_, _, zp) <- get
 	Just p <- return $ pos zp
@@ -120,8 +135,12 @@ peek (DgH x) = Just x
 peek _ = Nothing
 
 -- eat = undefined
-eat (Zp u ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp u ((ln, Zp l rs) : ds))
+eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
 eat _ = Nothing
+
+eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
+	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
+eat''' _ = Nothing
 
 pos :: Dg a -> Maybe (Int, Int)
 pos (DgPos ln cl _) = Just (ln, cl)
@@ -130,11 +149,14 @@ pos _ = Nothing
 -- 	DgPos ln cl _ <- return dg
 -- 	return (ln, cl)
 
-move :: Int -> Int -> Zp a -> Maybe (Zp a)
-move line col (Zp{}) = undefined
+move :: Int -> Int -> Dg a -> Maybe (Dg a)
+move line col zp
+	= moveToLine line zp
+	>>= moveToCol col
 
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
-moveToCol col zp@(DgPos _ cl cr)
+-- moveToCol col zp@((Zp u ((ln, Zp l (((cl, cr), x) : rs)) : ds)))
+moveToCol col ((Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds)))
 -- 	= undefined
 	| col >= cl = undefined
 	| col <= cl = undefined
@@ -176,7 +198,8 @@ main = do
 		Left err -> TIO.putStrLn err
 		Right x -> do
 -- 			print $ stripPos x
-			print $ applyDgp test001 $ mkDgZp x
+			let Right (_, (a,_,c)) = applyDgp test001 $ mkDgZp x
+				in print (here, a, c)
 			forM_ x $ \(l,c) -> do
 				print l
 				print c
