@@ -157,9 +157,9 @@ move line col zp
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
 -- moveToCol col zp@((Zp u ((ln, Zp l (((cl, cr), x) : rs)) : ds)))
 moveToCol col ((Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds)))
--- 	= undefined
-	| col >= cl = undefined
-	| col <= cl = undefined
+	| col >= cl = moveTo stepRight (isIn . fst) zp
+	| col <= cl = moveTo stepLeft (isIn . fst) zp
+	where isIn (a, b) = undefined
 moveToCol _ _ = Nothing
 
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
