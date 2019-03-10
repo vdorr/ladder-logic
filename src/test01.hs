@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
-	PatternSynonyms, DeriveFunctor #-}
+	PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -15,7 +15,10 @@ import LadderParser hiding (node, hline)
 import DiagramParser (Pos)
 
 data Zp a = Zp [a] [a]
-	deriving (Show, Functor)
+	deriving (Show, Functor) -- , Foldable)
+
+zpFromList :: [a] -> Zp a
+zpFromList = Zp []
 
 -- instance Functor Zp where
 -- 	fmap f (Zp l r) = Zp (fmap f l) (fmap f r)
@@ -156,10 +159,12 @@ move line col zp
 
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
 -- moveToCol col zp@((Zp u ((ln, Zp l (((cl, cr), x) : rs)) : ds)))
-moveToCol col ((Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds)))
-	| col >= cl = moveTo stepRight (isIn . fst) zp
-	| col <= cl = moveTo stepLeft (isIn . fst) zp
-	where isIn (a, b) = undefined
+moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds))
+	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
+	| col <= cl = reassemble <$> moveTo stepLeft (isIn . fst) zp
+	where
+	isIn (a, b) = undefined
+	reassemble zp' = Zp us ((ln, zp') : ds)
 moveToCol _ _ = Nothing
 
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
