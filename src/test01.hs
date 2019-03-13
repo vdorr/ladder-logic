@@ -67,6 +67,27 @@ test001 = do
 			((++) <$> hline <*> (down' *> restorePos *> vline)))
 	return ()
 
+branch
+	::
+	(Monoid a) => -- ???
+	=>
+	(Tok -> Bool) -- ??
+	-> [(Next, DgP a)]
+	->  DgP a
+branch fork branches = do
+	x <- currentPos
+	peek??? fork???
+	stuff <- for branches $ \(dir, p) -> do
+		setDir dir
+		setPos x
+		step --with dir
+		p
+	eat `fork`
+	undefined
+	return $ sconcat stuff
+-- [...] [a,...] -> [a,...] [...]
+-- then apply parsers and eat branch point
+
 -- |push current position, apply parser and restore it to the next from stored
 fromHere p = do
 	(a, b, c) <- get
