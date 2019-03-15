@@ -9,10 +9,13 @@ import qualified Data.Text.IO as TIO
 import Control.Monad hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
+import Data.Traversable
 
 import Preprocess
 import LadderParser hiding (node, hline)
 import DiagramParser (Pos)
+
+import Debug.Trace
 
 data Zp a = Zp [a] [a]
 	deriving (Show, Functor) -- , Foldable)
@@ -59,8 +62,11 @@ instance Alternative DgP where
 
 test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
+	traceShowM here
 	down'
+	traceShowM here
 	VLine <- eat' --down vline
+	traceShowM here
 -- 	down vline <|> (node *> (++) <$> right hline <*> down vline)
 	vline
 		<|> fromHere (right' *> node *>
@@ -69,24 +75,38 @@ test001 = do
 
 branch
 	::
-	(Monoid a) => -- ???
+	(Monoid a) -- ???
 	=>
 	(Tok -> Bool) -- ??
 	-> [(Next, DgP a)]
 	->  DgP a
-branch fork branches = do
+branch isFork branches = do
 	x <- currentPos
-	peek??? fork???
+	True <- isFork <$> peek'
 	stuff <- for branches $ \(dir, p) -> do
 		setDir dir
 		setPos x
 		step --with dir
 		p
-	eat `fork`
-	undefined
-	return $ sconcat stuff
+	setPos x --eat `fork`
+	eat'
+-- 	undefined
+	return $ mconcat stuff
 -- [...] [a,...] -> [a,...] [...]
 -- then apply parsers and eat branch point
+setDir f = do
+	(a, _, zp) <- get
+	put (a, f, zp)
+step = do
+	x <- currentPos
+	(a, f, zp) <- get
+	Right zp' <- return $ f x zp
+	put (a, f, zp')
+
+setPos (q, w) = do
+	(a, b, zp) <- get
+	Just zp' <- return $ move q w zp --FIXME can only move to direct neighbour!!!!!!!
+	put (a, b, zp')
 
 -- |push current position, apply parser and restore it to the next from stored
 fromHere p = do
@@ -103,8 +123,8 @@ type Next = (Int, Int) -> Dg Tok -> Either String (Dg Tok)
 goRight :: Next
 goRight (ln, co) dg
 	= case move ln (co+1) dg of
-		Just _ -> undefined
-		Nothing -> undefined
+		Just zp' -> return zp'
+		Nothing -> Left here
 
 restorePos = undefined
 
@@ -138,16 +158,25 @@ eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 	case eat''' dg of
 		 Just (v, (ln, (co, _)), dg') -> do
 -- 			 (stk, nx, dg)
+			traceShowM (here, ln, co)
+-- 			traceShowM (here, dg)
 			Right dg'' <- return $ nx (ln, co) dg'
+			traceShowM here
 			put (stk, nx, dg'')
 			return v
 		 Nothing -> undefined
+
+currentPos = pos'
 
 pos' = do
 	(_, _, zp) <- get
 	Just p <- return $ pos zp
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
+peek' = do
+	(_, _, zp) <- get
+	Just p <- return $ peek zp
+	return p
 
 pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 pattern DgH' ln x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
@@ -184,7 +213,7 @@ moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds))
 	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
 	| col <= cl = reassemble <$> moveTo stepLeft (isIn . fst) zp
 	where
-	isIn (a, b) = undefined
+	isIn (a, b) = a>=col&&b<=col
 	reassemble zp' = Zp us ((ln, zp') : ds)
 moveToCol _ _ = Nothing
 
@@ -224,8 +253,13 @@ main = do
 		Left err -> TIO.putStrLn err
 		Right x -> do
 -- 			print $ stripPos x
-			let Right (_, (a,_,c)) = applyDgp test001 $ mkDgZp x
-				in print (here, a, c)
+			let zp = mkDgZp x
+			print (here, zp)
+			case applyDgp test001 zp of
+				Right (_, (a,_,c)) -> print (here, a, c)
+				Left err -> print (here, err)
+#if 0
 			forM_ x $ \(l,c) -> do
 				print l
 				print c
+#endif
