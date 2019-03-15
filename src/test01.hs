@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
-	PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+	PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
+	LambdaCase #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -12,7 +13,7 @@ import Control.Applicative hiding (fail)
 import Data.Traversable
 
 import Preprocess
-import LadderParser hiding (node, hline)
+import LadderParser hiding (node, hline, Node)
 import DiagramParser (Pos)
 
 import Debug.Trace
@@ -28,12 +29,11 @@ zpFromList = Zp []
 
 type Dg a = Zp (Int, Zp ((Int, Int), a))
 
-up, down, left, right :: Dg a -> Maybe (Dg a)
-
-up = undefined
-down = undefined
-left = undefined
-right = undefined
+-- up, down, left, right :: Dg a -> Maybe (Dg a)
+-- up = undefined
+-- down = undefined
+-- left = undefined
+-- right = undefined
 
 peek :: Dg a -> Maybe a
 eat :: Dg a -> Maybe (a, Dg a)
@@ -63,14 +63,24 @@ instance Alternative DgP where
 test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
 	traceShowM here
-	down'
+	setDir goDown
 	traceShowM here
 	VLine <- eat' --down vline
 	traceShowM here
+
 -- 	down vline <|> (node *> (++) <$> right hline <*> down vline)
-	vline
-		<|> fromHere (right' *> node *>
-			((++) <$> hline <*> (down' *> restorePos *> vline)))
+
+-- 	vline
+-- 		<|> fromHere (setDir goRight *> node *>
+-- 			((++) <$> (traceShowM here >> hline) <*> (setDir goDown *> restorePos *> vline)))
+
+	branch
+		(\case
+			Node -> True
+			_ -> False)
+		[ (goRight, return ())
+		]
+
 	return ()
 
 branch
@@ -82,11 +92,17 @@ branch
 	->  DgP a
 branch isFork branches = do
 	x <- currentPos
+	traceShowM (here, x)
 	True <- isFork <$> peek'
+	traceShowM (here)
 	stuff <- for branches $ \(dir, p) -> do
+		traceShowM (here)
 		setDir dir
+		traceShowM (here)
 		setPos x
+		traceShowM (here)
 		step --with dir
+		traceShowM (here)
 		p
 	setPos x --eat `fork`
 	eat'
@@ -100,6 +116,7 @@ setDir f = do
 step = do
 	x <- currentPos
 	(a, f, zp) <- get
+	traceShowM (here, x)
 	Right zp' <- return $ f x zp
 	put (a, f, zp')
 
@@ -126,6 +143,12 @@ goRight (ln, co) dg
 		Just zp' -> return zp'
 		Nothing -> Left here
 
+goDown :: Next
+goDown (ln, co) dg
+	= case move (ln+1) co dg of
+		Just zp' -> return zp'
+		Nothing -> Left here
+
 restorePos = undefined
 
 get = DgP $ \s -> return (s, s)
@@ -135,9 +158,13 @@ put s = DgP $ \_ -> return ((), s)
 from :: DgP a -> DgP a
 from = undefined
 
-hline = undefined
-down' = return ()
-right' = return ()
+hline = do
+-- 	p <- pos'
+	traceShowM here
+	HLine <- eat'
+	return []
+-- down' = return ()
+-- right' = return ()
 
 vline = do
 -- 	p <- pos'
@@ -154,13 +181,17 @@ eat'' = undefined
 
 eat' :: DgP Tok
 eat' = do --DgP ((maybe (Left "empty") Right) . eat)
-	(stk, nx, dg) <- get
+	(stk, nx, dg@(DgH x)) <- get
 	case eat''' dg of
 		 Just (v, (ln, (co, _)), dg') -> do
 -- 			 (stk, nx, dg)
 			traceShowM (here, ln, co)
--- 			traceShowM (here, dg)
-			Right dg'' <- return $ nx (ln, co) dg'
+-- 			traceShowM (here, dg')
+			dg'' <- case nx (ln, co) dg' of
+				Right q -> return q
+				Left err -> do
+					traceShowM (here, err)
+					fail err
 			traceShowM here
 			put (stk, nx, dg'')
 			return v
@@ -179,7 +210,7 @@ peek' = do
 	return p
 
 pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
-pattern DgH' ln x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
+-- pattern DgH' ln cl x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
 pattern DgPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 --pattern DgM = (Zp u ((ln, Zp l ((_, x) : rs)) : ds))
 
@@ -240,6 +271,7 @@ moveTo :: (Zp a -> Maybe (Zp a)) -> (a -> Bool) -> Zp a -> Maybe (Zp a)
 moveTo move test zp@(ZpR l foc r) -- = undefined
 	| test foc = pure zp
 	| otherwise = move zp >>= moveTo move test
+moveTo _ _ _ = Nothing
 
 mkDgZp
 	:: [(Int, [((Int, Int), Tok)])]
