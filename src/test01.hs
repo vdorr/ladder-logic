@@ -25,16 +25,7 @@ data Zp a = Zp [a] [a]
 zpFromList :: [a] -> Zp a
 zpFromList = Zp []
 
--- instance Functor Zp where
--- 	fmap f (Zp l r) = Zp (fmap f l) (fmap f r)
-
 type Dg a = Zp (Int, Zp ((Int, Int), a))
-
--- up, down, left, right :: Dg a -> Maybe (Dg a)
--- up = undefined
--- down = undefined
--- left = undefined
--- right = undefined
 
 peek :: Dg a -> Maybe a
 eat :: Dg a -> Maybe (a, Dg a)
