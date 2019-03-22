@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
 	PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
-	LambdaCase #-}
+	LambdaCase, ScopedTypeVariables #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -66,14 +66,7 @@ test001 = do
 -- 	traceShowM here
 	setDir goDown
 -- 	traceShowM here
-	VLine <- eat' --down vline
--- 	traceShowM here
-
--- 	down vline <|> (node *> (++) <$> right hline <*> down vline)
-
--- 	vline
--- 		<|> fromHere (setDir goRight *> node *>
--- 			((++) <$> (traceShowM here >> hline) <*> (setDir goDown *> restorePos *> vline)))
+	VLine <- eat'
 
 	branch
 		(\case
@@ -88,12 +81,8 @@ test001 = do
 	return ()
 
 branch
-	::
--- 	(Monoid a) -- ???
--- 	=>
-	(Tok -> Bool) -- ??
+	:: (Tok -> Bool)
 	-> [(Next, DgP a)]
--- 	->  DgP a
 	->  DgP [a]
 branch isFork branches = do
 	x <- currentPos
@@ -110,14 +99,13 @@ branch isFork branches = do
 		traceShowM (here)
 		p
 	setPos x --eat `fork`
-	eat'
--- 	undefined
+	eat' --FIXME set direction!!!!!!!!!!!!!
 	return stuff
--- [...] [a,...] -> [a,...] [...]
--- then apply parsers and eat branch point
+
 setDir f = do
 	(a, _, zp) <- get
 	put (a, f, zp)
+
 step = do
 	x <- currentPos
 	(a, f, zp) <- get
@@ -128,56 +116,52 @@ step = do
 			traceShowM (here, err)
 			fail here
 
-setPos (q, w) = do
+setPos (q, (w, _FIXME)) = do
 	(a, b, zp) <- get
 	Just zp' <- return $ move q w zp --FIXME can only move to direct neighbour!!!!!!!
 	put (a, b, zp')
 
 -- |push current position, apply parser and restore it to the next from stored
-fromHere p = do
-	(a, b, c) <- get
-	pp <- pos'
-	put (pp:a, b, c) --can i just keep position in local var?
-	x <- p
-	put (a, b, c)
-	return x
+-- fromHere p = do
+-- 	(a, b, c) <- get
+-- 	pp <- pos'
+-- 	put (pp:a, b, c) --can i just keep position in local var?
+-- 	x <- p
+-- 	put (a, b, c)
+-- 	return x
 
 --move in some direction from provided origin
-type Next = (Int, Int) -> Dg Tok -> Either String (Dg Tok)
+type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
 
 goRight :: Next
-goRight (ln, co) dg
+goRight (ln, (_, co)) dg
 	= case move ln (co+1) dg of
 		Just zp' -> return zp'
 		Nothing -> do
 -- 			traceShowM (here, dg)
-			traceShowM (here, ln, (co+1))
+-- 			traceShowM (here, ln, (co+1))
 			Left here
 
 goDown :: Next
-goDown (ln, co) dg
+goDown (ln, (co, _)) dg
 	= case move (ln+1) co dg of
 		Just zp' -> return zp'
 		Nothing -> do
-			traceShowM (here, dg)
-			traceShowM (here, (ln+1), co)
+-- 			traceShowM (here, dg)
+-- 			traceShowM (here, (ln+1), co)
 			Left here
-
--- restorePos = undefined
 
 get = DgP $ \s -> return (s, s)
 put s = DgP $ \_ -> return ((), s)
 
--- |
-from :: DgP a -> DgP a
-from = undefined
-
 hline' = do
-	traceShowM (here)
 	many
-		$ hline
-		<|> coil
+		$ coil
+		<|> hline
 		<|> contact
+	p <- currentPos
+	q <- peek'
+-- 	traceShowM (here, p, q)
 	return []
 hline = do
 	p <- currentPos
@@ -193,41 +177,35 @@ coil = do
 contact = do
 	Contact _ <- eat'
 	return []
-	
--- down' = return ()
--- right' = return ()
 
 vline = do
--- 	p <- pos'
 	VLine <- eat'
 	return []
 
 node = do
--- 	p <- pos'
 	Preprocess.Node <- eat'
 	return ()
-
--- variant of eat that check position of next token
--- eat'' = undefined
 
 eat' :: DgP Tok
 eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 	(stk, nx, dg@(DgH x)) <- get
 	case eat''' dg of
-		 Just (v, (ln, (co, _)), dg') -> do
+		 Just (v, (ln, co), dg') -> do
 -- 			 (stk, nx, dg)
 			traceShowM (here, ln, co)
 -- 			traceShowM (here, dg')
 			dg'' <- case nx (ln, co) dg' of
 				Right q -> return q
 				Left err -> do
-					traceShowM (here, err)
-					fail err
+-- 					traceShowM (here, err)
+-- 					fail err
+					traceShowM (here, "nowhere to move")
+					return dg'
 			put (stk, nx, dg'')
 			return v
 		 Nothing -> undefined
 
-currentPos :: DgP (Int, Int)
+currentPos :: DgP (Int, (Int, Int))
 currentPos = pos'
 
 pos' = do
@@ -257,8 +235,8 @@ eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
 	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
 eat''' _ = Nothing
 
-pos :: Dg a -> Maybe (Int, Int)
-pos (DgPos ln cl _) = Just (ln, cl)
+pos :: Dg a -> Maybe (Int, (Int, Int))
+pos (DgPos ln cl cr) = Just (ln, (cl, cr))
 pos _ = Nothing
 -- pos dg = do
 -- 	DgPos ln cl _ <- return dg
