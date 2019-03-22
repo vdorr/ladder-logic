@@ -11,6 +11,7 @@ import Control.Monad hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Data.Traversable
+import Data.Foldable
 
 import Preprocess
 import LadderParser hiding (node, hline, Node)
@@ -62,11 +63,11 @@ instance Alternative DgP where
 
 test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
-	traceShowM here
+-- 	traceShowM here
 	setDir goDown
-	traceShowM here
+-- 	traceShowM here
 	VLine <- eat' --down vline
-	traceShowM here
+-- 	traceShowM here
 
 -- 	down vline <|> (node *> (++) <$> right hline <*> down vline)
 
@@ -79,26 +80,28 @@ test001 = do
 			Node -> True
 			_ -> False)
 		[ (goRight, return ())
+		, (goDown, return ())
 		]
 
 	return ()
 
 branch
 	::
-	(Monoid a) -- ???
-	=>
+-- 	(Monoid a) -- ???
+-- 	=>
 	(Tok -> Bool) -- ??
 	-> [(Next, DgP a)]
-	->  DgP a
+-- 	->  DgP a
+	->  DgP [a]
 branch isFork branches = do
 	x <- currentPos
-	traceShowM (here, x)
+-- 	traceShowM (here, x)
 	True <- isFork <$> peek'
-	traceShowM (here)
+-- 	traceShowM (here)
 	stuff <- for branches $ \(dir, p) -> do
-		traceShowM (here)
+-- 		traceShowM (here)
 		setDir dir
-		traceShowM (here)
+-- 		traceShowM (here)
 		setPos x
 		traceShowM (here)
 		step --with dir
@@ -107,7 +110,7 @@ branch isFork branches = do
 	setPos x --eat `fork`
 	eat'
 -- 	undefined
-	return $ mconcat stuff
+	return stuff
 -- [...] [a,...] -> [a,...] [...]
 -- then apply parsers and eat branch point
 setDir f = do
@@ -116,9 +119,12 @@ setDir f = do
 step = do
 	x <- currentPos
 	(a, f, zp) <- get
-	traceShowM (here, x)
-	Right zp' <- return $ f x zp
-	put (a, f, zp')
+-- 	traceShowM (here, x)
+	case f x zp of
+		Right zp' -> put (a, f, zp')
+		Left err -> do
+			traceShowM (here, err)
+			fail here
 
 setPos (q, w) = do
 	(a, b, zp) <- get
@@ -141,7 +147,10 @@ goRight :: Next
 goRight (ln, co) dg
 	= case move ln (co+1) dg of
 		Just zp' -> return zp'
-		Nothing -> Left here
+		Nothing -> do
+			traceShowM (here, dg)
+			traceShowM (here, ln, (co+1))
+			Left here
 
 goDown :: Next
 goDown (ln, co) dg
@@ -160,7 +169,7 @@ from = undefined
 
 hline = do
 -- 	p <- pos'
-	traceShowM here
+-- 	traceShowM here
 	HLine <- eat'
 	return []
 -- down' = return ()
@@ -185,14 +194,13 @@ eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 	case eat''' dg of
 		 Just (v, (ln, (co, _)), dg') -> do
 -- 			 (stk, nx, dg)
-			traceShowM (here, ln, co)
+-- 			traceShowM (here, ln, co)
 -- 			traceShowM (here, dg')
 			dg'' <- case nx (ln, co) dg' of
 				Right q -> return q
 				Left err -> do
-					traceShowM (here, err)
+-- 					traceShowM (here, err)
 					fail err
-			traceShowM here
 			put (stk, nx, dg'')
 			return v
 		 Nothing -> undefined
@@ -244,9 +252,9 @@ moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds))
 	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
 	| col <= cl = reassemble <$> moveTo stepLeft (isIn . fst) zp
 	where
-	isIn (a, b) = a>=col&&b<=col
+	isIn (a, b) = (b>=col)&&(a<=col)
 	reassemble zp' = Zp us ((ln, zp') : ds)
-moveToCol _ _ = Nothing
+moveToCol _ _ = traceShowM here >> Nothing
 
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
 moveToLine line zp@(DgPos ln _ _)
@@ -285,10 +293,17 @@ main = do
 		Left err -> TIO.putStrLn err
 		Right x -> do
 -- 			print $ stripPos x
-			let zp = mkDgZp x
-			print (here, zp)
+			let zp@(Zp zpl zpr) = mkDgZp x
+
+-- 			print (here, zp)
+			for_ zpl $ \q -> print (here, q)
+			for_ zpr $ \q -> print (here, q)
+			
 			case applyDgp test001 zp of
-				Right (_, (a,_,c)) -> print (here, a, c)
+				Right (_, (a,_,c@(Zp zpl zpr))) -> do
+-- 					print (here, a, c)
+					for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
+-- 					for_ zpr $ \q -> print (here, q)
 				Left err -> print (here, err)
 #if 0
 			forM_ x $ \(l,c) -> do
