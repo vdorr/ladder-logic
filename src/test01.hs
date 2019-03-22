@@ -100,7 +100,6 @@ setDir f = do
 step = do
 	x <- currentPos
 	(a, f, zp) <- get
--- 	traceShowM (here, x)
 	case f x zp of
 		Right zp' -> put (a, f, zp')
 		Left err -> do
@@ -111,15 +110,6 @@ setPos (q, (w, _FIXME)) = do
 	(a, b, zp) <- get
 	Just zp' <- return $ move q w zp --FIXME can only move to direct neighbour!!!!!!!
 	put (a, b, zp')
-
--- |push current position, apply parser and restore it to the next from stored
--- fromHere p = do
--- 	(a, b, c) <- get
--- 	pp <- pos'
--- 	put (pp:a, b, c) --can i just keep position in local var?
--- 	x <- p
--- 	put (a, b, c)
--- 	return x
 
 --move in some direction from provided origin
 type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
@@ -229,9 +219,6 @@ eat''' _ = Nothing
 pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgPos ln cl cr) = Just (ln, (cl, cr))
 pos _ = Nothing
--- pos dg = do
--- 	DgPos ln cl _ <- return dg
--- 	return (ln, cl)
 
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col zp
