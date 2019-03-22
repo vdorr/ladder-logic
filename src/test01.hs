@@ -227,7 +227,7 @@ eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 			return v
 		 Nothing -> undefined
 
-currentPos :: _
+currentPos :: DgP (Int, Int)
 currentPos = pos'
 
 pos' = do
