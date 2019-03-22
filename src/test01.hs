@@ -79,9 +79,11 @@ test001 = do
 		(\case
 			Node -> True
 			_ -> False)
-		[ (goRight, return ())
-		, (goDown, return ())
+		[ (goRight, hline' >> return () )
+		, (goDown, return () -- <|> pure ()
+			)
 		]
+-- 		<|> pure []
 
 	return ()
 
@@ -148,7 +150,7 @@ goRight (ln, co) dg
 	= case move ln (co+1) dg of
 		Just zp' -> return zp'
 		Nothing -> do
-			traceShowM (here, dg)
+-- 			traceShowM (here, dg)
 			traceShowM (here, ln, (co+1))
 			Left here
 
@@ -156,9 +158,12 @@ goDown :: Next
 goDown (ln, co) dg
 	= case move (ln+1) co dg of
 		Just zp' -> return zp'
-		Nothing -> Left here
+		Nothing -> do
+			traceShowM (here, dg)
+			traceShowM (here, (ln+1), co)
+			Left here
 
-restorePos = undefined
+-- restorePos = undefined
 
 get = DgP $ \s -> return (s, s)
 put s = DgP $ \_ -> return ((), s)
@@ -167,11 +172,28 @@ put s = DgP $ \_ -> return ((), s)
 from :: DgP a -> DgP a
 from = undefined
 
-hline = do
--- 	p <- pos'
--- 	traceShowM here
-	HLine <- eat'
+hline' = do
+	traceShowM (here)
+	many
+		$ hline
+		<|> coil
+		<|> contact
 	return []
+hline = do
+	p <- currentPos
+	q <- peek'
+	traceShowM (here, p, q)
+	
+	HLine <- eat'
+	traceShowM (here)
+	return []
+coil = do
+	Coil _ <- eat'
+	return []
+contact = do
+	Contact _ <- eat'
+	return []
+	
 -- down' = return ()
 -- right' = return ()
 
@@ -186,7 +208,7 @@ node = do
 	return ()
 
 -- variant of eat that check position of next token
-eat'' = undefined
+-- eat'' = undefined
 
 eat' :: DgP Tok
 eat' = do --DgP ((maybe (Left "empty") Right) . eat)
@@ -194,12 +216,12 @@ eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 	case eat''' dg of
 		 Just (v, (ln, (co, _)), dg') -> do
 -- 			 (stk, nx, dg)
--- 			traceShowM (here, ln, co)
+			traceShowM (here, ln, co)
 -- 			traceShowM (here, dg')
 			dg'' <- case nx (ln, co) dg' of
 				Right q -> return q
 				Left err -> do
--- 					traceShowM (here, err)
+					traceShowM (here, err)
 					fail err
 			put (stk, nx, dg'')
 			return v
