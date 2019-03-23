@@ -81,14 +81,19 @@ branch isFork branches = do
 	True <- isFork <$> peek'
 -- 	traceShowM (here)
 	stuff <- for branches $ \(dir, p) -> do
--- 		traceShowM (here)
+--  		traceShowM (here)
 		setDir dir
--- 		traceShowM (here)
+-- 		(_, _, zp) <- get
+--  		traceShowM (here, x)
+--  		traceShowM (here, zp)
 		setPos x
-		traceShowM (here)
+-- 		traceShowM (here)
 		step --with dir
-		traceShowM (here)
-		p
+-- 		traceShowM (here)
+		y <- p
+-- 		traceShowM (here)
+		pure y
+	traceShowM (here)
 	setPos x --eat `fork`
 	eat' --FIXME set direction!!!!!!!!!!!!!
 	return stuff
@@ -140,17 +145,13 @@ hline' = do
 		$ coil
 		<|> hline
 		<|> contact
-	p <- currentPos
-	q <- peek'
+-- 	p <- currentPos
+-- 	q <- peek'
 -- 	traceShowM (here, p, q)
 	return []
-hline = do
-	p <- currentPos
-	q <- peek'
-	traceShowM (here, p, q)
-	
+hline = do	
 	HLine <- eat'
-	traceShowM (here)
+-- 	traceShowM (here)
 	return []
 coil = do
 	Coil _ <- eat'
@@ -173,7 +174,7 @@ eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 	case eat''' dg of
 		 Just (v, (ln, co), dg') -> do
 -- 			 (stk, nx, dg)
-			traceShowM (here, ln, co)
+-- 			traceShowM (here, ln, co)
 -- 			traceShowM (here, dg')
 			dg'' <- case nx (ln, co) dg' of
 				Right q -> return q
@@ -187,10 +188,9 @@ eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 		 Nothing -> undefined
 
 currentPos :: DgP (Int, (Int, Int))
-currentPos = pos'
-
-pos' = do
+currentPos = do
 	(_, _, zp) <- get
+-- 	traceShowM (here, zp)
 	Just p <- return $ pos zp
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
@@ -235,11 +235,19 @@ moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds))
 	reassemble zp' = Zp us ((ln, zp') : ds)
 moveToCol _ _ = traceShowM here >> Nothing
 
+-- |Bring something into focus
+foc :: Zp a -> Zp a
+foc (Zp (x:xs) []) = Zp xs [x]
+foc zp = zp
+
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
-moveToLine line zp@(DgPos ln _ _)
+moveToLine l zp = moveToLine' l (fmap (fmap foc) (foc zp))
+
+moveToLine' :: Int -> Dg a -> Maybe (Dg a)
+moveToLine' line zp@(DgPos ln _ _)
 	| line >= ln = moveTo stepRight ((line==).fst) zp
 	| otherwise = moveTo stepLeft ((line==).fst) zp
-moveToLine _ _ = Nothing
+moveToLine' _ _ = Nothing
 
 pattern ZpR' x <- Zp _ (x : _)
 pattern ZpR l f r = Zp l (f : r)
