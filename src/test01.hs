@@ -54,6 +54,48 @@ instance Alternative DgP where
 	empty = DgP $ const $ Left "alt empty"
 	a <|> b = DgP $ \s -> dgp a s <|> dgp b s
 
+get = DgP $ \s -> return (s, s)
+put s = DgP $ \_ -> return ((), s)
+modify f = (f <$> get) >>= put
+
+--------------------------------------------------------------------------------
+
+setDir f = do
+	(_, zp) <- get
+	put (f, zp)
+
+step = do
+	origin <- currentPos
+	(f, zp) <- get
+	case f origin zp of
+		Right zp' -> put (f, zp')
+		Left err -> fail here --or not?
+
+setPos (ln, (co, _)) = do
+	(b, zp) <- get
+	Just zp' <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
+	put (b, zp')
+
+--move in some direction from provided origin
+type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
+
+move_ :: Int -> Int -> Dg a -> Either String (Dg a)
+move_ ln co dg = maybe (Left here) return (move ln co dg)
+
+goRight :: Next
+goRight (ln, (_, co)) = move_ ln (co+1)
+-- dg
+-- 	= case move ln (co+1) dg of
+-- 		Just zp' -> return zp'
+-- 		Nothing -> Left here
+
+goDown :: Next
+goDown (ln, (co, _)) = move_ (ln+1) co
+-- dg
+-- 	= case move (ln+1) co dg of
+-- 		Just zp' -> return zp'
+-- 		Nothing -> Left here
+
 --------------------------------------------------------------------------------
 
 test001 :: DgP () --(Cofree Symbol_ Pos)
@@ -79,87 +121,22 @@ branch
 	-> [(Next, DgP a)]
 	->  DgP [a]
 branch isFork branches = do
-	x <- currentPos
--- 	traceShowM (here, x)
+	origin <- currentPos
 	True <- isFork <$> peek'
--- 	traceShowM (here)
 	stuff <- for branches $ \(dir, p) -> do
---  		traceShowM (here)
 		setDir dir
--- 		(_, _, zp) <- get
---  		traceShowM (here, x)
---  		traceShowM (here, zp)
-		setPos x
--- 		traceShowM (here)
+		setPos origin
 		step --with dir
--- 		traceShowM (here)
-		y <- p
--- 		traceShowM (here)
-		pure y
--- 	(_, _, zp) <- get
--- 	traceShowM (here, x)
--- 	traceShowM (here, zp)
-	setPos x --eat `fork`
--- 	traceShowM here
+		p
+	setPos origin --eat `fork`
 	eat' --FIXME set direction!!!!!!!!!!!!!
--- 	traceShowM here
 	return stuff
 
-setDir f = do
-	(_, zp) <- get
-	put (f, zp)
-
-step = do
-	x <- currentPos
-	(f, zp) <- get
-	case f x zp of
-		Right zp' -> put (f, zp')
-		Left err -> do
-			traceShowM (here, err)
-			fail here
-
-setPos (q, (w, _FIXME)) = do
-	(b, zp) <- get
-	Just zp' <- return $ move q w zp --FIXME can only move to direct neighbour!!!!!!!
-	put (b, zp')
-
---move in some direction from provided origin
-type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
-
-goRight :: Next
-goRight (ln, (_, co)) dg
-	= case move ln (co+1) dg of
-		Just zp' -> return zp'
-		Nothing -> do
--- 			traceShowM (here, dg)
--- 			traceShowM (here, ln, (co+1))
-			Left here
-
-goDown :: Next
-goDown (ln, (co, _)) dg
-	= case move (ln+1) co dg of
-		Just zp' -> return zp'
-		Nothing -> do
--- 			traceShowM (here, dg)
--- 			traceShowM (here, (ln+1), co)
-			Left here
-
-get = DgP $ \s -> return (s, s)
-put s = DgP $ \_ -> return ((), s)
-
 hline' = do
-	many
-		$ coil
-		<|> hline
-		<|> contact
-		<|> node'
--- 	p <- currentPos
--- 	q <- peek'
--- 	traceShowM (here, p, q)
+	many (coil <|> hline <|> contact <|> node')
 	return []
 hline = do	
 	HLine <- eat'
--- 	traceShowM (here)
 	return []
 coil = do
 	Coil _ <- eat'
@@ -176,35 +153,27 @@ node = do
 	Preprocess.Node <- eat'
 	return ()
 
+--------------------------------------------------------------------------------
+
 eat' :: DgP Tok
-eat' = do --DgP ((maybe (Left "empty") Right) . eat)
-	(nx, dg@(DgH x)) <- get
+eat' = do
+	(nx, dg) <- get
 	case eat''' dg of
 		 Just (v, (ln, co), dg') -> do
--- 			 (stk, nx, dg)
--- 			traceShowM (here, ln, co)
--- 			traceShowM (here, dg')
 			dg'' <- case nx (ln, co) dg' of
 				Right q -> return q
-				Left err -> do
--- 					traceShowM (here, err)
--- 					fail err
-					traceShowM (here, "nowhere to move")
-					return dg'
+				Left _err -> return dg' --nowhere to move
 			put (nx, dg'')
 			return v
-		 Nothing -> undefined
+		 Nothing -> fail here
 
 currentPos :: DgP (Int, (Int, Int))
 currentPos = do
-	(_, zp) <- get
--- 	traceShowM (here, zp)
-	Just p <- return $ pos zp
+	Just p <- (pos . snd) <$> get
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
 peek' = do
-	(_, zp) <- get
-	Just p <- return $ peek zp
+	Just p <- (peek . snd) <$> get
 	return p
 
 pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
@@ -216,7 +185,6 @@ pattern DgPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 peek (DgH x) = Just x
 peek _ = Nothing
 
--- eat = undefined
 eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
 eat _ = Nothing
 
