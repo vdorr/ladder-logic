@@ -56,20 +56,23 @@ test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
 -- 	traceShowM here
 	setDir goDown
--- 	traceShowM here
-	VLine <- eat'
+-- 	VLine <- eat'
+	vline
 
-	branch
+	node'
+-- 		<|> pure []
+
+	return ()
+
+node'
+	= branch
 		(\case
 			Node -> True
 			_ -> False)
 		[ (goRight, hline' >> return () )
-		, (goDown, return () -- <|> pure ()
+		, (goDown, (vline) >> return () -- <|> pure ()
 			)
 		]
--- 		<|> pure []
-
-	return ()
 
 branch
 	:: (Tok -> Bool)
@@ -93,9 +96,13 @@ branch isFork branches = do
 		y <- p
 -- 		traceShowM (here)
 		pure y
-	traceShowM (here)
+	(_, _, zp) <- get
+	traceShowM (here, x)
+	traceShowM (here, zp)
 	setPos x --eat `fork`
+	traceShowM here
 	eat' --FIXME set direction!!!!!!!!!!!!!
+	traceShowM here
 	return stuff
 
 setDir f = do
@@ -220,20 +227,19 @@ pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgPos ln cl cr) = Just (ln, (cl, cr))
 pos _ = Nothing
 
-move :: Int -> Int -> Dg a -> Maybe (Dg a)
+-- move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col zp
-	= moveToLine line zp
+	= moveToLine line zp --(fmap (fmap foc) (foc zp))
 	>>= moveToCol col
 
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
--- moveToCol col zp@((Zp u ((ln, Zp l (((cl, cr), x) : rs)) : ds)))
 moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds))
 	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
 	| col <= cl = reassemble <$> moveTo stepLeft (isIn . fst) zp
 	where
 	isIn (a, b) = (b>=col)&&(a<=col)
 	reassemble zp' = Zp us ((ln, zp') : ds)
-moveToCol _ _ = traceShowM here >> Nothing
+moveToCol _ _ = Nothing
 
 -- |Bring something into focus
 foc :: Zp a -> Zp a
@@ -243,8 +249,8 @@ foc zp = zp
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
 moveToLine l zp = moveToLine' l (fmap (fmap foc) (foc zp))
 
-moveToLine' :: Int -> Dg a -> Maybe (Dg a)
-moveToLine' line zp@(DgPos ln _ _)
+-- moveToLine' :: Int -> Dg a -> Maybe (Dg a)
+moveToLine' line zp@(Zp _ ( (ln, _) : _))
 	| line >= ln = moveTo stepRight ((line==).fst) zp
 	| otherwise = moveTo stepLeft ((line==).fst) zp
 moveToLine' _ _ = Nothing
