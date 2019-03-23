@@ -32,9 +32,9 @@ type Dg a = Zp (Int, Zp ((Int, Int), a))
 peek :: Dg a -> Maybe a
 eat :: Dg a -> Maybe (a, Dg a)
 
-type DgPSt = ([(Int, Int)], Next, Dg Tok)
+type DgPSt = (Next, Dg Tok)
 
-applyDgp p dg = dgp p ([], goRight, dg)
+applyDgp p dg = dgp p (goRight, dg)
 
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
@@ -106,22 +106,22 @@ branch isFork branches = do
 	return stuff
 
 setDir f = do
-	(a, _, zp) <- get
-	put (a, f, zp)
+	(_, zp) <- get
+	put (f, zp)
 
 step = do
 	x <- currentPos
-	(a, f, zp) <- get
+	(f, zp) <- get
 	case f x zp of
-		Right zp' -> put (a, f, zp')
+		Right zp' -> put (f, zp')
 		Left err -> do
 			traceShowM (here, err)
 			fail here
 
 setPos (q, (w, _FIXME)) = do
-	(a, b, zp) <- get
+	(b, zp) <- get
 	Just zp' <- return $ move q w zp --FIXME can only move to direct neighbour!!!!!!!
-	put (a, b, zp')
+	put (b, zp')
 
 --move in some direction from provided origin
 type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
@@ -178,7 +178,7 @@ node = do
 
 eat' :: DgP Tok
 eat' = do --DgP ((maybe (Left "empty") Right) . eat)
-	(stk, nx, dg@(DgH x)) <- get
+	(nx, dg@(DgH x)) <- get
 	case eat''' dg of
 		 Just (v, (ln, co), dg') -> do
 -- 			 (stk, nx, dg)
@@ -191,19 +191,19 @@ eat' = do --DgP ((maybe (Left "empty") Right) . eat)
 -- 					fail err
 					traceShowM (here, "nowhere to move")
 					return dg'
-			put (stk, nx, dg'')
+			put (nx, dg'')
 			return v
 		 Nothing -> undefined
 
 currentPos :: DgP (Int, (Int, Int))
 currentPos = do
-	(_, _, zp) <- get
+	(_, zp) <- get
 -- 	traceShowM (here, zp)
 	Just p <- return $ pos zp
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
 peek' = do
-	(_, _, zp) <- get
+	(_, zp) <- get
 	Just p <- return $ peek zp
 	return p
 
@@ -296,7 +296,7 @@ main = do
 			for_ zpr $ \q -> print (here, q)
 			
 			case applyDgp test001 zp of
-				Right (_, (a,_,c@(Zp zpl zpr))) -> do
+				Right (_, (_,c@(Zp zpl zpr))) -> do
 -- 					print (here, a, c)
 					for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 -- 					for_ zpr $ \q -> print (here, q)
