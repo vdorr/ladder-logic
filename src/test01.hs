@@ -19,6 +19,8 @@ import DiagramParser (Pos)
 
 import Debug.Trace
 
+--------------------------------------------------------------------------------
+
 data Zp a = Zp [a] [a]
 	deriving (Show, Functor) -- , Foldable)
 
@@ -52,16 +54,13 @@ instance Alternative DgP where
 	empty = DgP $ const $ Left "alt empty"
 	a <|> b = DgP $ \s -> dgp a s <|> dgp b s
 
+--------------------------------------------------------------------------------
+
 test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
--- 	traceShowM here
 	setDir goDown
--- 	VLine <- eat'
 	vline
-
 	node'
--- 		<|> pure []
-
 	return ()
 
 node'
@@ -70,9 +69,10 @@ node'
 			Node -> True
 			_ -> False)
 		[ (goRight, hline' >> return () )
-		, (goDown, (vline) >> return () -- <|> pure ()
-			)
+		, (goDown, vline' >> return () )
 		]
+
+vline' = some (node' <|> vline)
 
 branch
 	:: (Tok -> Bool)
@@ -96,13 +96,13 @@ branch isFork branches = do
 		y <- p
 -- 		traceShowM (here)
 		pure y
-	(_, _, zp) <- get
-	traceShowM (here, x)
-	traceShowM (here, zp)
+-- 	(_, _, zp) <- get
+-- 	traceShowM (here, x)
+-- 	traceShowM (here, zp)
 	setPos x --eat `fork`
-	traceShowM here
+-- 	traceShowM here
 	eat' --FIXME set direction!!!!!!!!!!!!!
-	traceShowM here
+-- 	traceShowM here
 	return stuff
 
 setDir f = do
@@ -152,6 +152,7 @@ hline' = do
 		$ coil
 		<|> hline
 		<|> contact
+		<|> node'
 -- 	p <- currentPos
 -- 	q <- peek'
 -- 	traceShowM (here, p, q)
@@ -278,6 +279,8 @@ mkDgZp
 	:: [(Int, [((Int, Int), Tok)])]
 	-> Dg Tok
 mkDgZp = Zp [] . fmap (fmap (Zp []))
+
+--------------------------------------------------------------------------------
 
 main = do
 	[file] <- getArgs
