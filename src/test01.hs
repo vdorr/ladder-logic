@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
 	PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
-	LambdaCase, ScopedTypeVariables #-}
+	LambdaCase, ScopedTypeVariables, ViewPatterns #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -28,9 +28,6 @@ zpFromList :: [a] -> Zp a
 zpFromList = Zp []
 
 type Dg a = Zp (Int, Zp ((Int, Int), a))
-
-peek :: Dg a -> Maybe a
-eat :: Dg a -> Maybe (a, Dg a)
 
 type DgPSt = (Next, Dg Tok)
 
@@ -82,6 +79,7 @@ type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
 move_ ln co dg = maybe (Left here) return (move ln co dg)
 
+--FIXME should move only to direct neigbour
 goRight :: Next
 goRight (ln, (_, co)) = move_ ln (co+1)
 -- dg
@@ -139,7 +137,13 @@ hline = do
 	HLine <- eat'
 	return []
 coil = do
+	origin@(ln, co) <- currentPos
 	Coil _ <- eat'
+	next <- currentPos
+	setPos (ln-1, co)
+	n@Name{} <- eat'
+	setPos next
+	traceShowM (here, origin, n)
 	return []
 contact = do
 	Contact _ <- eat'
@@ -172,6 +176,7 @@ currentPos = do
 	Just p <- (pos . snd) <$> get
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
+
 peek' = do
 	Just p <- (peek . snd) <$> get
 	return p
@@ -181,12 +186,13 @@ pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 pattern DgPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 --pattern DgM = (Zp u ((ln, Zp l ((_, x) : rs)) : ds))
 
+peek :: Dg a -> Maybe a
 --peek (Zp _ ((_, Zp _ ((_, x) : _)) : _)) = Just x
 peek (DgH x) = Just x
 peek _ = Nothing
 
-eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
-eat _ = Nothing
+-- eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
+-- eat _ = Nothing
 
 eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
 	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
@@ -196,33 +202,44 @@ pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgPos ln cl cr) = Just (ln, (cl, cr))
 pos _ = Nothing
 
--- move :: Int -> Int -> Dg a -> Maybe (Dg a)
-move line col zp
-	= moveToLine line zp --(fmap (fmap foc) (foc zp))
-	>>= moveToCol col
+mkDgZp :: [(Int, [((Int, Int), Tok)])] -> Dg Tok
+mkDgZp = Zp [] . fmap (fmap (Zp []))
+
+move'' :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
+move'' f (foc -> zp@(Zp _ (x : xs)))
+	= case f x of
+		LT -> moveTo stepLeft ((==EQ).f) zp
+		_ -> moveTo stepRight ((==EQ).f) zp
+
+move :: Int -> Int -> Dg a -> Maybe (Dg a)
+move line col
+	= moveToLine line --(fmap (fmap foc) (foc zp))
+	>=> moveToCol col
 
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
-moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), x) : rs))) : ds))
+moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
 	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
-	| col <= cl = reassemble <$> moveTo stepLeft (isIn . fst) zp
+	| otherwise = reassemble <$> moveTo stepLeft (isIn . fst) zp
 	where
-	isIn (a, b) = (b>=col)&&(a<=col)
+	isIn (a, b) = b >= col && a <= col
 	reassemble zp' = Zp us ((ln, zp') : ds)
 moveToCol _ _ = Nothing
+
+moveToLine :: Int -> Dg a -> Maybe (Dg a)
+moveToLine l zp = moveToLine' l (fmap (fmap foc) (foc zp))
+
+moveToLine' :: Int -> Dg a -> Maybe (Dg a)
+moveToLine' line zp@(Zp _ ( (ln, _) : _))
+	| line >= ln = moveTo stepRight ((line==).fst) zp
+	| otherwise = moveTo stepLeft ((line==).fst) zp
+moveToLine' _ _ = Nothing
+
+--------------------------------------------------------------------------------
 
 -- |Bring something into focus
 foc :: Zp a -> Zp a
 foc (Zp (x:xs) []) = Zp xs [x]
 foc zp = zp
-
-moveToLine :: Int -> Dg a -> Maybe (Dg a)
-moveToLine l zp = moveToLine' l (fmap (fmap foc) (foc zp))
-
--- moveToLine' :: Int -> Dg a -> Maybe (Dg a)
-moveToLine' line zp@(Zp _ ( (ln, _) : _))
-	| line >= ln = moveTo stepRight ((line==).fst) zp
-	| otherwise = moveTo stepLeft ((line==).fst) zp
-moveToLine' _ _ = Nothing
 
 pattern ZpR' x <- Zp _ (x : _)
 pattern ZpR l f r = Zp l (f : r)
@@ -242,11 +259,6 @@ moveTo move test zp@(ZpR l foc r) -- = undefined
 	| test foc = pure zp
 	| otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
-
-mkDgZp
-	:: [(Int, [((Int, Int), Tok)])]
-	-> Dg Tok
-mkDgZp = Zp [] . fmap (fmap (Zp []))
 
 --------------------------------------------------------------------------------
 
