@@ -105,16 +105,19 @@ test001 = do
 	node'
 	return ()
 
+node' :: DgP ()
 node'
-	= branch
+	= () <$ branch
 		(\case
 			Node -> True
 			_ -> False)
-		[ (goRight, hline' >> return () )
-		, (goDown, vline' >> return () )
+		[ (goRight, hline')
+		, (goDown, vline')
 		]
 
-vline' = some (node' <|> vline)
+vline' :: DgP ()
+-- vline' = some (node' <|> vline)
+vline' = many vline *> (node' <|> end)
 
 branch
 	:: (Tok -> Bool)
@@ -122,7 +125,7 @@ branch
 	->  DgP [a]
 branch isFork branches = do
 	origin <- currentPos
-	True <- isFork <$> peek'
+	True <- isFork <$> peek_
 	stuff <- for branches $ \(dir, p) -> do
 		setDir dir
 		setPos origin
@@ -134,26 +137,27 @@ branch isFork branches = do
 
 hline' = do
 	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
-	return []
-hline = do	
+	return ()
+
+hline = do
 	HLine <- eat'
-	return []
+	return ()
 coil = do
 	labelOnTop $ do
 		Coil _ <- eat'
 		return ()
-	return []
+	return ()
 
 contact = do
 -- 	Contact _ <- eat'
 	labelOnTop $ do
 		Contact _ <- eat'
 		return ()
-	return []
+	return ()
 
 vline = do
 	VLine <- eat'
-	return []
+	return ()
 
 node = do
 	Preprocess.Node <- eat'
@@ -170,6 +174,11 @@ labelOnTop p = do
 	return (lbl, x)
 	
 --------------------------------------------------------------------------------
+
+end :: DgP ()
+end = do
+	Nothing <- (peek . snd) <$> get
+	return ()
 
 eat' :: DgP Tok
 eat' = do
@@ -189,7 +198,7 @@ currentPos = do
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
 
-peek' = do
+peek_ = do
 	Just p <- (peek . snd) <$> get
 	return p
 
