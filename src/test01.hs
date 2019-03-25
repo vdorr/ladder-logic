@@ -12,6 +12,7 @@ import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Data.Traversable
 import Data.Foldable
+import Data.Text (Text)
 
 import Preprocess
 import LadderParser hiding (node, hline, Node)
@@ -53,14 +54,14 @@ instance Alternative DgP where
 
 get = DgP $ \s -> return (s, s)
 put s = DgP $ \_ -> return ((), s)
-modify f = (f <$> get) >>= put
+modify f = f <$> get >>= put
 
 --------------------------------------------------------------------------------
 
-setDir f = do
-	(_, zp) <- get
-	put (f, zp)
+setDir :: Next -> DgP ()
+setDir f = modify $ \(_, zp) -> (f, zp)
 
+step :: DgP ()
 step = do
 	origin <- currentPos
 	(f, zp) <- get
@@ -68,6 +69,7 @@ step = do
 		Right zp' -> put (f, zp')
 		Left err -> fail here --or not?
 
+setPos :: (Int, (Int, b)) -> DgP ()
 setPos (ln, (co, _)) = do
 	(b, zp) <- get
 	Just zp' <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
@@ -131,22 +133,22 @@ branch isFork branches = do
 	return stuff
 
 hline' = do
-	many (coil <|> hline <|> contact <|> node')
+	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
 	return []
 hline = do	
 	HLine <- eat'
 	return []
 coil = do
-	origin@(ln, co) <- currentPos
-	Coil _ <- eat'
-	next <- currentPos
-	setPos (ln-1, co)
-	n@Name{} <- eat'
-	setPos next
-	traceShowM (here, origin, n)
+	labelOnTop $ do
+		Coil _ <- eat'
+		return ()
 	return []
+
 contact = do
-	Contact _ <- eat'
+-- 	Contact _ <- eat'
+	labelOnTop $ do
+		Contact _ <- eat'
+		return ()
 	return []
 
 vline = do
@@ -157,6 +159,16 @@ node = do
 	Preprocess.Node <- eat'
 	return ()
 
+labelOnTop :: DgP a -> DgP (Text, a)
+labelOnTop p = do
+	(ln, co) <- currentPos
+	x <- p
+	next <- currentPos
+	setPos (ln-1, co)
+	Name lbl <- eat'
+	setPos next
+	return (lbl, x)
+	
 --------------------------------------------------------------------------------
 
 eat' :: DgP Tok
@@ -187,7 +199,6 @@ pattern DgPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 --pattern DgM = (Zp u ((ln, Zp l ((_, x) : rs)) : ds))
 
 peek :: Dg a -> Maybe a
---peek (Zp _ ((_, Zp _ ((_, x) : _)) : _)) = Just x
 peek (DgH x) = Just x
 peek _ = Nothing
 
