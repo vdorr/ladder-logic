@@ -30,6 +30,12 @@ zpFromList = Zp []
 
 type Dg a = Zp (Int, Zp ((Int, Int), a))
 
+zpLength :: Zp a -> Int
+zpLength (Zp l r) = length l + length r
+
+dgLength :: Dg a -> Int
+dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
+
 type DgPSt = (Next, Dg Tok)
 
 applyDgp p dg = dgp p (goRight, dg)
@@ -82,28 +88,28 @@ move_ :: Int -> Int -> Dg a -> Either String (Dg a)
 move_ ln co dg = maybe (Left here) return (move ln co dg)
 
 --FIXME should move only to direct neigbour
-goRight :: Next
+-- (by using single step to exact position it probably works already)
+goRight, goDown, goUp, goLeft :: Next
 goRight (ln, (_, co)) = move_ ln (co+1)
--- dg
--- 	= case move ln (co+1) dg of
--- 		Just zp' -> return zp'
--- 		Nothing -> Left here
-
-goDown :: Next
 goDown (ln, (co, _)) = move_ (ln+1) co
--- dg
--- 	= case move (ln+1) co dg of
--- 		Just zp' -> return zp'
--- 		Nothing -> Left here
+goUp (ln, (co, _)) = move_ (ln-1) co
+goLeft (ln, (_, co)) = move_ ln (co-1)
 
 --------------------------------------------------------------------------------
+
+dgIsEmpty :: DgP ()
+dgIsEmpty
+	= (dgLength . snd) <$> get
+	>>= \case
+		 0 -> return ()
+		 _ -> fail $ here ++ "not empty"
 
 test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
 	setDir goDown
-	vline
-	node'
-	return ()
+	some vline
+	node' <|> end
+	dgIsEmpty
 
 node' :: DgP ()
 node'
@@ -134,6 +140,24 @@ branch isFork branches = do
 	setPos origin --eat `fork`
 	eat' --FIXME set direction!!!!!!!!!!!!!
 	return stuff
+
+branch'
+	:: (Tok -> Maybe b)
+	-> [(Next, DgP a)]
+	->  DgP (b, [a])
+branch' isFork branches = do
+	origin <- currentPos
+	dir0 <- fst <$> get
+	Just f <- isFork <$> peek_
+	stuff <- for branches $ \(dir, p) -> do
+		setDir dir
+		setPos origin
+		step --with dir
+		p
+	setPos origin --eat `fork`
+	setDir dir0 --restore direction, good for parsing boxes
+	eat'
+	return (f, stuff)
 
 hline' = do
 	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
@@ -169,10 +193,94 @@ labelOnTop p = do
 	x <- p
 	next <- currentPos
 	setPos (ln-1, co)
-	Name lbl <- eat'
+	lbl <- name
 	setPos next
 	return (lbl, x)
 	
+--------------------------------------------------------------------------------
+
+{-
+
+smallest possible box:
+	+-+
+	| |
+	+-+
+
+clearance:
+     |    // <--- reject!
+   +-+
+ --| |
+   +-+--  // <--- reject!
+
+-}
+
+edge
+	= eat' >>= \t -> case t of
+		REdge -> return t
+		FEdge -> return t
+		_ -> fail here
+
+name = do
+	Name lbl <- eat'
+	return lbl
+
+-- |parse left side of a box
+leftSide = do
+	--VLine, REdge, FEdge, Name, connections (HLine+Name)
+	some leftSideBrick
+	return ()
+
+leftSideBrick = do
+	(ln, co) <- currentPos
+-- 	vline <|> edge
+	branch
+		(\case
+			VLine -> True
+			REdge -> True
+			FEdge -> True
+			_ -> False)
+		[ (goLeft, hline *> name)
+		, (goRight, name)
+		]
+	setDir goDown --i guess branch should restore direction
+	
+-- 	setPos (ln, co+1)
+-- 	setDir goRight
+
+
+
+
+--TODO check clearance
+box = do
+	(ln, (_, co)) <- currentPos
+
+	setDir goUp
+-- 	VLine <- eat'
+	some vline
+	node
+
+	setDir goRight
+	hline
+	node
+	--TODO parse box instance name
+
+	setDir goDown --parsing right side, look for output line position
+	some $ do
+-- 		(ln, co) <- currentPos
+		vline
+-- 		setPos (ln, co+1)
+-- 		??? peek & record position
+	node
+
+	setDir goLeft
+	hline
+	node
+
+	setDir goUp
+	many vline --0 or more
+
+	return ()
+
 --------------------------------------------------------------------------------
 
 end :: DgP ()
@@ -224,6 +332,8 @@ pos _ = Nothing
 
 mkDgZp :: [(Int, [((Int, Int), Tok)])] -> Dg Tok
 mkDgZp = Zp [] . fmap (fmap (Zp []))
+
+--------------------------------------------------------------------------------
 
 move'' :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
 move'' f (foc -> zp@(Zp _ (x : xs)))
@@ -279,6 +389,21 @@ moveTo move test zp@(ZpR l foc r) -- = undefined
 	| test foc = pure zp
 	| otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
+
+--------------------------------------------------------------------------------
+
+good =
+	[ "|"
+
+	]
+
+bad =
+	[ unlines
+		[ "|"
+		, " "
+		, "|"
+		]
+	]
 
 --------------------------------------------------------------------------------
 
