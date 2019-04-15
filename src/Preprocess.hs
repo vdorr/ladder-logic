@@ -87,6 +87,36 @@ preproc3 src =
 		 Right n -> Right n
 
 --------------------------------------------------------------------------------
+{-
+letter       : 'A'..'Z' | '_'
+number       : '0'..'9'
+
+token        : node | vline | hline | label ...
+
+target       : number+ | letter+
+node         : '+'
+vline        : '|'
+hline        : '-'+ 
+label        : target ':'
+redge        : '>'
+fedge        : '<'
+negated      : '0' '|'
+contact      : '[' ('\' | ' ') ']'
+coil         : '(' ('\' | ' ') ')'
+connector    : '>' letter+ '>'
+continuation : connector
+return       : '<RETURN>'
+jump         : '>>' target
+name         : letter+
+location     : '%' ('I' | 'Q' | 'M') number+
+
+linecomment  : '//' anychar* '\n'
+blockcomment : '(*' anychar* '*)'
+
+-}
+
+test7 :: (Int, Int, String) -> Either String ((Int, Int, String), Tok)
+test7 = undefined
 
 --rule: control statements ar followed by EOL
 data Tok

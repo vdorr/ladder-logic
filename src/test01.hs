@@ -206,7 +206,7 @@ smallest possible box:
 	| |
 	+-+
 
-clearance:
+clearance (example of incorrect box):
      |    // <--- reject!
    +-+
  --| |
