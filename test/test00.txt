@@ -1,0 +1,3 @@
+(* --- test 00 : minimal non-empty network --- *)
+
+|
