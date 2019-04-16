@@ -28,11 +28,15 @@ data Zp a = Zp [a] [a]
 zpFromList :: [a] -> Zp a
 zpFromList = Zp []
 
-type Dg a = Zp (Int, Zp ((Int, Int), a))
-
 zpLength :: Zp a -> Int
 zpLength (Zp l r) = length l + length r
 
+--------------------------------------------------------------------------------
+
+-- |Diagram parser input stream
+type Dg a = Zp (Int, Zp ((Int, Int), a))
+
+-- |Returns number of remaining tokens
 dgLength :: Dg a -> Int
 dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 
@@ -44,16 +48,20 @@ newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
 instance Functor DgP where
 	fmap = ap . return
+
 instance Applicative DgP where
 	pure = return
 	(<*>) = ap
+
 instance Monad DgP where
 	return a = DgP $ \s -> return (a, s)
 	a >>= b = DgP $ \s -> do
 		(y, s') <- dgp a s
 		dgp (b y) s'
+
 instance MonadFail DgP where
 	fail = DgP . const . Left
+
 instance Alternative DgP where
 	empty = DgP $ const $ Left "alt empty"
 	a <|> b = DgP $ \s -> dgp a s <|> dgp b s
@@ -410,7 +418,7 @@ bad =
 main = do
 	[file] <- getArgs
 	src <- TIO.readFile file
-	case stripPos <$> preproc4 src of
+	case preproc4'' src of
 		Left err -> TIO.putStrLn err
 		Right x -> do
 -- 			print $ stripPos x

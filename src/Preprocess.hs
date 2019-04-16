@@ -12,6 +12,7 @@ import Text.Megaparsec.Char --as PC
 -- import Text.Megaparsec.Char.Lexer (symbol)
 import Text.Megaparsec.Debug
 import Data.Bifunctor
+import Control.Monad hiding (fail)
 
 import Control.Applicative.Combinators (between)
 
@@ -101,8 +102,10 @@ label        : target ':'
 redge        : '>'
 fedge        : '<'
 negated      : '0' '|'
-contact      : '[' ('\' | ' ') ']'
-coil         : '(' ('\' | ' ') ')'
+contact      : '[' ('/' | ' ' | 'P' | 'N' | '<' | '>' | '>=' | '<=' | '<>') ']'
+coil         : '(' ('/' | ' ' | 'S' | 'R' | 'P' | 'N') ')'
+contact'      : '[' anychar+ ']'
+coil'         : '(' anychar+ ')'
 connector    : '>' letter+ '>'
 continuation : connector
 return       : '<RETURN>'
@@ -115,7 +118,46 @@ blockcomment : '(*' anychar* '*)'
 
 -}
 
-test7 :: (Int, Int, String) -> Either String ((Int, Int, String), Tok)
+type LexSt = ((Int, Int), String)
+
+newtype Lexer a = Lexer { lexer :: LexSt -> Either String (a, LexSt) }
+
+instance Functor Lexer where
+	fmap = ap . return
+
+instance Applicative Lexer where
+	pure = return
+	(<*>) = ap
+
+instance Monad Lexer where
+	return a = Lexer $ \s -> return (a, s)
+	a >>= b = Lexer $ \s -> do
+		(y, s') <- lexer a s
+		lexer (b y) s'
+
+getOne :: Lexer Char
+getOne = Lexer $ \((ln, co), s) -> 
+	case s of
+		 c : s' -> case c of
+			'\n'-> Right (c, ((ln + 1, 0), s'))
+			_ -> Right (c, ((ln, co + 1), s'))
+		 [] -> Left "empty"
+
+{-
+k ('\n' : s)
+k ('+' : s)
+k ('|' : s)
+k ('-' : s)
+k ('>' : s)
+k ('<' : s)
+--k ('0' : '|' : s)
+k ('0' : s) -- : '|'
+k ('[' : s)
+k ('(' : s)
+k ('%' : s)
+-}
+
+test7 :: ((Int, Int), String) -> Either String (((Int, Int), String), Tok)
 test7 = undefined
 
 --rule: control statements ar followed by EOL
@@ -238,6 +280,10 @@ preproc4 src =
 				Left $ T.pack $ errorBundlePretty err
 		 Right n -> Right n
 
+preproc4'' :: Text -> Either Text [(Int, [((Int, Int), Tok)])]
+preproc4'' = fmap stripPos . preproc4
+
+preproc4' :: String -> Either Text [(Int, [((Int, Int), Tok)])]
 preproc4' = fmap stripPos . preproc4 . T.pack
 -- test01 = preproc4 ""
 
