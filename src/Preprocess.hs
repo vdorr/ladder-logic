@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances #-}
 
 -- #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -249,6 +249,7 @@ withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
 
 --------------------------------------------------------------------------------
 
+#if 0
 test6 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
 test6 = many ln <* eof
 	where
@@ -332,7 +333,7 @@ test6 = many ln <* eof
 	spaceButNotEOL = satisfy (\c -> isSpace c && c /= '\n')
 	white = skipMany spaceButNotEOL
 -- 	somewhite = () <$ some spaceButNotEOL
-
+#endif
 
 --now with columns stored i can eat tokens almost randomly
 --TODO should also work for FBD

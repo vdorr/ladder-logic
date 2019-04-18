@@ -41,6 +41,10 @@ foc :: Zp a -> Zp a
 foc (Zp (x:xs) []) = Zp xs [x]
 foc zp = zp
 
+tip :: Zp a -> Maybe a
+tip (Zp _ (x:_)) = Just x
+tip _ =  Nothing
+
 pattern ZpR' x <- Zp _ (x : _)
 pattern ZpR l f r = Zp l (f : r)
 pattern ZpL l f r = Zp (f : l) r
