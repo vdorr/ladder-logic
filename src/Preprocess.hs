@@ -1,6 +1,6 @@
-{-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances #-}
 
-#define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
+-- #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 
 module Preprocess where
@@ -157,8 +157,8 @@ k ('(' : s)
 k ('%' : s)
 -}
 
-test7 :: ((Int, Int), String) -> Either String (((Int, Int), String), Tok)
-test7 = undefined
+test8 :: ((Int, Int), String) -> Either String (((Int, Int), String), Tok)
+test8 = undefined
 
 --rule: control statements ar followed by EOL
 data Tok
@@ -185,6 +185,70 @@ data Tok
 	| Name Text --inside of block
 	deriving (Show, Eq)
 
+token7 :: Parsec ParseErr Text Tok
+token7 = tok
+	where
+	tok
+		=   Label' <$> try (labelName <* char ':')
+		<|> VLine <$ char '|'
+		<|> Node <$ char '+'
+		<|> Continuation <$> try (between' ">" ">" name)
+		<|> HLine <$ some (char '-')
+		<|> Jump' <$> (try (chunk ">>") *> labelName)
+		<|> Return <$ try (between' "<" ">" labelName)
+		<|> Contact <$> between' "[" "]" innards
+		<|> Coil <$> between' "(" ")" innards
+		<|> Connector <$> between ">" ">" name
+-- 		<|> REdge <$ (char '>')
+-- 		<|> FEdge <$ char '<'
+-- 		<|> Negated <$ char '0'
+-- 		<|> [] <$ (eof <|> () <$ eol)
+		<|> Name <$> name
+
+-- 	labelName :: Parsec ParseErr Text Text
+	labelName = T.pack <$> some alphaNumChar
+-- 	name :: Parsec ParseErr Text Text
+-- 	name = label "identifier" $ T.pack <$> some (letterChar <|> char '%')
+	name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '%')
+
+-- 	innards :: Parsec ParseErr Text Text
+	innards = T.pack <$> some (satisfy (\c -> notElem c [')', ']']))
+
+	between' a b = between (chunk a) (chunk b)
+
+whitespace7 :: Parsec ParseErr Text ()
+whitespace7 = whitespace
+	where
+	whitespace = label "whitespace" $ space *> many (actualComment *> space) *> space
+	actualComment = chunk "(*" *> manyTill anySingle (try (chunk "*)"))
+
+test7' :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok)]
+test7' = whitespace7 *> many (withPos token7 <* whitespace7) <* eof
+
+test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
+test7 = f <$> test7'
+	where
+	f (x@((p, _), _) : xs) = (p, x : a) : f b
+		where
+		(a, b) = break ((sourceColumn p==).sourceColumn.fst.fst) xs
+	f [] = []
+
+--preproc5 :: Text -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
+preproc5 :: Text -> Either Text [((SourcePos, SourcePos), Tok)]
+preproc5 src =
+	case parse test7' "(file)" src of
+		 Left err ->
+-- 				trace (errorBundlePretty err)
+				Left $ T.pack $ errorBundlePretty err
+		 Right n -> Right n
+
+--------------------------------------------------------------------------------
+
+withPos :: Parsec ParseErr Text a -> Parsec ParseErr Text ((SourcePos, SourcePos), a)
+withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
+
+--------------------------------------------------------------------------------
+
 test6 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
 test6 = many ln <* eof
 	where
@@ -196,7 +260,7 @@ test6 = many ln <* eof
 
 	--ehm "not cheap"
 -- 	tok_ :: Parsec ParseErr Text p -> Parsec ParseErr Text ((SourcePos, SourcePos), p)
-	tok_ p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
+	tok_ = withPos -- p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
 	tok' p px
 		= (:) <$> tok_ ( p) <*> px
 	tok t p px
@@ -268,13 +332,13 @@ test6 = many ln <* eof
 	spaceButNotEOL = satisfy (\c -> isSpace c && c /= '\n')
 	white = skipMany spaceButNotEOL
 -- 	somewhite = () <$ some spaceButNotEOL
-	
+
 
 --now with columns stored i can eat tokens almost randomly
 --TODO should also work for FBD
 preproc4 :: Text -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
 preproc4 src =
-	case parse test6 "(file)" src of
+	case parse test7 "(file)" src of
 		 Left err ->
 -- 				trace (errorBundlePretty err)
 				Left $ T.pack $ errorBundlePretty err
@@ -288,8 +352,8 @@ preproc4' = fmap stripPos . preproc4 . T.pack
 -- test01 = preproc4 ""
 
 stripPos
-	:: [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
-	-> [ (Int, [((Int, Int), Tok)]) ]
+	:: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
+	-> [ (Int, [((Int, Int), a)]) ]
 stripPos = fmap (bimap (unPos.sourceLine)
 	(fmap (bimap (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)) id)))
 
