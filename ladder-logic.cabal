@@ -26,6 +26,7 @@ library
                      , LadderParser
                      , Compile
                      , Ladder.Javascript
+                     , Zipper
   -- other-modules:       
   other-extensions:    CPP, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts

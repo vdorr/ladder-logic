@@ -4,25 +4,23 @@
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-import qualified Data.Text.IO as TIO
-import Data.Foldable
-import System.Environment (getArgs)
+module Zipper where
 
-import Preprocess
-import Zipper
-
-#if 0
 import Prelude hiding (fail)
+-- import System.Environment (getArgs)
+-- import qualified Data.Text.IO as TIO
 import Control.Monad hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Data.Traversable
+-- import Data.Foldable
 import Data.Text (Text)
 
-import LadderParser hiding (node, hline, Node)
-import DiagramParser (Pos)
+import Preprocess
+-- import LadderParser hiding (node, hline, Node)
+-- import DiagramParser (Pos)
 
-import Debug.Trace
+-- import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -401,45 +399,3 @@ moveTo move test zp@(ZpR l foc r) -- = undefined
 	| test foc = pure zp
 	| otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
-#endif
---------------------------------------------------------------------------------
-
-good =
-	[ "|"
-
-	]
-
-bad =
-	[ unlines
-		[ "|"
-		, " "
-		, "|"
-		]
-	]
-
---------------------------------------------------------------------------------
-
-main = do
-	[file] <- getArgs
-	src <- TIO.readFile file
-	case preproc4'' src of
-		Left err -> TIO.putStrLn err
-		Right x -> do
--- 			print $ stripPos x
-			let zp@(Zp zpl zpr) = mkDgZp x
-
--- 			print (here, zp)
-			for_ zpl $ \q -> print (here, q)
-			for_ zpr $ \q -> print (here, q)
-			
-			case applyDgp test001 zp of
-				Right (_, (_,c@(Zp zpl zpr))) -> do
--- 					print (here, a, c)
-					for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
--- 					for_ zpr $ \q -> print (here, q)
-				Left err -> print (here, err)
-#if 0
-			forM_ x $ \(l,c) -> do
-				print l
-				print c
-#endif
