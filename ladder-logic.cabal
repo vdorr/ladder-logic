@@ -46,3 +46,16 @@ library
                       -fwarn-incomplete-patterns
                       -fwarn-unused-binds
                       -fwarn-unused-imports
+
+test-suite            1
+  default-language:   Haskell2010
+  type:               exitcode-stdio-1.0
+  hs-source-dirs:     test
+  main-is:            test.hs
+  build-depends:
+                      base
+                    , tasty
+                    , tasty-hunit
+                    , ladder-logic
+                    , text
+                    , neat-interpolation

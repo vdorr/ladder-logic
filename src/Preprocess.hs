@@ -183,7 +183,7 @@ data Tok
 --others
 -- 	| Store Text -- FBD only "---VARIABLE"
 	| Name Text --inside of block
-	deriving Show
+	deriving (Show, Eq)
 
 test6 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
 test6 = many ln <* eof
