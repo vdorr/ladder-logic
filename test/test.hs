@@ -12,11 +12,12 @@ import NeatInterpolation
 import Data.Text (Text)
 
 import Preprocess
+import Zipper
 
 --------------------------------------------------------------------------------
 
 tests :: TestTree
-tests = testGroup "Tests" [unitTests]
+tests = testGroup "Tests" [tokenizerTests, zipperTests]
 
 testPreproc4 :: Text -> Either Text [[Tok]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc4
@@ -24,7 +25,7 @@ testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc4
 testPreproc5 :: Text -> Either Text [Tok]
 testPreproc5 = fmap (fmap ( snd)) . preproc5
 
-unitTests = testGroup "Tokenize"
+tokenizerTests = testGroup "Tokenize"
 	[ testCase "empty string" $
 		(@?= Right []) $ testPreproc4  ""
 	, testCase "one VLine" $
@@ -49,6 +50,15 @@ unitTests = testGroup "Tokenize"
 			| (* hello *)
 			+->>LBL
 			|]
+	]
+
+zipperTests = testGroup "Zipper"
+	[ testCase "from/to list" $
+		zpToList <$> (stepRight $ zpFromList [1,2,3,4]) @=? Just [1,2,3,4]
+	,  testCase "length" $
+		zpLength <$> (stepRight $ zpFromList [1,2]) @=? Just 2
+	,  testCase "bad move" $
+		stepLeft (zpFromList [1::Int,2]) @=? Nothing
 	]
 
 main :: IO ()

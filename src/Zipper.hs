@@ -25,13 +25,40 @@ import Preprocess
 --------------------------------------------------------------------------------
 
 data Zp a = Zp [a] [a]
-	deriving (Show, Functor) -- , Foldable)
+	deriving (Show, Functor, Eq) -- , Foldable)
 
 zpFromList :: [a] -> Zp a
 zpFromList = Zp []
 
+zpToList :: Zp a -> [a]
+zpToList (Zp l r) = reverse l ++ r
+
 zpLength :: Zp a -> Int
 zpLength (Zp l r) = length l + length r
+
+-- |Bring something into focus
+foc :: Zp a -> Zp a
+foc (Zp (x:xs) []) = Zp xs [x]
+foc zp = zp
+
+pattern ZpR' x <- Zp _ (x : _)
+pattern ZpR l f r = Zp l (f : r)
+pattern ZpL l f r = Zp (f : l) r
+
+stepLeft :: Zp a -> Maybe (Zp a)
+stepLeft (ZpL l foc r) = Just (ZpR l foc r)
+stepLeft _ = Nothing
+
+stepRight :: Zp a -> Maybe (Zp a)
+stepRight (ZpR l foc r) = Just (ZpL l foc r)
+stepRight _ = Nothing
+
+-- |Move to first element where predicate holds or fail
+moveTo :: (Zp a -> Maybe (Zp a)) -> (a -> Bool) -> Zp a -> Maybe (Zp a)
+moveTo move test zp@(ZpR l foc r) -- = undefined
+	| test foc = pure zp
+	| otherwise = move zp >>= moveTo move test
+moveTo _ _ _ = Nothing
 
 --------------------------------------------------------------------------------
 
@@ -375,27 +402,3 @@ moveToLine' line zp@(Zp _ ( (ln, _) : _))
 moveToLine' _ _ = Nothing
 
 --------------------------------------------------------------------------------
-
--- |Bring something into focus
-foc :: Zp a -> Zp a
-foc (Zp (x:xs) []) = Zp xs [x]
-foc zp = zp
-
-pattern ZpR' x <- Zp _ (x : _)
-pattern ZpR l f r = Zp l (f : r)
-pattern ZpL l f r = Zp (f : l) r
-
-stepLeft :: Zp a -> Maybe (Zp a)
-stepLeft (ZpL l foc r) = Just (ZpR l foc r)
-stepLeft _ = Nothing
-
-stepRight :: Zp a -> Maybe (Zp a)
-stepRight (ZpR l foc r) = Just (ZpL l foc r)
-stepRight _ = Nothing
-
--- |Move to first element where predicate holds or fail
-moveTo :: (Zp a -> Maybe (Zp a)) -> (a -> Bool) -> Zp a -> Maybe (Zp a)
-moveTo move test zp@(ZpR l foc r) -- = undefined
-	| test foc = pure zp
-	| otherwise = move zp >>= moveTo move test
-moveTo _ _ _ = Nothing
