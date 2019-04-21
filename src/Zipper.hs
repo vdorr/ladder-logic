@@ -15,9 +15,10 @@ import Control.Applicative hiding (fail)
 import Data.Traversable
 -- import Data.Foldable
 import Data.Text (Text, unpack)
+import Data.Bifunctor
 
 import Preprocess
-import LadderParser hiding (node, hline, Node)
+import LadderParser hiding (node, hline, Node, device)
 import qualified LadderParser
 import DiagramParser (Pos(..))
 
@@ -163,6 +164,18 @@ labelOnTop p = do
 	setPos next
 	return (lbl, x)
 
+labelOnTop' :: DgP a -> DgP (String, a)
+labelOnTop' p = bimap unpack id <$> labelOnTop p
+
+--XXX beware setting direction
+-- nameAbove :: DgP Text
+-- nameAbove = do
+-- 	pos@(ln, co) <- currentPos
+-- 	setPos (ln-1, co)
+-- 	lbl <- name
+-- 	setPos pos
+-- 	return lbl
+
 branch
 	:: (Tok -> Bool)
 	-> [(Next, DgP a)]
@@ -198,6 +211,13 @@ branch isFork branches = do
 -- 	setDir dir0 --restore direction, good for parsing boxes
 -- 	eat'
 -- 	return (f, stuff)
+
+-- |Succeeds only when positioned on end of line
+eol :: DgP ()
+eol =
+	snd <$> get >>= \case
+		 Zp l ((_ln, Zp _ []) : _) -> return ()
+		 _ -> fail here
 
 --------------------------------------------------------------------------------
 
@@ -282,26 +302,34 @@ hline'2 = do
 	some hline2
 	coil2 <|> contact2 <|> node'2' <|> eol2
 
-eol :: DgP ()
-eol =
-	snd <$> get >>= \case
-		 Zp l ((_ln, Zp _ []) : _) -> return ()
-		 _ -> fail here
-
 eol2 :: DgP (Cofree Symbol_ Pos)
 eol2 = Pos (-1,-1) :< Sink <$ eol
 
--- eol2 :: DgP (Cofree Symbol_ Pos)
--- eol2 = do
--- 	zp <- snd <$> get
--- 	case zp of
--- 		 Zp l ((_ln, Zp _ []) : _) -> return (Pos (-1,-1) :< Sink)
--- 		 _ -> fail here
+vline2 :: DgP (Cofree Symbol_ Pos)
+vline2 = do
+	VLine <- eat'
+	vline'2
 
-hline2 :: DgP () --(Cofree Symbol_ Pos)
+hline2 :: DgP ()
 hline2 = do
 	HLine <- eat'
 	return ()
+
+-- device :: DgP String -> DgP (Cofree Symbol_ Pos)
+-- device p = do
+-- 	pos <- currentPos2
+-- 	(lbl, f) <- labelOnTop' p
+-- 	(pos :<) <$> (Device f [lbl] <$> hline'2)
+-- 
+-- coil2 :: DgP (Cofree Symbol_ Pos)
+-- coil2 = device $ do
+-- 	Coil f <- eat'
+-- 	return $ "(" ++ unpack f ++ ")"
+
+-- contact2 :: DgP (Cofree Symbol_ Pos)
+-- contact2 = device $ do
+-- 	Coil f <- eat'
+-- 	return $ "[" ++ unpack f ++ "]"
 
 coil2 :: DgP (Cofree Symbol_ Pos)
 coil2 = do
@@ -318,11 +346,6 @@ contact2 = do
 		Contact f <- eat'
 		return f
 	(p :<) <$> (Device ("[" ++ unpack f ++ "]") [unpack lbl] <$> hline'2)
-
-vline2 :: DgP (Cofree Symbol_ Pos)
-vline2 = do
-	VLine <- eat'
-	vline'2
 	
 --------------------------------------------------------------------------------
 
