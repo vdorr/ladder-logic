@@ -21,7 +21,9 @@ import LadderParser hiding (node, hline, Node)
 import qualified LadderParser
 import DiagramParser (Pos(..))
 
-import Debug.Trace
+-- import Debug.Trace
+-- import GHC.Stack
+-- import GHC.Exts
 
 --------------------------------------------------------------------------------
 
@@ -253,90 +255,65 @@ node = do
 test002 :: DgP (Cofree Symbol_ Pos)
 test002 = do
 	setDir goDown
-	traceShowM (here)
-	vline2 -- <* dgIsEmpty
+	vline2 <* dgIsEmpty
 
 node'2' :: DgP (Cofree Symbol_ Pos)
-node'2' = traceShowM (here) >> xxx (LadderParser.Node <$> node'2)
+node'2' = xxx (LadderParser.Node <$> node'2)
 
 node'2 :: DgP [Cofree Symbol_ Pos]
 node'2
 	= branch
 		(==Preprocess.Node)
-		[ (goRight, traceShowM (here) >> hline'2)
-		, (goDown, traceShowM (here) >> vline'2)
+		[ (goRight, hline'2)
+		, (goDown, vline'2)
 		]
 
 currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
 xxx p = (:<) <$> currentPos2 <*> p
--- xxx (some vline2)
 
 vline'2 :: DgP (Cofree Symbol_ Pos)
-vline'2
-	= traceShowM (here) >> many vline2 *> (node'2' <|> end2)
+vline'2 = many vline2 *> (node'2' <|> end2)
 
 end2 :: DgP (Cofree Symbol_ Pos)
-end2 = xxx (Sink <$ end)
+end2 = Pos (-1,-1) :< Sink <$ end
 
 hline'2 :: DgP (Cofree Symbol_ Pos)
 hline'2 = do
-	p <- currentPos
-	traceShowM (here, p)
-	coil2 <|> hline2 <|> contact2 <|> node'2' <|> eol2 --TODO vline crossing
+	some hline2
+	coil2 <|> contact2 <|> node'2' <|> eol2
 
 eol2 :: DgP (Cofree Symbol_ Pos)
 eol2 = do
-	p <- currentPos
 	zp <- snd <$> get
-	traceShowM (here, p, zp)
 	case zp of
-		 Zp l ((_ln, Zp _ []) : _) -> undefined
+		 Zp l ((_ln, Zp _ []) : _) -> return (Pos (-1,-1) :< Sink)
 		 _ -> fail here
--- Zp (Int, Zp ((Int, Int), a))
 
-hline2 :: DgP (Cofree Symbol_ Pos)
+hline2 :: DgP () --(Cofree Symbol_ Pos)
 hline2 = do
-	traceShowM (here)
 	HLine <- eat'
-	p <- currentPos
-	traceShowM (here, p)
-	hline'2 <|> eol2
+	return ()
 
 coil2 :: DgP (Cofree Symbol_ Pos)
 coil2 = do
-	traceShowM (here)
-	pp <- currentPos
 	p <- currentPos2
 	(lbl, f) <- labelOnTop $ do
 		Coil f <- eat'
-		traceShowM (here, pp)
 		return f
-	traceShowM (here)
-	(p :<) <$> (Device ("("++unpack f++")") [unpack lbl]
-		<$> (traceShowM (here) >>(hline'2 
-			<* traceShowM (here))))
+	(p :<) <$> (Device ("(" ++ unpack f ++ ")") [unpack lbl] <$> hline'2)
 
 contact2 :: DgP (Cofree Symbol_ Pos)
 contact2 = do
-	traceShowM (here)
--- 	Contact _ <- eat'
 	p <- currentPos2
 	(lbl, f) <- labelOnTop $ do
 		Contact f <- eat'
-		traceShowM (here)
 		return f
-	(p :<) <$> (Device ("["++unpack f++"]") [unpack lbl] <$> hline'2)
+	(p :<) <$> (Device ("[" ++ unpack f ++ "]") [unpack lbl] <$> hline'2)
 
 vline2 :: DgP (Cofree Symbol_ Pos)
 vline2 = do
 	VLine <- eat'
-	traceShowM (here)
 	vline'2
-
--- node2 :: DgP ()
--- node2 = do
--- 	Preprocess.Node <- eat'
--- 	return ()
 	
 --------------------------------------------------------------------------------
 
@@ -426,17 +403,6 @@ box = do
 
 end :: DgP ()
 end = do
-	s <- snd <$> get
--- 	s <- (peek . snd) <$> get
-	traceShowM (here, peek s)
-	case peek s of
-		Nothing -> do
--- 			traceShowM (here, s)
-			return ()
-		Just _ -> do
-			traceShowM (here, s)
-			return ()
-
 	Nothing <- (peek . snd) <$> get
 	return ()
 
@@ -492,6 +458,7 @@ move'' f (foc -> zp@(Zp _ (x : xs)))
 	= case f x of
 		LT -> moveTo stepLeft ((==EQ).f) zp
 		_ -> moveTo stepRight ((==EQ).f) zp
+move'' _ _ = Nothing
 
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col
