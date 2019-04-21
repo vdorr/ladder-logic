@@ -252,13 +252,16 @@ node = do
 	
 --------------------------------------------------------------------------------
 
+currentPos2 :: DgP Pos
+currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
+
 test002 :: DgP (Cofree Symbol_ Pos)
 test002 = do
 	setDir goDown
 	vline2 <* dgIsEmpty
 
 node'2' :: DgP (Cofree Symbol_ Pos)
-node'2' = xxx (LadderParser.Node <$> node'2)
+node'2' = (:<) <$> currentPos2 <*> (LadderParser.Node <$> node'2)
 
 node'2 :: DgP [Cofree Symbol_ Pos]
 node'2
@@ -267,9 +270,6 @@ node'2
 		[ (goRight, hline'2)
 		, (goDown, vline'2)
 		]
-
-currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
-xxx p = (:<) <$> currentPos2 <*> p
 
 vline'2 :: DgP (Cofree Symbol_ Pos)
 vline'2 = many vline2 *> (node'2' <|> end2)
@@ -282,12 +282,21 @@ hline'2 = do
 	some hline2
 	coil2 <|> contact2 <|> node'2' <|> eol2
 
-eol2 :: DgP (Cofree Symbol_ Pos)
-eol2 = do
-	zp <- snd <$> get
-	case zp of
-		 Zp l ((_ln, Zp _ []) : _) -> return (Pos (-1,-1) :< Sink)
+eol :: DgP ()
+eol =
+	snd <$> get >>= \case
+		 Zp l ((_ln, Zp _ []) : _) -> return ()
 		 _ -> fail here
+
+eol2 :: DgP (Cofree Symbol_ Pos)
+eol2 = Pos (-1,-1) :< Sink <$ eol
+
+-- eol2 :: DgP (Cofree Symbol_ Pos)
+-- eol2 = do
+-- 	zp <- snd <$> get
+-- 	case zp of
+-- 		 Zp l ((_ln, Zp _ []) : _) -> return (Pos (-1,-1) :< Sink)
+-- 		 _ -> fail here
 
 hline2 :: DgP () --(Cofree Symbol_ Pos)
 hline2 = do
