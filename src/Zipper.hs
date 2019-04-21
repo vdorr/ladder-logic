@@ -58,7 +58,11 @@ stepRight (ZpR l foc r) = Just (ZpL l foc r)
 stepRight _ = Nothing
 
 -- |Move to first element where predicate holds or fail
-moveTo :: (Zp a -> Maybe (Zp a)) -> (a -> Bool) -> Zp a -> Maybe (Zp a)
+moveTo
+	:: (Zp a -> Maybe (Zp a)) -- ^move function
+	-> (a -> Bool) -- ^predicate
+	-> Zp a
+	-> Maybe (Zp a)
 moveTo move test zp@(ZpR l foc r) -- = undefined
 	| test foc = pure zp
 	| otherwise = move zp >>= moveTo move test
@@ -138,12 +142,59 @@ goLeft (ln, (_, co)) = move_ ln (co-1)
 
 --------------------------------------------------------------------------------
 
+-- |Fail if input stream is not empty
 dgIsEmpty :: DgP ()
 dgIsEmpty
 	= (dgLength . snd) <$> get
 	>>= \case
 		 0 -> return ()
 		 _ -> fail $ here ++ "not empty"
+
+labelOnTop :: DgP a -> DgP (Text, a)
+labelOnTop p = do
+	(ln, co) <- currentPos
+	x <- p
+	next <- currentPos
+	setPos (ln-1, co)
+	lbl <- name
+	setPos next
+	return (lbl, x)
+
+branch
+	:: (Tok -> Bool)
+	-> [(Next, DgP a)]
+	->  DgP [a]
+branch isFork branches = do
+	origin <- currentPos
+	True <- isFork <$> peek_
+	stuff <- for branches $ \(dir, p) -> do
+		setDir dir
+		setPos origin
+		step --with dir
+		p
+	setPos origin --eat `fork`
+	eat' --FIXME set direction!!!!!!!!!!!!!
+	return stuff
+
+-- branch'
+-- 	:: (Tok -> Maybe b)
+-- 	-> [(Next, DgP a)]
+-- 	->  DgP (b, [a])
+-- branch' isFork branches = do
+-- 	origin <- currentPos
+-- 	dir0 <- fst <$> get
+-- 	Just f <- isFork <$> peek_
+-- 	stuff <- for branches $ \(dir, p) -> do
+-- 		setDir dir
+-- 		setPos origin
+-- 		step --with dir
+-- 		p
+-- 	setPos origin --eat `fork`
+-- 	setDir dir0 --restore direction, good for parsing boxes
+-- 	eat'
+-- 	return (f, stuff)
+
+--------------------------------------------------------------------------------
 
 test001 :: DgP () --(Cofree Symbol_ Pos)
 test001 = do
@@ -165,40 +216,6 @@ node'
 vline' :: DgP ()
 -- vline' = some (node' <|> vline)
 vline' = many vline *> (node' <|> end)
-
-branch
-	:: (Tok -> Bool)
-	-> [(Next, DgP a)]
-	->  DgP [a]
-branch isFork branches = do
-	origin <- currentPos
-	True <- isFork <$> peek_
-	stuff <- for branches $ \(dir, p) -> do
-		setDir dir
-		setPos origin
-		step --with dir
-		p
-	setPos origin --eat `fork`
-	eat' --FIXME set direction!!!!!!!!!!!!!
-	return stuff
-
-branch'
-	:: (Tok -> Maybe b)
-	-> [(Next, DgP a)]
-	->  DgP (b, [a])
-branch' isFork branches = do
-	origin <- currentPos
-	dir0 <- fst <$> get
-	Just f <- isFork <$> peek_
-	stuff <- for branches $ \(dir, p) -> do
-		setDir dir
-		setPos origin
-		step --with dir
-		p
-	setPos origin --eat `fork`
-	setDir dir0 --restore direction, good for parsing boxes
-	eat'
-	return (f, stuff)
 
 hline' = do
 	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
@@ -227,16 +244,6 @@ vline = do
 node = do
 	Preprocess.Node <- eat'
 	return ()
-
-labelOnTop :: DgP a -> DgP (Text, a)
-labelOnTop p = do
-	(ln, co) <- currentPos
-	x <- p
-	next <- currentPos
-	setPos (ln-1, co)
-	lbl <- name
-	setPos next
-	return (lbl, x)
 	
 --------------------------------------------------------------------------------
 
