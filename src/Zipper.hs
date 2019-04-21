@@ -14,13 +14,14 @@ import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Data.Traversable
 -- import Data.Foldable
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 
 import Preprocess
--- import LadderParser hiding (node, hline, Node)
--- import DiagramParser (Pos)
+import LadderParser hiding (node, hline, Node)
+import qualified LadderParser
+import DiagramParser (Pos(..))
 
--- import Debug.Trace
+import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -165,6 +166,7 @@ branch
 	-> [(Next, DgP a)]
 	->  DgP [a]
 branch isFork branches = do
+--  	dir0 <- fst <$> get
 	origin <- currentPos
 	True <- isFork <$> peek_
 	stuff <- for branches $ \(dir, p) -> do
@@ -173,6 +175,7 @@ branch isFork branches = do
 		step --with dir
 		p
 	setPos origin --eat `fork`
+--  	setDir dir0 --restore direction, good for parsing boxes
 	eat' --FIXME set direction!!!!!!!!!!!!!
 	return stuff
 
@@ -244,6 +247,96 @@ vline = do
 node = do
 	Preprocess.Node <- eat'
 	return ()
+	
+--------------------------------------------------------------------------------
+
+test002 :: DgP (Cofree Symbol_ Pos)
+test002 = do
+	setDir goDown
+	traceShowM (here)
+	vline2 -- <* dgIsEmpty
+
+node'2' :: DgP (Cofree Symbol_ Pos)
+node'2' = traceShowM (here) >> xxx (LadderParser.Node <$> node'2)
+
+node'2 :: DgP [Cofree Symbol_ Pos]
+node'2
+	= branch
+		(==Preprocess.Node)
+		[ (goRight, traceShowM (here) >> hline'2)
+		, (goDown, traceShowM (here) >> vline'2)
+		]
+
+currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
+xxx p = (:<) <$> currentPos2 <*> p
+-- xxx (some vline2)
+
+vline'2 :: DgP (Cofree Symbol_ Pos)
+vline'2
+	= traceShowM (here) >> many vline2 *> (node'2' <|> end2)
+
+end2 :: DgP (Cofree Symbol_ Pos)
+end2 = xxx (Sink <$ end)
+
+hline'2 :: DgP (Cofree Symbol_ Pos)
+hline'2 = do
+	p <- currentPos
+	traceShowM (here, p)
+	coil2 <|> hline2 <|> contact2 <|> node'2' <|> eol2 --TODO vline crossing
+
+eol2 :: DgP (Cofree Symbol_ Pos)
+eol2 = do
+	p <- currentPos
+	zp <- snd <$> get
+	traceShowM (here, p, zp)
+	case zp of
+		 Zp l ((_ln, Zp _ []) : _) -> undefined
+		 _ -> fail here
+-- Zp (Int, Zp ((Int, Int), a))
+
+hline2 :: DgP (Cofree Symbol_ Pos)
+hline2 = do
+	traceShowM (here)
+	HLine <- eat'
+	p <- currentPos
+	traceShowM (here, p)
+	hline'2 <|> eol2
+
+coil2 :: DgP (Cofree Symbol_ Pos)
+coil2 = do
+	traceShowM (here)
+	pp <- currentPos
+	p <- currentPos2
+	(lbl, f) <- labelOnTop $ do
+		Coil f <- eat'
+		traceShowM (here, pp)
+		return f
+	traceShowM (here)
+	(p :<) <$> (Device ("("++unpack f++")") [unpack lbl]
+		<$> (traceShowM (here) >>(hline'2 
+			<* traceShowM (here))))
+
+contact2 :: DgP (Cofree Symbol_ Pos)
+contact2 = do
+	traceShowM (here)
+-- 	Contact _ <- eat'
+	p <- currentPos2
+	(lbl, f) <- labelOnTop $ do
+		Contact f <- eat'
+		traceShowM (here)
+		return f
+	(p :<) <$> (Device ("["++unpack f++"]") [unpack lbl] <$> hline'2)
+
+vline2 :: DgP (Cofree Symbol_ Pos)
+vline2 = do
+	VLine <- eat'
+	traceShowM (here)
+	vline'2
+
+-- node2 :: DgP ()
+-- node2 = do
+-- 	Preprocess.Node <- eat'
+-- 	return ()
 	
 --------------------------------------------------------------------------------
 
@@ -333,6 +426,17 @@ box = do
 
 end :: DgP ()
 end = do
+	s <- snd <$> get
+-- 	s <- (peek . snd) <$> get
+	traceShowM (here, peek s)
+	case peek s of
+		Nothing -> do
+-- 			traceShowM (here, s)
+			return ()
+		Just _ -> do
+			traceShowM (here, s)
+			return ()
+
 	Nothing <- (peek . snd) <$> get
 	return ()
 
