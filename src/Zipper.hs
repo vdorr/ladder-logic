@@ -84,6 +84,9 @@ move'' _ _ = Nothing
 -- |Diagram parser input stream (or, say, input vortex)
 type Dg a = Zp (Int, Zp ((Int, Int), a))
 
+-- |Token position and extent
+type DgExt = (Int, (Int, Int))
+
 -- |Returns number of remaining tokens
 dgLength :: Dg a -> Int
 dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
@@ -92,10 +95,11 @@ dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 data DgPSt = DgPSt
 	{ psNext :: Next
 	, psStr :: Dg Tok
+	, psPos :: Maybe DgExt -- ^position of last token eaten
 	}
 
 applyDgp :: DgP a -> Dg Tok -> Either String (a, DgPSt)
-applyDgp p dg = dgp p (DgPSt goRight dg)
+applyDgp p dg = dgp p (DgPSt goRight dg Nothing)
 
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
@@ -131,21 +135,21 @@ modify f = f <$> get >>= put
 --------------------------------------------------------------------------------
 
 setDir :: Next -> DgP ()
-setDir f = modify $ \(DgPSt _ zp) -> DgPSt f zp
+setDir f = modify $ \(DgPSt _ zp ps) -> DgPSt f zp ps
 
 step :: DgP ()
 step = do
 	origin <- currentPos
-	DgPSt f zp <- get
+	DgPSt f zp ps <- get
 	case f origin zp of
-		Right zp' -> put (DgPSt f zp')
+		Right zp' -> put (DgPSt f zp' ps)
 		Left err -> fail here --or not?
 
 setPos :: (Int, (Int, b)) -> DgP ()
 setPos (ln, (co, _)) = do
-	DgPSt b zp <- get
+	DgPSt b zp ps <- get
 	Just zp' <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
-	put (DgPSt b zp')
+	put (DgPSt b zp' ps)
 
 --move in some direction from provided origin
 type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
@@ -458,13 +462,13 @@ end = do
 
 eat' :: DgP Tok
 eat' = do
-	DgPSt nx dg <- get
+	DgPSt nx dg ps <- get
 	case eat''' dg of
 		 Just (v, (ln, co), dg') -> do
 			dg'' <- case nx (ln, co) dg' of
 				Right q -> return q
 				Left _err -> return dg' --nowhere to move
-			put (DgPSt nx dg'')
+			put (DgPSt nx dg'' undefined)
 			return v
 		 Nothing -> fail here
 
@@ -472,12 +476,12 @@ eat' = do
 -- eat _ = Nothing
 
 -- eat''' :: Zp (a, Zp (b, a1)) -> Maybe (a1, (a, b), Zp (a, Zp (b, a1)))
-eat''' :: Dg a -> Maybe (a, (Int, (Int, Int)), Dg a)
+eat''' :: Dg a -> Maybe (a, DgExt, Dg a)
 eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
 	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
 eat''' _ = Nothing
 
-currentPos :: DgP (Int, (Int, Int))
+currentPos :: DgP DgExt --(Int, (Int, Int))
 currentPos = do
 	Just p <- (pos . psStr) <$> get
 	return p
