@@ -1,0 +1,7 @@
+|       Start     Stop   Run
++--+----[ ]--+----[\]----( )-
+   |         |
+   |    Run  |
+   +----[ ]--+
+
+(* from https://en.wikipedia.org/wiki/Ladder_logic *)
