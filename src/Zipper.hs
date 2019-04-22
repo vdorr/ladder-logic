@@ -83,6 +83,7 @@ dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 
 type DgPSt = (Next, Dg Tok)
 
+applyDgp :: DgP a -> Dg Tok -> Either String (a, DgPSt)
 applyDgp p dg = dgp p (goRight, dg)
 
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
@@ -107,8 +108,13 @@ instance Alternative DgP where
 	empty = DgP $ const $ Left "alt empty"
 	a <|> b = DgP $ \s -> dgp a s <|> dgp b s
 
+get :: DgP DgPSt
 get = DgP $ \s -> return (s, s)
+
+put :: DgPSt -> DgP ()
 put s = DgP $ \_ -> return ((), s)
+
+modify :: (DgPSt -> DgPSt) -> DgP ()
 modify f = f <$> get >>= put
 
 --------------------------------------------------------------------------------
@@ -212,11 +218,14 @@ branch isFork branches = do
 -- 	eat'
 -- 	return (f, stuff)
 
+pattern DgEmpty <- Zp _l ((_ln, Zp _ []) : _)
+
 -- |Succeeds only when positioned on end of line
 eol :: DgP ()
 eol =
 	snd <$> get >>= \case
-		 Zp l ((_ln, Zp _ []) : _) -> return ()
+-- 		 Zp l ((_ln, Zp _ []) : _) -> return ()
+		 DgEmpty -> return ()
 		 _ -> fail here
 
 --------------------------------------------------------------------------------
