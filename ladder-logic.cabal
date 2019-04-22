@@ -28,7 +28,7 @@ library
                      , Ladder.Javascript
                      , Zipper
   -- other-modules:       
-  other-extensions:    CPP, ScopedTypeVariables
+  default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
                      , PatternSynonyms
   build-depends:       base >=4.9 && <5

@@ -1,7 +1,5 @@
-{-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances #-}
-
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
 -- #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
-
 
 module Preprocess where
 
@@ -10,7 +8,6 @@ import Data.Char
 import Text.Megaparsec --as P hiding (runParser', Pos)
 import Text.Megaparsec.Char --as PC
 -- import Text.Megaparsec.Char.Lexer (symbol)
-import Text.Megaparsec.Debug
 import Data.Bifunctor
 import Control.Monad hiding (fail)
 
@@ -19,7 +16,8 @@ import Control.Applicative.Combinators (between)
 import qualified Data.Text as T
 import Data.Text (Text)
 
-import Debug.Trace
+-- import Text.Megaparsec.Debug
+-- import Debug.Trace
 
 --------------------------------------------------------------------------------
 
