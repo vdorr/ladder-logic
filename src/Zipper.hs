@@ -72,6 +72,13 @@ moveTo move test zp@(ZpR l foc r) -- = undefined
 	| otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
 
+move'' :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
+move'' f (foc -> zp@(Zp _ (x : xs)))
+	= case f x of
+		LT -> moveTo stepLeft ((==EQ).f) zp
+		_ -> moveTo stepRight ((==EQ).f) zp
+move'' _ _ = Nothing
+
 --------------------------------------------------------------------------------
 
 -- |Diagram parser input stream
@@ -457,31 +464,36 @@ eat' = do
 			return v
 		 Nothing -> fail here
 
+-- eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
+-- eat _ = Nothing
+
+-- eat''' :: Zp (a, Zp (b, a1)) -> Maybe (a1, (a, b), Zp (a, Zp (b, a1)))
+eat''' :: Dg a -> Maybe (a, (Int, (Int, Int)), Dg a)
+eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
+	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
+eat''' _ = Nothing
+
 currentPos :: DgP (Int, (Int, Int))
 currentPos = do
 	Just p <- (pos . snd) <$> get
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
 
+peek_ :: DgP Tok
 peek_ = do
 	Just p <- (peek . snd) <$> get
 	return p
 
 pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 -- pattern DgH' ln cl x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
-pattern DgPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 --pattern DgM = (Zp u ((ln, Zp l ((_, x) : rs)) : ds))
 
 peek :: Dg a -> Maybe a
 peek (DgH x) = Just x
 peek _ = Nothing
 
--- eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
--- eat _ = Nothing
-
-eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
-	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
-eat''' _ = Nothing
+-- |Match on current token position
+pattern DgPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 
 pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgPos ln cl cr) = Just (ln, (cl, cr))
@@ -492,17 +504,8 @@ mkDgZp = Zp [] . fmap (fmap (Zp []))
 
 --------------------------------------------------------------------------------
 
-move'' :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
-move'' f (foc -> zp@(Zp _ (x : xs)))
-	= case f x of
-		LT -> moveTo stepLeft ((==EQ).f) zp
-		_ -> moveTo stepRight ((==EQ).f) zp
-move'' _ _ = Nothing
-
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
-move line col
-	= moveToLine line --(fmap (fmap foc) (foc zp))
-	>=> moveToCol col
+move line col = moveToLine line >=> moveToCol col
 
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
 moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
