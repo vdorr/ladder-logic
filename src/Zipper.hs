@@ -276,9 +276,7 @@ currentPos2 :: DgP Pos
 currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
 
 test002 :: DgP (Cofree Symbol_ Pos)
-test002 = do
-	setDir goDown
-	vline2 <* dgIsEmpty
+test002 = setDir goDown *> vline2 <* dgIsEmpty
 
 node'2' :: DgP (Cofree Symbol_ Pos)
 node'2' = (:<) <$> currentPos2 <*> (LadderParser.Node <$> node'2)
@@ -300,7 +298,7 @@ end2 = Pos (-1,-1) :< Sink <$ end
 hline'2 :: DgP (Cofree Symbol_ Pos)
 hline'2 = do
 	some hline2
-	coil2 <|> contact2 <|> node'2' <|> eol2
+	coil2 <|> contact2 <|> node'2' <|> eol2 --TODO vline crossing
 
 eol2 :: DgP (Cofree Symbol_ Pos)
 eol2 = Pos (-1,-1) :< Sink <$ eol
@@ -315,37 +313,37 @@ hline2 = do
 	HLine <- eat'
 	return ()
 
--- device :: DgP String -> DgP (Cofree Symbol_ Pos)
--- device p = do
--- 	pos <- currentPos2
--- 	(lbl, f) <- labelOnTop' p
--- 	(pos :<) <$> (Device f [lbl] <$> hline'2)
--- 
--- coil2 :: DgP (Cofree Symbol_ Pos)
--- coil2 = device $ do
--- 	Coil f <- eat'
--- 	return $ "(" ++ unpack f ++ ")"
-
--- contact2 :: DgP (Cofree Symbol_ Pos)
--- contact2 = device $ do
--- 	Coil f <- eat'
--- 	return $ "[" ++ unpack f ++ "]"
+device :: DgP String -> DgP (Cofree Symbol_ Pos)
+device p = do
+	pos <- currentPos2
+	(lbl, f) <- labelOnTop' p
+	(pos :<) <$> (Device f [lbl] <$> hline'2)
 
 coil2 :: DgP (Cofree Symbol_ Pos)
-coil2 = do
-	p <- currentPos2
-	(lbl, f) <- labelOnTop $ do
-		Coil f <- eat'
-		return f
-	(p :<) <$> (Device ("(" ++ unpack f ++ ")") [unpack lbl] <$> hline'2)
+coil2 = device $ do
+	Coil f <- eat'
+	return $ "(" ++ unpack f ++ ")"
 
 contact2 :: DgP (Cofree Symbol_ Pos)
-contact2 = do
-	p <- currentPos2
-	(lbl, f) <- labelOnTop $ do
-		Contact f <- eat'
-		return f
-	(p :<) <$> (Device ("[" ++ unpack f ++ "]") [unpack lbl] <$> hline'2)
+contact2 = device $ do
+	Contact f <- eat'
+	return $ "[" ++ unpack f ++ "]"
+
+-- coil2 :: DgP (Cofree Symbol_ Pos)
+-- coil2 = do
+-- 	p <- currentPos2
+-- 	(lbl, f) <- labelOnTop $ do
+-- 		Coil f <- eat'
+-- 		return f
+-- 	(p :<) <$> (Device ("(" ++ unpack f ++ ")") [unpack lbl] <$> hline'2)
+
+-- contact2 :: DgP (Cofree Symbol_ Pos)
+-- contact2 = do
+-- 	p <- currentPos2
+-- 	(lbl, f) <- labelOnTop $ do
+-- 		Contact f <- eat'
+-- 		return f
+-- 	(p :<) <$> (Device ("[" ++ unpack f ++ "]") [unpack lbl] <$> hline'2)
 	
 --------------------------------------------------------------------------------
 
