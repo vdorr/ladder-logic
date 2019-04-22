@@ -10,6 +10,8 @@ import Data.Ord
 
 import NeatInterpolation
 import Data.Text (Text)
+import qualified Data.Text
+import Data.Bifunctor
 
 import Preprocess
 import Zipper
@@ -27,27 +29,46 @@ tokenizerTests = testGroup "Tokenizer"
 		(@?= Right []) $ testPreproc4  ""
 	, testCase "one VLine" $
 		(Right [[VLine]] @=?) $ testPreproc4 $ [text|
-			|
-			|]
+			|               |]
 	, testCase "3" $
 		(Right [[VLine], [Node], [VLine]] @=?) $ testPreproc4 $ [text|
 			| (* hello *)
 			+
-			|
-			|]
-
+			|               |]
 	, testCase "4" $
 		(Right [VLine, Node, VLine] @=?) $ testPreproc5 $ [text|
 			| (* hello *)
 			+
-			|
-			|]
+			|               |]
 	, testCase "5" $
 		(Right [[VLine],[Node,HLine,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
 			| (* hello *)
-			+->>LBL
-			|]
+			+->>LBL         |]
+	, testCase "label" $
+		(Right [[VLine],[Label' "LBL"],[VLine]] @=?) $ testPreproc4 $ [text|
+			| (* hello *)
+			LBL:
+			|               |]
+	, testCase "continuation" $
+		(Right [[VLine],[Node,HLine,Continuation "LBL"],[VLine]] @=?)
+			$ testPreproc4 $ [text|
+				| (* hello *)
+				+-->LBL>
+				|               |]
+	, testCase "return" $
+		(Right [[VLine],[Node,HLine,Return],[VLine]] @=?)
+			$ testPreproc4 $ [text|
+				| (* hello *)
+				+--<RETURN>
+				|               |]
+
+
+
+	, testCase "invalid char" $
+		 simpleResult (testPreproc4 "?") @?= Left True
 	]
+
+simpleResult = bimap ((>0).Data.Text.length) id
 
 zipperTests = testGroup "Zipper"
 	[ testCase "from/to list" $
@@ -71,12 +92,55 @@ dgpTests = testGroup "Diagram parser"
 		dgLength (mkDgZp []) @=? 0
 	, testCase "trivial" $
 		fst <$> applyDgp (pure ()) (mkDgZp []) @=? Right ()
+	, testCase "trim 1" $
+		dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp []
+	, testCase "trim 2" $
+		dgTrim (Zp [] [(1, Zp [] [((1, 1), VLine)])])
+			@=? mkDgZp [(1, [((1, 1), VLine)])]
 	]
+
+ladderTests = testGroup "Ladder parser"
+	[ testCase "test01" $
+		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t01))
+			@=? Right (Zp [] [])
+	, testCase "test04" $
+		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t04))
+			@=? Right (Zp [] [])
+	]
+	where
+	Right t01 = test01_tokenized
+	Right t04 = test04_tokenized
+
+test01_tokenized = preproc4'' test01
+
+test04_tokenized = preproc4'' test04
+
+test01 =
+	[text|
+	(* --- test 01 --- *)
+
+	| %IX0  %QX0
+	+--[ ]---( )--
+	|                          |]
+
+test04 =
+	[text|
+	(* --- test 04 --- *)
+
+	| %MX0 %MX1      %MX1
+	+--[/]--[/]-------(S)-
+	| %MX0 %MX1 %MX0 %MX1
+	+--[/]--[ ]--(S)--(R)-
+	| %MX0 %MX1      %MX1
+	+--[ ]--[/]-------(S)-
+	| %MX0 %MX1 %MX0 %MX1
+	+--[ ]--[ ]--(R)--(R)-
+	|                          |]
 
 --------------------------------------------------------------------------------
 
 tests :: TestTree
-tests = testGroup "Tests" [tokenizerTests, zipperTests, dgpTests]
+tests = testGroup "Tests" [tokenizerTests, zipperTests, dgpTests, ladderTests]
 
 main :: IO ()
 main = defaultMain tests

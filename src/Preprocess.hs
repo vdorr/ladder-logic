@@ -195,7 +195,8 @@ token7 = tok
 		<|> Continuation <$> try (between' ">" ">" name)
 		<|> HLine <$ some (char '-')
 		<|> Jump' <$> (try (chunk ">>") *> labelName)
-		<|> Return <$ try (between' "<" ">" labelName)
+-- 		<|> Return <$ try (between' "<" ">" labelName)
+		<|> Return <$ try (chunk "<RETURN>")
 		<|> Contact <$> between' "[" "]" innards
 		<|> Coil <$> between' "(" ")" innards
 		<|> Connector <$> between ">" ">" name

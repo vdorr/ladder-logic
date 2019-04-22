@@ -40,6 +40,9 @@ zpToList (Zp l r) = reverse l ++ r
 zpLength :: Zp a -> Int
 zpLength (Zp l r) = length l + length r
 
+zpNull :: Zp a -> Bool
+zpNull = (<=0) . zpLength
+
 -- |Bring something into focus
 foc :: Zp a -> Zp a
 foc (Zp (x:xs) []) = Zp xs [x]
@@ -79,6 +82,10 @@ move'' f (foc -> zp@(Zp _ (x : xs)))
 		_ -> moveTo stepRight ((==EQ).f) zp
 move'' _ _ = Nothing
 
+-- |Drop empty lines
+dgTrim :: Dg a -> Dg a
+dgTrim (Zp l r) = Zp (filter (not.zpNull.snd) l) (filter (not.zpNull.snd) r)
+
 --------------------------------------------------------------------------------
 
 -- |Diagram parser input stream (or, say, input vortex)
@@ -95,8 +102,12 @@ dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 data DgPSt = DgPSt
 	{ psNext :: Next
 	, psStr :: Dg Tok
-	, psPos :: Maybe DgExt -- ^position of last token eaten
+	, psLastBite :: Maybe DgExt -- ^position of last token eaten
 	}
+
+lastPos :: DgP DgExt
+lastPos = psLastBite <$> get >>= maybe (fail here) return
+
 
 applyDgp :: DgP a -> Dg Tok -> Either String (a, DgPSt)
 applyDgp p dg = dgp p (DgPSt goRight dg Nothing)
@@ -302,11 +313,11 @@ currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
 test002 :: DgP (Cofree Symbol_ Pos)
 test002 = setDir goDown *> vline2 <* dgIsEmpty
 
-node'2' :: DgP (Cofree Symbol_ Pos)
-node'2' = (:<) <$> currentPos2 <*> (LadderParser.Node <$> node'2)
+node2 :: DgP (Cofree Symbol_ Pos)
+node2 = (:<) <$> currentPos2 <*> (LadderParser.Node <$> node2')
 
-node'2 :: DgP [Cofree Symbol_ Pos]
-node'2
+node2' :: DgP [Cofree Symbol_ Pos]
+node2'
 	= branch
 		(==Preprocess.Node)
 		[ (goRight, hline'2)
@@ -314,7 +325,7 @@ node'2
 		]
 
 vline'2 :: DgP (Cofree Symbol_ Pos)
-vline'2 = many vline2 *> (node'2' <|> end2)
+vline'2 = many vline2 *> (node2 <|> end2)
 
 end2 :: DgP (Cofree Symbol_ Pos)
 end2 = Pos (-1,-1) :< Sink <$ end
@@ -322,10 +333,11 @@ end2 = Pos (-1,-1) :< Sink <$ end
 hline'2 :: DgP (Cofree Symbol_ Pos)
 hline'2 = do
 	some hline2
-	coil2 <|> contact2 <|> node'2' <|> eol2 --TODO vline crossing
+	coil2 <|> contact2 <|> node2 <|> eol2 --TODO vline crossing
 
 eol2 :: DgP (Cofree Symbol_ Pos)
-eol2 = Pos (-1,-1) :< Sink <$ eol
+-- eol2 = Pos (-1,-1) :< Sink <$ eol
+eol2 = (:< Sink) <$> (fmap (\(ln, (_, co)) -> Pos (ln, co)) lastPos) <* eol
 
 vline2 :: DgP (Cofree Symbol_ Pos)
 vline2 = do
@@ -464,18 +476,17 @@ eat' :: DgP Tok
 eat' = do
 	DgPSt nx dg ps <- get
 	case eat''' dg of
-		 Just (v, (ln, co), dg') -> do
-			dg'' <- case nx (ln, co) dg' of
+		 Just (v, pos, dg') -> do
+			dg'' <- case nx pos dg' of
 				Right q -> return q
 				Left _err -> return dg' --nowhere to move
-			put (DgPSt nx dg'' undefined)
+			put (DgPSt nx dg'' (Just pos))
 			return v
 		 Nothing -> fail here
 
 -- eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
 -- eat _ = Nothing
 
--- eat''' :: Zp (a, Zp (b, a1)) -> Maybe (a1, (a, b), Zp (a, Zp (b, a1)))
 eat''' :: Dg a -> Maybe (a, DgExt, Dg a)
 eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
 	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
