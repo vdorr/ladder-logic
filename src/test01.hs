@@ -434,7 +434,7 @@ main = do
 
 			print (here, "--------------------------------------------------")
 			case applyDgp test001 zp of
-				Right (_, (_,c@(Zp zpl zpr))) -> do
+				Right (_, (DgPSt _ c@(Zp zpl zpr))) -> do
 -- 					print (here, a, c)
 					for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 -- 					for_ zpr $ \q -> print (here, q)
@@ -443,7 +443,7 @@ main = do
 			print (here, "--------------------------------------------------")
 
 			case applyDgp test002 zp of
-				Right (_, (_,c@(Zp zpl zpr))) -> do
+				Right (_, (DgPSt _ c@(Zp zpl zpr))) -> do
 -- 					print (here, a, c)
 					for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 -- 					for_ zpr $ \q -> print (here, q)

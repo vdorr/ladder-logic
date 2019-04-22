@@ -81,17 +81,21 @@ move'' _ _ = Nothing
 
 --------------------------------------------------------------------------------
 
--- |Diagram parser input stream
+-- |Diagram parser input stream (or, say, input vortex)
 type Dg a = Zp (Int, Zp ((Int, Int), a))
 
 -- |Returns number of remaining tokens
 dgLength :: Dg a -> Int
 dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 
-type DgPSt = (Next, Dg Tok)
+-- type DgPSt = (Next, Dg Tok)
+data DgPSt = DgPSt
+	{ psNext :: Next
+	, psStr :: Dg Tok
+	}
 
 applyDgp :: DgP a -> Dg Tok -> Either String (a, DgPSt)
-applyDgp p dg = dgp p (goRight, dg)
+applyDgp p dg = dgp p (DgPSt goRight dg)
 
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
@@ -127,21 +131,21 @@ modify f = f <$> get >>= put
 --------------------------------------------------------------------------------
 
 setDir :: Next -> DgP ()
-setDir f = modify $ \(_, zp) -> (f, zp)
+setDir f = modify $ \(DgPSt _ zp) -> DgPSt f zp
 
 step :: DgP ()
 step = do
 	origin <- currentPos
-	(f, zp) <- get
+	DgPSt f zp <- get
 	case f origin zp of
-		Right zp' -> put (f, zp')
+		Right zp' -> put (DgPSt f zp')
 		Left err -> fail here --or not?
 
 setPos :: (Int, (Int, b)) -> DgP ()
 setPos (ln, (co, _)) = do
-	(b, zp) <- get
+	DgPSt b zp <- get
 	Just zp' <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
-	put (b, zp')
+	put (DgPSt b zp')
 
 --move in some direction from provided origin
 type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
@@ -162,7 +166,7 @@ goLeft (ln, (_, co)) = move_ ln (co-1)
 -- |Fail if input stream is not empty
 dgIsEmpty :: DgP ()
 dgIsEmpty
-	= (dgLength . snd) <$> get
+	= (dgLength . psStr) <$> get
 	>>= \case
 		 0 -> return ()
 		 _ -> fail $ here ++ "not empty"
@@ -194,7 +198,7 @@ branch
 	-> [(Next, DgP a)]
 	->  DgP [a]
 branch isFork branches = do
---  	dir0 <- fst <$> get
+--  	dir0 <- psNext <$> get
 	origin <- currentPos
 	True <- isFork <$> peek_
 	stuff <- for branches $ \(dir, p) -> do
@@ -213,7 +217,7 @@ branch isFork branches = do
 -- 	->  DgP (b, [a])
 -- branch' isFork branches = do
 -- 	origin <- currentPos
--- 	dir0 <- fst <$> get
+-- 	dir0 <- psNext <$> get
 -- 	Just f <- isFork <$> peek_
 -- 	stuff <- for branches $ \(dir, p) -> do
 -- 		setDir dir
@@ -230,7 +234,7 @@ pattern DgEmpty <- Zp _l ((_ln, Zp _ []) : _)
 -- |Succeeds only when positioned on end of line
 eol :: DgP ()
 eol =
-	snd <$> get >>= \case
+	psStr <$> get >>= \case
 -- 		 Zp l ((_ln, Zp _ []) : _) -> return ()
 		 DgEmpty -> return ()
 		 _ -> fail here
@@ -449,18 +453,18 @@ box = do
 
 end :: DgP ()
 end = do
-	Nothing <- (peek . snd) <$> get
+	Nothing <- (peek . psStr) <$> get
 	return ()
 
 eat' :: DgP Tok
 eat' = do
-	(nx, dg) <- get
+	DgPSt nx dg <- get
 	case eat''' dg of
 		 Just (v, (ln, co), dg') -> do
 			dg'' <- case nx (ln, co) dg' of
 				Right q -> return q
 				Left _err -> return dg' --nowhere to move
-			put (nx, dg'')
+			put (DgPSt nx dg'')
 			return v
 		 Nothing -> fail here
 
@@ -475,13 +479,13 @@ eat''' _ = Nothing
 
 currentPos :: DgP (Int, (Int, Int))
 currentPos = do
-	Just p <- (pos . snd) <$> get
+	Just p <- (pos . psStr) <$> get
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
 
 peek_ :: DgP Tok
 peek_ = do
-	Just p <- (peek . snd) <$> get
+	Just p <- (peek . psStr) <$> get
 	return p
 
 pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
