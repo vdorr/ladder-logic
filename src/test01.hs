@@ -13,6 +13,10 @@ import Zipper
 
 --------------------------------------------------------------------------------
 
+testAst ast = do
+    print (here, ast)
+
+main :: IO ()
 main = do
     [file] <- getArgs
     src <- TIO.readFile file
@@ -37,10 +41,16 @@ main = do
             print (here, "--------------------------------------------------")
 
             case applyDgp test002 zp of
-                Right (_, (DgPSt _ c@(Zp zpl zpr) _)) -> do
+                Right (ast, (DgPSt _ c@(Zp zpl zpr) _)) -> do
 --                     print (here, a, c)
                     for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 --                     for_ zpr $ \q -> print (here, q)
+
+                    print (here, "--------------------------------------------------")
+                    testAst ast
+
+
+
                 Left err -> print (here, err)
 #if 0
             forM_ x $ \(l,c) -> do

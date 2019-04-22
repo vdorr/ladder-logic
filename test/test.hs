@@ -102,18 +102,22 @@ dgpTests = testGroup "Diagram parser"
 ladderTests = testGroup "Ladder parser"
 	[ testCase "test01" $
 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t01))
-			@=? Right (Zp [] [])
+			@?= Right (Zp [] [])
 	, testCase "test04" $
 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t04))
-			@=? Right (Zp [] [])
+			@?= Right (Zp [] [])
+	, testCase "test07" $
+		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
+			@?= Right (Zp [] [])
 	]
 	where
 	Right t01 = test01_tokenized
 	Right t04 = test04_tokenized
+	Right t07 = test07_tokenized
 
 test01_tokenized = preproc4'' test01
-
 test04_tokenized = preproc4'' test04
+test07_tokenized = preproc4'' test07
 
 test01 =
 	[text|
@@ -135,6 +139,16 @@ test04 =
 	+--[ ]--[/]-------(S)-
 	| %MX0 %MX1 %MX0 %MX1
 	+--[ ]--[ ]--(R)--(R)-
+	|                          |]
+
+test07 =
+	[text|
+	(* --- test 07 --- *)
+
+	| %IX0    %QX0
+	+--[ ]--+--( )--
+	| %IX1  |
+	+--[ ]--+
 	|                          |]
 
 --------------------------------------------------------------------------------
