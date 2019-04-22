@@ -256,53 +256,50 @@ eol =
 
 --------------------------------------------------------------------------------
 
-test001 :: DgP () --(Cofree Symbol_ Pos)
-test001 = do
-	setDir goDown
-	some vline
-	node' <|> end
-	dgIsEmpty
-
-node' :: DgP ()
-node'
-	= () <$ branch
-		(\case
-			Node -> True
-			_ -> False)
-		[ (goRight, hline')
-		, (goDown, vline')
-		]
-
-vline' :: DgP ()
--- vline' = some (node' <|> vline)
-vline' = many vline *> (node' <|> end)
-
-hline' = do
-	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
-	return ()
-
+-- test001 :: DgP () --(Cofree Symbol_ Pos)
+-- test001 = do
+-- 	setDir goDown
+-- 	some vline
+-- 	node' <|> end
+-- 	dgIsEmpty
+-- 
+-- node' :: DgP ()
+-- node'
+-- 	= () <$ branch
+-- 		(\case
+-- 			Node -> True
+-- 			_ -> False)
+-- 		[ (goRight, hline')
+-- 		, (goDown, vline')
+-- 		]
+-- 
+-- vline' :: DgP ()
+-- -- vline' = some (node' <|> vline)
+-- vline' = many vline *> (node' <|> end)
+-- 
+-- hline' = do
+-- 	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
+-- 	return ()
+-- 
 hline = do
 	HLine <- eat'
 	return ()
-coil = do
-	labelOnTop $ do
-		Coil _ <- eat'
-		return ()
-	return ()
 
-contact = do
--- 	Contact _ <- eat'
-	labelOnTop $ do
-		Contact _ <- eat'
-		return ()
-	return ()
+-- coil = do
+-- 	labelOnTop $ do
+-- 		Coil _ <- eat'
+-- 		return ()
+-- 	return ()
+
+-- contact = do
+-- -- 	Contact _ <- eat'
+-- 	labelOnTop $ do
+-- 		Contact _ <- eat'
+-- 		return ()
+-- 	return ()
 
 vline = do
 	VLine <- eat'
-	return ()
-
-node = do
-	Preprocess.Node <- eat'
 	return ()
 	
 --------------------------------------------------------------------------------
@@ -397,6 +394,10 @@ clearance (example of incorrect box):
    +-+--  // <--- reject!
 
 -}
+
+node = do
+	Preprocess.Node <- eat'
+	return ()
 
 edge
 	= eat' >>= \t -> case t of
