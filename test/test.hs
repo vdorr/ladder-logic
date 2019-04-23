@@ -12,6 +12,7 @@ import NeatInterpolation
 import Data.Text (Text)
 import qualified Data.Text
 import Data.Bifunctor
+import GHC.Exts
 
 import Preprocess
 import Zipper
@@ -68,7 +69,10 @@ tokenizerTests = testGroup "Tokenizer"
 		 simpleResult (testPreproc4 "?") @?= Left True
 	]
 
-simpleResult = bimap ((>0).Data.Text.length) id
+-- simpleResult = bimap ((>0).Data.Text.length) id
+simpleResult :: (Bifunctor f, IsList e) => f e a -> f Bool a
+simpleResult = bimap ((>0).length.toList) id
+-- simpleResult' = bimap ((>0).length) (const ())
 
 zipperTests = testGroup "Zipper"
 	[ testCase "from/to list" $
@@ -92,12 +96,19 @@ dgpTests = testGroup "Diagram parser"
 		dgLength (mkDgZp []) @=? 0
 	, testCase "trivial" $
 		fst <$> applyDgp (pure ()) (mkDgZp []) @=? Right ()
+	, testCase "dgIsEmpty positive case" $
+		simpleResult (fst <$> applyDgp dgIsEmpty (mkDgZp [])) @=? Right ()
+	, testCase "dgIsEmpty negative case" $
+		simpleResult (fst <$> applyDgp dgIsEmpty someDg) @=? Left True
 	, testCase "trim 1" $
 		dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp []
 	, testCase "trim 2" $
-		dgTrim (Zp [] [(1, Zp [] [((1, 1), VLine)])])
+		dgTrim someDg
 			@=? mkDgZp [(1, [((1, 1), VLine)])]
 	]
+	where
+	someDg = Zp [] [(1, Zp [] [((1, 1), VLine)])]
+
 
 ladderTests = testGroup "Ladder parser"
 	[ testCase "test01" $
@@ -190,11 +201,11 @@ box01 =
 
 box02 =
 	[text|
-	+---+
-	|   |
-	|   |
-	|   |
-	+---+                        |]
+	+-----+
+	|     |
+	|     |
+	|     |
+	+-----+                    |]
 
 --------------------------------------------------------------------------------
 

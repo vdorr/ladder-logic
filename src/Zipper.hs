@@ -77,12 +77,14 @@ moveTo move test zp@(ZpR l foc r) -- = undefined
 	| otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
 
+#if 0
 move'' :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
 move'' f (foc -> zp@(Zp _ (x : xs)))
 	= case f x of
 		LT -> moveTo stepLeft ((==EQ).f) zp
 		_ -> moveTo stepRight ((==EQ).f) zp
 move'' _ _ = Nothing
+#endif
 
 -- |Drop empty lines
 dgTrim :: Dg a -> Dg a
@@ -176,7 +178,7 @@ goRight, goDown, goUp, goLeft :: Next
 goRight (ln, (_, co)) = move_ ln (co+1)
 goDown (ln, (co, _)) = move_ (ln+1) co
 goUp (ln, (co, _)) = move_ (ln-1) co
-goLeft (ln, (_, co)) = move_ ln (co-1)
+goLeft (ln, (co, _)) = move_ ln (co-1)
 
 --------------------------------------------------------------------------------
 
@@ -505,12 +507,23 @@ box = do
 	node
 
 	currentPosM >>= (traceShowM . (here,"bottom wall",))
+
+	Zp zpl zpr <- psStr <$> get
+	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+
+
 	hline
+	
+	
+	currentPosM >>= (traceShowM . (here,))
+	Zp zpl zpr <- psStr <$> get
+	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+
 	currentPosM >>= (traceShowM . (here,"bottom left corner",))
+	setDir goUp
 	node
 
 	currentPosM >>= (traceShowM . (here,"remaining left wall",))
-	setDir goUp
 	many vline --0 or more
 
 	return ()
