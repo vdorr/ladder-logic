@@ -164,10 +164,19 @@ test07a =
 	+--+--( )--
 	|                          |]
 
+--------------------------------------------------------------------------------
+
+testBox ln input
+	= bimap (Data.Text.unpack) mkDgZp (preproc4'' input)
+	>>= applyDgp (box001 ln)
+-- fmap (dgTrim.psStr.snd) 
 
 boxTests = testGroup "Box parser"
 	[ testCase "1" $
 		fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized))
+			@?= Right (Zp [] [])
+	, testCase "2" $
+		fmap (dgTrim.psStr.snd) (testBox 2 box02)
 			@?= Right (Zp [] [])
 	]
 	where
@@ -178,6 +187,14 @@ box01 =
 	+-+
 	| |
 	+-+                        |]
+
+box02 =
+	[text|
+	+---+
+	|   |
+	|   |
+	|   |
+	+---+                        |]
 
 --------------------------------------------------------------------------------
 

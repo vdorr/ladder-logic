@@ -474,28 +474,42 @@ box001 ln = do
 box = do
 	(ln, (_, co)) <- currentPos
 
+	traceShowM (here, ln, co, "------------->")
+	Zp zpl zpr <- psStr <$> get
+	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+
 	setDir goUp
 -- 	VLine <- eat'
+	currentPosM >>= (traceShowM . (here, "left wall", ))
 	some vline
-	node
-
+	currentPosM >>= (traceShowM . (here, "left top corner",))
 	setDir goRight
-	hline
 	node
-	--TODO parse box instance name
+	currentPosM >>= (traceShowM . (here,"top wall",))
+	hline
 
 	setDir goDown --parsing right side, look for output line position
+	currentPosM >>= (traceShowM . (here,"right top corner",))
+	node
+
+	currentPosM >>= (traceShowM . (here,"right wall",))
+	--TODO parse box instance name
 	some $ do
 -- 		(ln, co) <- currentPos
 		vline
 -- 		setPos (ln, co+1)
 -- 		??? peek & record position
-	node
 
+	currentPosM >>= (traceShowM . (here,"bottom right corner",))
 	setDir goLeft
-	hline
 	node
 
+	currentPosM >>= (traceShowM . (here,"bottom wall",))
+	hline
+	currentPosM >>= (traceShowM . (here,"bottom left corner",))
+	node
+
+	currentPosM >>= (traceShowM . (here,"remaining left wall",))
 	setDir goUp
 	many vline --0 or more
 
