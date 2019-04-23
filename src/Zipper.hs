@@ -465,6 +465,10 @@ leftSideBrick = do
 -- 	setPos (ln, co+1)
 -- 	setDir goRight
 
+box001 :: Int -> DgP ()
+box001 ln = do
+	setPos (ln, (1, 1))
+	box
 
 --TODO check clearance
 box = do

@@ -164,10 +164,31 @@ test07a =
 	+--+--( )--
 	|                          |]
 
+
+boxTests = testGroup "Box parser"
+	[ testCase "1" $
+		fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized))
+			@?= Right (Zp [] [])
+	]
+	where
+	Right box01_tokenized = preproc4'' box01
+
+box01 =
+	[text|
+	+-+
+	| |
+	+-+                        |]
+
 --------------------------------------------------------------------------------
 
 tests :: TestTree
-tests = testGroup "Tests" [tokenizerTests, zipperTests, dgpTests, ladderTests]
+tests = testGroup "Tests"
+	[ tokenizerTests
+	, zipperTests
+	, dgpTests
+	, ladderTests
+	, boxTests
+	]
 
 main :: IO ()
 main = defaultMain tests
