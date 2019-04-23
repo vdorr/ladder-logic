@@ -221,12 +221,19 @@ branch isFork branches = do
 	stuff <- for branches $ \(dir, p) -> do
 		setDir dir
 		setPos origin
-		step --with dir
-		fmap Just p <|> return Nothing
+
+		--XXX fail if there is nothing under/after node!
+-- 		step <|> undefined --with dir
+
+-- 		fmap Just p <|> return Nothing
+-- 		p
+		fmap Just (step *> p) <|> return Nothing --step fail if there's nothing in desired direction
 	setPos origin --eat `fork`
 --  	setDir dir0 --restore direction, good for parsing boxes
 	eat' --FIXME set direction!!!!!!!!!!!!!
-	return $ catMaybes stuff
+
+ 	return $ catMaybes stuff
+--	return stuff
 
 -- branch'
 -- 	:: (Tok -> Maybe b)
@@ -246,6 +253,7 @@ branch isFork branches = do
 -- 	eat'
 -- 	return (f, stuff)
 
+-- |Matches diagram with nothing remaining on current line
 pattern DgEmpty <- Zp _l ((_ln, Zp _ []) : _)
 
 -- |Succeeds only when positioned on end of line
@@ -456,8 +464,6 @@ leftSideBrick = do
 	
 -- 	setPos (ln, co+1)
 -- 	setDir goRight
-
-
 
 
 --TODO check clearance
