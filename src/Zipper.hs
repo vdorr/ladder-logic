@@ -321,6 +321,24 @@ vline = do
 	
 --------------------------------------------------------------------------------
 
+{-
+hlink   : '-'+ ('|'+ '-'+)?
+hline   : (hlink | contact | coil | node)+
+node    : '+'
+name    : <cf tokenizer>
+
+--interpret as 2D syntax
+contact : name
+          '[' contactType ']'
+          name?
+
+coil    : name
+          '[' coilType ']'
+
+contactType : ...
+coilType    : ...
+
+-}
 
 currentPos2 :: DgP Pos
 currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
@@ -414,6 +432,24 @@ contact2 = do
 -- 	(p :<) <$> (Device ("[" ++ unpack f ++ "]") [unpack lbl] <$> hline'2)
 	
 --------------------------------------------------------------------------------
+
+{-
+
+--very approximate syntax
+
+wall   : '+' '-'+ '+'
+
+top    : name
+         wall
+
+bottom : wall
+
+
+left   : '0'? ('|' | '>' | '<') name?
+
+right  : name? '|' '0'?
+
+-}
 
 {-
 

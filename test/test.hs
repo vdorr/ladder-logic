@@ -169,7 +169,7 @@ test07 =
 
 test07a =
 	[text|
-	(* --- test 07 --- *)
+	(* --- test 07a --- *)
 
 	|    %QX0
 	+--+--( )--
@@ -188,6 +188,12 @@ boxTests = testGroup "Box parser"
 			@?= Right (Zp [] [])
 	, testCase "2" $
 		fmap (dgTrim.psStr.snd) (testBox 2 box02)
+			@?= Right (Zp [] [])
+	, testCase "2a" $
+		fmap (dgTrim.psStr.snd) (testBox 3 box02)
+			@?= Right (Zp [] [])
+	, testCase "2b" $
+		fmap (dgTrim.psStr.snd) (testBox 4 box02)
 			@?= Right (Zp [] [])
 	]
 	where
