@@ -17,12 +17,16 @@ import GHC.Exts
 import Preprocess
 import Zipper
 
+import qualified LadderParser (Symbol_(..))
+import LadderParser (Cofree(..))
+import DiagramParser (Pos(..))
+
 --------------------------------------------------------------------------------
 
-testPreproc4 :: Text -> Either Text [[Tok]]
+testPreproc4 :: Text -> Either Text [[(Tok Text)]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc4
 
-testPreproc5 :: Text -> Either Text [Tok]
+testPreproc5 :: Text -> Either Text [(Tok Text)]
 testPreproc5 = fmap (fmap ( snd)) . preproc5
 
 tokenizerTests = testGroup "Tokenizer"
@@ -50,11 +54,17 @@ tokenizerTests = testGroup "Tokenizer"
 			| (* hello *)
 			LBL:
 			|               |]
+	, testCase "label/blocks" $
+		(Right [(Nothing, [[VLine]]),(Just "LBL", [[VLine]])] @=?)
+			$ fmap basicBlocks $ testPreproc4 $ [text|
+				| (* hello *)
+				LBL:
+				|               |]
 	, testCase "continuation" $
-		(Right [[VLine],[Node,HLine,Continuation "LBL"],[VLine]] @=?)
+		(Right [[VLine],[Node,HLine,Continuation "X"],[VLine]] @=?)
 			$ testPreproc4 $ [text|
 				| (* hello *)
-				+-->LBL>
+				+-->X>
 				|               |]
 	, testCase "return" $
 		(Right [[VLine],[Node,HLine,Return],[VLine]] @=?)
@@ -62,9 +72,11 @@ tokenizerTests = testGroup "Tokenizer"
 				| (* hello *)
 				+--<RETURN>
 				|               |]
-
-
-
+	, testCase "connector" $
+		(Right [[Continuation "X", HLine]] @=?)
+			$ testPreproc4 $ [text|
+				(* hello *)
+				>X>--           |]
 	, testCase "invalid char" $
 		 simpleResult (testPreproc4 "?") @?= Left True
 	]
@@ -111,12 +123,21 @@ dgpTests = testGroup "Diagram parser"
 
 
 ladderTests = testGroup "Ladder parser"
-	[ testCase "test01" $
+	[ testCase "test00" $
+		fmap fst (applyDgp test002 (mkDgZp t00))
+			@?= Right ( Pos (-1,-1) :< LadderParser.Sink )
+	, testCase "test00" $
+		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t00))
+			@?= Right (Zp [] [])
+	, testCase "test01" $
 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t01))
 			@?= Right (Zp [] [])
 	, testCase "test04" $
 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t04))
 			@?= Right (Zp [] [])
+-- 	, testCase "test05" $
+-- 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t05))
+-- 			@?= Right (Zp [] [])
 	, testCase "test07a" $
 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07a))
 			@?= Right (Zp [] [])
@@ -125,15 +146,26 @@ ladderTests = testGroup "Ladder parser"
 -- 			@?= Right (Zp [] [])
 	]
 	where
+	Right t00 = test00_tokenized
 	Right t01 = test01_tokenized
 	Right t04 = test04_tokenized
+	Right t05 = test05_tokenized
 	Right t07 = test07_tokenized
 	Right t07a = test07a_tokenized
 
+test00_tokenized = preproc4'' test00
+
 test01_tokenized = preproc4'' test01
 test04_tokenized = preproc4'' test04
+test05_tokenized = preproc4'' test05
 test07_tokenized = preproc4'' test07
 test07a_tokenized = preproc4'' test07a
+
+test00 =
+	[text|
+	(* --- test 00 --- *)
+
+	|                          |]
 
 test01 =
 	[text|
@@ -155,6 +187,20 @@ test04 =
 	+--[ ]--[/]-------(S)-
 	| %MX0 %MX1 %MX0 %MX1
 	+--[ ]--[ ]--(R)--(R)-
+	|                          |]
+
+test05 =
+	[text|
+	(* --- test 05 --- *)
+
+	| %MX0
+	+--[ ]-->>MAIN
+	| %QX0 %MX0
+	+--(S)--(S)--
+	|
+	MAIN:
+	| %IX0 %QX0
+	+--[ ]--( )--
 	|                          |]
 
 test07 =

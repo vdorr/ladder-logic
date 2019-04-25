@@ -1,6 +1,9 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase, RecordWildCards
   , FlexibleContexts, DeriveFunctor, QuantifiedConstraints
   , DeriveFoldable, DeriveTraversable #-}
+
+{-# LANGUAGE UndecidableInstances #-}
+
 {-# OPTIONS_GHC -fno-warn-tabs -fwarn-incomplete-patterns
                      -fwarn-unused-binds
                      -fwarn-unused-imports #-}
@@ -34,16 +37,21 @@ import DiagramParser
 
 data Symbol_ a
 	= Source a
-	| Sink
+	| Sink --where wire has to connect to right rail
+		  --maybe i need another case to mark end of left rail
 	| Device String [String] a
 	| Jump String
 	| Label String a
 	| Node [a]
 -- 	| Node' --already visited Node
-	deriving (Show, Functor, Foldable, Traversable)
+	deriving (Show, Functor, Foldable, Traversable, Eq)
 
 data Cofree f a = a :< f (Cofree f a)
 	deriving (Functor, Foldable, Traversable)
+
+instance (Eq a, Eq (f (Cofree f a))) => Eq (Cofree f a) where
+	a :< b == c :< d = a == c && b == d
+
 --unFix :: Cofree f a -> (a, f (Cofree f a))
 --unFix (a :< x) = (a, x)
 --cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a

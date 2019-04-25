@@ -105,7 +105,7 @@ dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 -- type DgPSt = (Next, Dg Tok)
 data DgPSt = DgPSt
 	{ psNext :: Next
-	, psStr :: Dg Tok
+	, psStr :: Dg (Tok Text)
 	, psLastBite :: Maybe DgExt -- ^position of last token eaten
 	}
 
@@ -113,7 +113,7 @@ lastPos :: DgP DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
 
 
-applyDgp :: DgP a -> Dg Tok -> Either String (a, DgPSt)
+applyDgp :: DgP a -> Dg (Tok Text) -> Either String (a, DgPSt)
 applyDgp p dg = dgp p (DgPSt goRight dg Nothing)
 
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
@@ -167,7 +167,7 @@ setPos (ln, (co, _)) = do
 	put (DgPSt b zp' ps)
 
 --move in some direction from provided origin
-type Next = (Int, (Int, Int)) -> Dg Tok -> Either String (Dg Tok)
+type Next = (Int, (Int, Int)) -> Dg (Tok Text) -> Either String (Dg (Tok Text))
 
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
 move_ ln co dg = maybe (Left here) return (move ln co dg)
@@ -213,7 +213,7 @@ labelOnTop' p = bimap unpack id <$> labelOnTop p
 -- 	return lbl
 
 branch
-	:: (Tok -> Bool)
+	:: ((Tok Text) -> Bool)
 	-> [(Next, DgP a)]
 	->  DgP [a]
 branch isFork branches = do
@@ -238,7 +238,7 @@ branch isFork branches = do
 --	return stuff
 
 -- branch'
--- 	:: (Tok -> Maybe b)
+-- 	:: ((Tok Text) -> Maybe b)
 -- 	-> [(Next, DgP a)]
 -- 	->  DgP (b, [a])
 -- branch' isFork branches = do
@@ -261,8 +261,8 @@ pattern DgEmpty <- Zp _l ((_ln, Zp _ []) : _)
 -- |Succeeds only when positioned on end of line
 eol :: DgP ()
 eol = do
-	p <- currentPosM
-	traceShowM (here, p)
+-- 	p <- currentPosM
+-- 	traceShowM (here, p)
 	psStr <$> get >>= \case
 -- 		 Zp l ((_ln, Zp _ []) : _) -> return ()
 		 DgEmpty -> return ()
@@ -270,44 +270,44 @@ eol = do
 
 --------------------------------------------------------------------------------
 
-test001 :: DgP ()
-test001 = do
-	setDir goDown
-	some vline
-	node' <|> end
-	dgIsEmpty
-
-node' :: DgP ()
-node'
-	= () <$ branch
-		(\case
-			Node -> True
-			_ -> False)
-		[ (goRight, hline')
-		, (goDown, vline')
-		]
-
-vline' :: DgP ()
--- vline' = some (node' <|> vline)
-vline' = many vline *> (node' <|> end)
-
-hline' = do
-	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
-	return ()
-
-
-coil = do
-	labelOnTop $ do
-		Coil _ <- eat'
-		return ()
-	return ()
-
-contact = do
--- 	Contact _ <- eat'
-	labelOnTop $ do
-		Contact _ <- eat'
-		return ()
-	return ()
+-- test001 :: DgP ()
+-- test001 = do
+-- 	setDir goDown
+-- 	some vline
+-- 	node' <|> end
+-- 	dgIsEmpty
+-- 
+-- node' :: DgP ()
+-- node'
+-- 	= () <$ branch
+-- 		(\case
+-- 			Node -> True
+-- 			_ -> False)
+-- 		[ (goRight, hline')
+-- 		, (goDown, vline')
+-- 		]
+-- 
+-- vline' :: DgP ()
+-- -- vline' = some (node' <|> vline)
+-- vline' = many vline *> (node' <|> end)
+-- 
+-- hline' = do
+-- 	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
+-- 	return ()
+-- 
+-- 
+-- coil = do
+-- 	labelOnTop $ do
+-- 		Coil _ <- eat'
+-- 		return ()
+-- 	return ()
+-- 
+-- contact = do
+-- -- 	Contact _ <- eat'
+-- 	labelOnTop $ do
+-- 		Contact _ <- eat'
+-- 		return ()
+-- 	return ()
 
 --------------------------------------------------------------------------------
 
@@ -349,8 +349,7 @@ test002 = do
 	q <- setDir goDown *> vline2
 	Zp zpl zpr <- psStr <$> get
 -- 	traceShowM (here, zp)
-	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
-
+-- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 	dgIsEmpty
 	return q
 
@@ -361,10 +360,11 @@ node2' :: DgP [Cofree Symbol_ Pos]
 node2'
 	= branch
 		(==Preprocess.Node)
-		[ (goRight, currentPosM>>=traceShowM>>hline'2)
-		, (goDown, currentPosM>>=traceShowM>>vline'2)
+		[ (goRight, hline'2) --currentPosM>>=traceShowM>>
+		, (goDown, vline'2)
 		]
 
+--FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
 vline'2 :: DgP (Cofree Symbol_ Pos)
 vline'2 = many vline2 *> (end2 <|> node2)
 
@@ -374,14 +374,14 @@ end2 = Pos (-1,-1) :< Sink <$ end
 hline'2 :: DgP (Cofree Symbol_ Pos)
 hline'2 = do
 	some hline2
-	p <- currentPosM
-	traceShowM (here, p, ">>>>>>>")
+-- 	p <- currentPosM
+-- 	traceShowM (here, p, ">>>>>>>")
 	coil2 <|> contact2 <|> node2 <|> eol2 --TODO vline crossing
 
 eol2 :: DgP (Cofree Symbol_ Pos)
 eol2 = do
-	p <- currentPosM
-	traceShowM (here, p)
+-- 	p <- currentPosM
+-- 	traceShowM (here, p)
 	(:< Sink) <$> (fmap (\(ln, (_, co)) -> Pos (ln, co)) lastPos) <* eol
 
 vline2 :: DgP (Cofree Symbol_ Pos)
@@ -407,12 +407,12 @@ coil2 = device $ do
 
 contact2 :: DgP (Cofree Symbol_ Pos)
 contact2 = do
-	p <- currentPosM
-	traceShowM (here, p)
+-- 	p <- currentPosM
+-- 	traceShowM (here, p)
 	device $ do
 		Contact f <- eat'
-		p <- currentPosM
-		traceShowM (here, p)
+-- 		p <- currentPosM
+-- 		traceShowM (here, p)
 		return $ "[" ++ unpack f ++ "]"
 
 -- coil2 :: DgP (Cofree Symbol_ Pos)
@@ -510,27 +510,27 @@ box001 ln = do
 
 --TODO check clearance
 box = do
-	(ln, (_, co)) <- currentPos
+-- 	(ln, (_, co)) <- currentPos
 
-	traceShowM (here, ln, co, "------------->")
-	Zp zpl zpr <- psStr <$> get
-	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+-- 	traceShowM (here, ln, co, "------------->")
+-- 	Zp zpl zpr <- psStr <$> get
+-- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 
 	setDir goUp
 -- 	VLine <- eat'
-	currentPosM >>= (traceShowM . (here, "left wall", ))
+-- 	currentPosM >>= (traceShowM . (here, "left wall", ))
 	some vline
-	currentPosM >>= (traceShowM . (here, "left top corner",))
+-- 	currentPosM >>= (traceShowM . (here, "left top corner",))
 	setDir goRight
 	node
-	currentPosM >>= (traceShowM . (here,"top wall",))
+-- 	currentPosM >>= (traceShowM . (here,"top wall",))
 	hline
 
 	setDir goDown --parsing right side, look for output line position
-	currentPosM >>= (traceShowM . (here,"right top corner",))
+-- 	currentPosM >>= (traceShowM . (here,"right top corner",))
 	node
 
-	currentPosM >>= (traceShowM . (here,"right wall",))
+-- 	currentPosM >>= (traceShowM . (here,"right wall",))
 	--TODO parse box instance name
 	some $ do
 -- 		(ln, co) <- currentPos
@@ -538,28 +538,28 @@ box = do
 -- 		setPos (ln, co+1)
 -- 		??? peek & record position
 
-	currentPosM >>= (traceShowM . (here,"bottom right corner",))
+-- 	currentPosM >>= (traceShowM . (here,"bottom right corner",))
 	setDir goLeft
 	node
 
-	currentPosM >>= (traceShowM . (here,"bottom wall",))
+-- 	currentPosM >>= (traceShowM . (here,"bottom wall",))
 
-	Zp zpl zpr <- psStr <$> get
-	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+-- 	Zp zpl zpr <- psStr <$> get
+-- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 
 
 	hline
 	
 	
-	currentPosM >>= (traceShowM . (here,))
-	Zp zpl zpr <- psStr <$> get
-	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+-- 	currentPosM >>= (traceShowM . (here,))
+-- 	Zp zpl zpr <- psStr <$> get
+-- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 
-	currentPosM >>= (traceShowM . (here,"bottom left corner",))
+-- 	currentPosM >>= (traceShowM . (here,"bottom left corner",))
 	setDir goUp
 	node
 
-	currentPosM >>= (traceShowM . (here,"remaining left wall",))
+-- 	currentPosM >>= (traceShowM . (here,"remaining left wall",))
 	many vline --0 or more
 
 	return ()
@@ -568,13 +568,13 @@ box = do
 
 end :: DgP ()
 end = do
-	p <- currentPosM
-	x <- (peek . psStr) <$> get
-	traceShowM (here, p, x)
+-- 	p <- currentPosM
+-- 	x <- (peek . psStr) <$> get
+-- 	traceShowM (here, p, x)
 	Nothing <- (peek . psStr) <$> get
 	return ()
 
-eat' :: DgP Tok
+eat' :: DgP (Tok Text)
 eat' = do
 	DgPSt nx dg ps <- get
 	case eat''' dg of
@@ -603,7 +603,7 @@ currentPos = do
 	return p
 -- 	maybe (fail "empty") (return . (,zp)) (pos zp)
 
-peek_ :: DgP Tok
+peek_ :: DgP (Tok Text)
 peek_ = do
 	Just p <- (peek . psStr) <$> get
 	return p
@@ -623,7 +623,7 @@ pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgPos ln cl cr) = Just (ln, (cl, cr))
 pos _ = Nothing
 
-mkDgZp :: [(Int, [((Int, Int), Tok)])] -> Dg Tok
+mkDgZp :: [(Int, [((Int, Int), (Tok Text))])] -> Dg (Tok Text)
 mkDgZp = Zp [] . fmap (fmap (Zp []))
 
 --------------------------------------------------------------------------------
