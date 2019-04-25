@@ -104,9 +104,6 @@ basicBlocks t = (lbl, this) : basicBlocks rest
 	isLabel [Label' _] = True
 	isLabel _ = False
 
--- test8 :: ((Int, Int), String) -> Either String (((Int, Int), String), Tok)
--- test8 = undefined
-
 --rule: control statements ar followed by EOL
 data Tok a
 --parts without mandatory horizontal component:
@@ -152,13 +149,8 @@ token7 = tok
 -- 		<|> Negated			<$  char '0'
 		<|> Name			<$> name
 
--- 	labelName :: Parsec ParseErr Text Text
 	labelName = T.pack <$> some alphaNumChar
--- 	name :: Parsec ParseErr Text Text
--- 	name = label "identifier" $ T.pack <$> some (letterChar <|> char '%')
 	name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '%')
-
--- 	innards :: Parsec ParseErr Text Text
 	innards = T.pack <$> some (satisfy (\c -> notElem c [')', ']']))
 
 	between' a b = between (chunk a) (chunk b)
@@ -180,16 +172,10 @@ test7 = f <$> test7'
 		(a, b) = break ((sourceColumn p==).sourceColumn.fst.fst) xs
 	f [] = []
 
---preproc5 :: Text -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok)]) ]
 preproc5 :: Text -> Either Text [((SourcePos, SourcePos), Tok Text)]
-preproc5 src
--- 	= case parse test7' "(file)" src of
--- 		 Left err ->
--- -- 				trace (errorBundlePretty err)
--- 				Left $ T.pack $ errorBundlePretty err
--- 		 Right n -> Right n
+preproc5
 	= bimap (T.pack . errorBundlePretty) id
-	$ parse test7' "(file)" src
+	. parse test7' "(file)"
 
 preproc5' :: Text -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
 preproc5'
