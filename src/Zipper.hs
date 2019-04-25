@@ -9,7 +9,7 @@ module Zipper where
 import Prelude hiding (fail)
 -- import System.Environment (getArgs)
 -- import qualified Data.Text.IO as TIO
-import Control.Monad hiding (fail)
+-- import Control.Monad hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Data.Traversable
@@ -18,10 +18,11 @@ import Data.Text (Text, unpack)
 import Data.Bifunctor
 import Data.Maybe
 
-import Preprocess
+-- import Preprocess
 import LadderParser hiding (node, hline, Node, device)
 import qualified LadderParser
 import DiagramParser (Pos(..))
+import Tokenizer
 
 import Control.Monad hiding (fail)
 import Debug.Trace
@@ -359,7 +360,7 @@ node2 = (:<) <$> currentPos2 <*> (LadderParser.Node <$> node2')
 node2' :: DgP [Cofree Symbol_ Pos]
 node2'
 	= branch
-		(==Preprocess.Node)
+		(==Tokenizer.Node)
 		[ (goRight, hline'2) --currentPosM>>=traceShowM>>
 		, (goDown, vline'2)
 		]
@@ -467,7 +468,7 @@ clearance (example of incorrect box):
 -}
 
 node = do
-	Preprocess.Node <- eat'
+	Tokenizer.Node <- eat'
 	return ()
 
 edge

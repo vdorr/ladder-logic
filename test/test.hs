@@ -16,6 +16,7 @@ import GHC.Exts
 
 import Preprocess
 import Zipper
+import Tokenizer
 
 import qualified LadderParser (Symbol_(..))
 import LadderParser (Cofree(..))
@@ -23,8 +24,11 @@ import DiagramParser (Pos(..))
 
 --------------------------------------------------------------------------------
 
+preproc4'' :: Text -> Either Text [(Int, [((Int, Int), Tok Text)])]
+preproc4'' = fmap stripPos . preproc5'
+
 testPreproc4 :: Text -> Either Text [[(Tok Text)]]
-testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc4
+testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 
 testPreproc5 :: Text -> Either Text [(Tok Text)]
 testPreproc5 = fmap (fmap ( snd)) . preproc5

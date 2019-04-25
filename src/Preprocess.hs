@@ -11,7 +11,7 @@ import Text.Megaparsec.Char --as PC
 import Data.Bifunctor
 -- import Control.Monad hiding (fail)
 
-import Control.Applicative.Combinators (between)
+-- import Control.Applicative.Combinators (between)
 
 import qualified Data.Text as T
 import Data.Text (Text)
@@ -155,6 +155,7 @@ k ('(' : s)
 k ('%' : s)
 -}
 
+#if 0
 -- chop by labels, does not look for labels floting among logic, that is left to parser
 basicBlocks :: [[Tok a]] -> [(Maybe a, [[Tok a]])]
 basicBlocks [] = []
@@ -254,6 +255,7 @@ preproc5 src
 -- 		 Right n -> Right n
 	= bimap (T.pack . errorBundlePretty) id
 	$ parse test7' "(file)" src
+#endif
 
 --------------------------------------------------------------------------------
 
@@ -346,7 +348,6 @@ test6 = many ln <* eof
 	spaceButNotEOL = satisfy (\c -> isSpace c && c /= '\n')
 	white = skipMany spaceButNotEOL
 -- 	somewhite = () <$ some spaceButNotEOL
-#endif
 
 --now with columns stored i can eat tokens almost randomly
 --TODO should also work for FBD
@@ -363,6 +364,7 @@ preproc4'' = fmap stripPos . preproc4
 
 -- preproc4' :: String -> Either Text [(Int, [((Int, Int), Tok Text)])]
 -- preproc4' = fmap stripPos . preproc4 . T.pack
+#endif
 
 --------------------------------------------------------------------------------
 
