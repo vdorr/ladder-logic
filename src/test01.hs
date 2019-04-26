@@ -9,6 +9,7 @@ import Data.Foldable
 import System.Environment (getArgs)
 
 import Preprocess
+import Tokenizer
 import Zipper
 
 --------------------------------------------------------------------------------
@@ -20,7 +21,7 @@ main :: IO ()
 main = do
     [file] <- getArgs
     src <- TIO.readFile file
-    case preproc4'' src of
+    case stripPos <$> preproc5' src of
         Left err -> TIO.putStrLn err
         Right x -> do
 --             print $ stripPos x
@@ -30,13 +31,13 @@ main = do
             for_ zpl $ \q -> print (here, q)
             for_ zpr $ \q -> print (here, q)
 
-            print (here, "--------------------------------------------------")
-            case applyDgp test001 zp of
-                Right (_, (DgPSt _ c@(Zp zpl zpr) _)) -> do
---                     print (here, a, c)
-                    for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
---                     for_ zpr $ \q -> print (here, q)
-                Left err -> print (here, err)
+--             print (here, "--------------------------------------------------")
+--             case applyDgp test001 zp of
+--                 Right (_, (DgPSt _ c@(Zp zpl zpr) _)) -> do
+-- --                     print (here, a, c)
+--                     for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
+-- --                     for_ zpr $ \q -> print (here, q)
+--                 Left err -> print (here, err)
 
             print (here, "--------------------------------------------------")
 

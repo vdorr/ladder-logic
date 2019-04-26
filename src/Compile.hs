@@ -104,7 +104,7 @@ instance Ord a => Ord (Pair a b) where
 instance Show a => Show (Pair a b) where
 	show (Pair x _) = show x
 
-jjj_ :: Cofree Symbol_ Pos -> AdjacencyMap (Pair Pos (Symbol_ Symbol))
+jjj_ :: Cofree (Symbol_ String) Pos -> AdjacencyMap (Pair Pos (Symbol_ String Symbol))
 jjj_ (p :< xx@(Source x)) = go (Pair p xx) x
 	where
 	go parent (p :< y)
@@ -157,7 +157,7 @@ xxxxXxx :: (Ref ref action, Monad compMo) =>
                                  -> M.Map Text (ref Bool, ref Bool)
                                  -> M.Map Pos (ref Bool)
                                  -> [(ref Bool,
-                                      TR.Tree (Pair Pos (Symbol_ a)))]
+                                      TR.Tree (Pair Pos (Symbol_ String a)))]
                                  -> compMo [Pg (Maybe String) action ()]
 xxxxXxx devs vars nodes nets = do
 	nets' <- for nets doNet

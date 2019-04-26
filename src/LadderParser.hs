@@ -35,13 +35,14 @@ import DiagramParser
 
 --------------------------------------------------------------------------------
 
-data Symbol_ a
+data Symbol_ s a
 	= Source a
-	| Sink --where wire has to connect to right rail
-		  --maybe i need another case to mark end of left rail
-	| Device String [String] a
-	| Jump String
-	| Label String a
+	| Sink -- ^where wire connects to (implied) right rail
+		  --maybe i need another case to mark end of left rail.... like 'End'
+	| End -- ^used where left rail ends
+	| Device s [s] a
+	| Jump s
+	| Label s a
 	| Node [a]
 -- 	| Node' --already visited Node
 	deriving (Show, Functor, Foldable, Traversable, Eq)
@@ -66,7 +67,7 @@ unFix' (a :< f) = (a, f)
 cata' :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
 cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 
-type Symbol = Cofree Symbol_ Pos
+type Symbol = Cofree (Symbol_ String) Pos
 
 cof a f = (a :<) . f
 

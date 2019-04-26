@@ -128,28 +128,25 @@ dgpTests = testGroup "Diagram parser"
 
 ladderTests = testGroup "Ladder parser"
 	[ testCase "test00" $
-		fmap fst (applyDgp test002 (mkDgZp t00))
-			@?= Right ( Pos (-1,-1) :< LadderParser.Sink )
-	, testCase "test00" $
-		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t00))
-			@?= Right (Zp [] [])
-	, testCase "test01" $
-		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t01))
-			@?= Right (Zp [] [])
-	, testCase "test04" $
-		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t04))
-			@?= Right (Zp [] [])
+		fst <$> dgParse t00
+			@?= Right ( Pos (-1,-1) :< LadderParser.End )
+	, testCase "test00" $ fullyConsumed t00
+	, testCase "test01" $ fullyConsumed t01
+	, testCase "test04" $ fullyConsumed t04
 -- 	, testCase "test05" $
 -- 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t05))
 -- 			@?= Right (Zp [] [])
-	, testCase "test07a" $
-		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07a))
-			@?= Right (Zp [] [])
+	, testCase "test07a" $ fullyConsumed t07a
 -- 	, testCase "test07" $
 -- 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
 -- 			@?= Right (Zp [] [])
 	]
 	where
+	
+	dgParse = applyDgp test002 . mkDgZp
+	getDg = dgTrim.psStr.snd
+	fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
+	
 	Right t00 = test00_tokenized
 	Right t01 = test01_tokenized
 	Right t04 = test04_tokenized

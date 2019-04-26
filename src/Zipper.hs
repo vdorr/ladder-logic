@@ -87,10 +87,6 @@ move'' f (foc -> zp@(Zp _ (x : xs)))
 move'' _ _ = Nothing
 #endif
 
--- |Drop empty lines
-dgTrim :: Dg a -> Dg a
-dgTrim (Zp l r) = Zp (filter (not.zpNull.snd) l) (filter (not.zpNull.snd) r)
-
 --------------------------------------------------------------------------------
 
 -- |Diagram parser input stream (or, say, input vortex)
@@ -112,7 +108,6 @@ data DgPSt = DgPSt
 
 lastPos :: DgP DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
-
 
 applyDgp :: DgP a -> Dg (Tok Text) -> Either String (a, DgPSt)
 applyDgp p dg = dgp p (DgPSt goRight dg Nothing)
@@ -147,6 +142,10 @@ put s = DgP $ \_ -> return ((), s)
 
 modify :: (DgPSt -> DgPSt) -> DgP ()
 modify f = f <$> get >>= put
+
+-- |Drop empty lines
+dgTrim :: Dg a -> Dg a
+dgTrim (Zp l r) = Zp (filter (not.zpNull.snd) l) (filter (not.zpNull.snd) r)
 
 --------------------------------------------------------------------------------
 
@@ -341,10 +340,17 @@ coilType    : ...
 
 -}
 
+--FIXME parse it with DgP's pos type and then fmap it to 'Pos'
 currentPos2 :: DgP Pos
 currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
 
-test002 :: DgP (Cofree Symbol_ Pos)
+extToPos :: DgExt -> Pos
+extToPos = Pos . fmap fst
+	
+toPos2 :: Cofree (Symbol_ String) DgExt -> Cofree (Symbol_ String) Pos
+toPos2 = fmap extToPos
+
+test002 :: DgP (Cofree (Symbol_ String) Pos)
 test002 = do
 -- 	setDir goDown *> vline2 <* dgIsEmpty
 	q <- setDir goDown *> vline2
@@ -354,10 +360,10 @@ test002 = do
 	dgIsEmpty
 	return q
 
-node2 :: DgP (Cofree Symbol_ Pos)
+node2 :: DgP (Cofree (Symbol_ String) Pos)
 node2 = (:<) <$> currentPos2 <*> (LadderParser.Node <$> node2')
 
-node2' :: DgP [Cofree Symbol_ Pos]
+node2' :: DgP [Cofree (Symbol_ String) Pos]
 node2'
 	= branch
 		(==Tokenizer.Node)
@@ -366,26 +372,26 @@ node2'
 		]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
-vline'2 :: DgP (Cofree Symbol_ Pos)
+vline'2 :: DgP (Cofree (Symbol_ String) Pos)
 vline'2 = many vline2 *> (end2 <|> node2)
 
-end2 :: DgP (Cofree Symbol_ Pos)
-end2 = Pos (-1,-1) :< Sink <$ end
+end2 :: DgP (Cofree (Symbol_ String) Pos)
+end2 = Pos (-1,-1) :< End <$ end
 
-hline'2 :: DgP (Cofree Symbol_ Pos)
+hline'2 :: DgP (Cofree (Symbol_ String) Pos)
 hline'2 = do
 	some hline2
 -- 	p <- currentPosM
 -- 	traceShowM (here, p, ">>>>>>>")
 	coil2 <|> contact2 <|> node2 <|> eol2 --TODO vline crossing
 
-eol2 :: DgP (Cofree Symbol_ Pos)
+eol2 :: DgP (Cofree (Symbol_ String) Pos)
 eol2 = do
 -- 	p <- currentPosM
 -- 	traceShowM (here, p)
 	(:< Sink) <$> (fmap (\(ln, (_, co)) -> Pos (ln, co)) lastPos) <* eol
 
-vline2 :: DgP (Cofree Symbol_ Pos)
+vline2 :: DgP (Cofree (Symbol_ String) Pos)
 vline2 = do
 	VLine <- eat'
 	vline'2
@@ -395,18 +401,18 @@ hline2 = do
 	HLine <- eat'
 	return ()
 
-device :: DgP String -> DgP (Cofree Symbol_ Pos)
+device :: DgP String -> DgP (Cofree (Symbol_ String) Pos)
 device p = do
 	pos <- currentPos2
 	(lbl, f) <- labelOnTop' p
 	(pos :<) <$> (Device f [lbl] <$> hline'2)
 
-coil2 :: DgP (Cofree Symbol_ Pos)
+coil2 :: DgP (Cofree (Symbol_ String) Pos)
 coil2 = device $ do
 	Coil f <- eat'
 	return $ "(" ++ unpack f ++ ")"
 
-contact2 :: DgP (Cofree Symbol_ Pos)
+contact2 :: DgP (Cofree (Symbol_ String) Pos)
 contact2 = do
 -- 	p <- currentPosM
 -- 	traceShowM (here, p)
