@@ -134,6 +134,7 @@ token7 = tok
 	where
 	tok
 		=   Label'			<$> try (labelName <* char ':')
+ 		<|> Negated			<$  char '0'
 		<|> VLine			<$  char '|'
 		<|> Node			<$  char '+'
 		<|> Continuation	<$> try (between' ">" ">" name)
@@ -144,9 +145,8 @@ token7 = tok
 		<|> Contact			<$> between' "[" "]" innards
 		<|> Coil			<$> between' "(" ")" innards
 -- 		<|> Connector		<$> try (between ">" ">" name)
--- 		<|> REdge			<$  (char '>')
--- 		<|> FEdge			<$  char '<'
--- 		<|> Negated			<$  char '0'
+ 		<|> REdge			<$  char '>'
+ 		<|> FEdge			<$  char '<'
 		<|> Name			<$> name
 
 	labelName = T.pack <$> some alphaNumChar
@@ -165,12 +165,14 @@ test7' :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
 test7' = whitespace7 *> many (withPos token7 <* whitespace7) <* eof
 
 test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
-test7 = f <$> test7'
+test7 = breakLines <$> test7'
+
+breakLines :: [((SourcePos, SourcePos), Tok Text)]
+	-> [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
 	where
-	f (x@((p, _), _) : xs) = (p, x : a) : f b
-		where
-		(a, b) = break ((sourceColumn p==).sourceColumn.fst.fst) xs
-	f [] = []
+	(a, b) = span ((sourceLine p==).sourceLine.fst.fst) xs
+breakLines [] = []
 
 preproc5 :: Text -> Either Text [((SourcePos, SourcePos), Tok Text)]
 preproc5

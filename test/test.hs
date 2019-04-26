@@ -163,76 +163,82 @@ test07_tokenized = preproc4'' test07
 test07a_tokenized = preproc4'' test07a
 
 test00 =
-	[text|
-	(* --- test 00 --- *)
+    [text|
+    (* --- test 00 --- *)
 
-	|                          |]
+    |                          |]
 
 test01 =
-	[text|
-	(* --- test 01 --- *)
+    [text|
+    (* --- test 01 --- *)
 
-	| %IX0  %QX0
-	+--[ ]---( )--
-	|                          |]
+    | %IX0  %QX0
+    +--[ ]---( )--
+    |                          |]
 
 test04 =
-	[text|
-	(* --- test 04 --- *)
+    [text|
+    (* --- test 04 --- *)
 
-	| %MX0 %MX1      %MX1
-	+--[/]--[/]-------(S)-
-	| %MX0 %MX1 %MX0 %MX1
-	+--[/]--[ ]--(S)--(R)-
-	| %MX0 %MX1      %MX1
-	+--[ ]--[/]-------(S)-
-	| %MX0 %MX1 %MX0 %MX1
-	+--[ ]--[ ]--(R)--(R)-
-	|                          |]
+    | %MX0 %MX1      %MX1
+    +--[/]--[/]-------(S)-
+    | %MX0 %MX1 %MX0 %MX1
+    +--[/]--[ ]--(S)--(R)-
+    | %MX0 %MX1      %MX1
+    +--[ ]--[/]-------(S)-
+    | %MX0 %MX1 %MX0 %MX1
+    +--[ ]--[ ]--(R)--(R)-
+    |                          |]
 
 test05 =
-	[text|
-	(* --- test 05 --- *)
+    [text|
+    (* --- test 05 --- *)
 
-	| %MX0
-	+--[ ]-->>MAIN
-	| %QX0 %MX0
-	+--(S)--(S)--
-	|
-	MAIN:
-	| %IX0 %QX0
-	+--[ ]--( )--
-	|                          |]
+    | %MX0
+    +--[ ]-->>MAIN
+    | %QX0 %MX0
+    +--(S)--(S)--
+    |
+    MAIN:
+    | %IX0 %QX0
+    +--[ ]--( )--
+    |                          |]
 
 test07 =
-	[text|
-	(* --- test 07 --- *)
+    [text|
+    (* --- test 07 --- *)
 
-	| %IX0    %QX0
-	+--[ ]--+--( )--
-	| %IX1  |
-	+--[ ]--+
-	|                          |]
+    | %IX0    %QX0
+    +--[ ]--+--( )--
+    | %IX1  |
+    +--[ ]--+
+    |                          |]
 
 test07a =
-	[text|
-	(* --- test 07a --- *)
+    [text|
+    (* --- test 07a --- *)
 
-	|    %QX0
-	+--+--( )--
-	|                          |]
+    |    %QX0
+    +--+--( )--
+    |                          |]
 
 --------------------------------------------------------------------------------
 
 testBox ln input
-	= bimap (Data.Text.unpack) mkDgZp (preproc4'' input)
-	>>= applyDgp (box001 ln)
+    = bimap (Data.Text.unpack) mkDgZp (preproc4'' input)
+    >>= applyDgp (box001 ln)
 -- fmap (dgTrim.psStr.snd) 
 
 boxTests = testGroup "Box parser"
 	[ testCase "1" $
 		fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized))
 			@?= Right (Zp [] [])
+-- 	, testCase "1b" $
+-- 		box01b_tokenized
+-- 			@?= []
+-- 	, testCase "1b" $
+-- 		fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01b_tokenized))
+-- 			@?= Right (Zp [] [])
 	, testCase "2" $
 		fmap (dgTrim.psStr.snd) (testBox 2 box02)
 			@?= Right (Zp [] [])
@@ -245,31 +251,38 @@ boxTests = testGroup "Box parser"
 	]
 	where
 	Right box01_tokenized = preproc4'' box01
+-- 	Right box01b_tokenized = preproc4'' box01b
 
 box01 =
-	[text|
-	+-+
-	| |
-	+-+                        |]
+    [text|
+    +-+
+    | |
+    +-+                        |]
+
+-- box01b =
+--     [text|
+--      +-+
+--     0| |
+--      +-+                        |]
 
 box02 =
-	[text|
-	+-----+
-	|     |
-	|     |
-	|     |
-	+-----+                    |]
+    [text|
+    +-----+
+    |     |
+    >     |
+    |     |
+    +-----+                    |]
 
 --------------------------------------------------------------------------------
 
 tests :: TestTree
 tests = testGroup "Tests"
-	[ tokenizerTests
-	, zipperTests
-	, dgpTests
-	, ladderTests
-	, boxTests
-	]
+    [ tokenizerTests
+    , zipperTests
+    , dgpTests
+    , ladderTests
+    , boxTests
+    ]
 
 main :: IO ()
 main = defaultMain tests

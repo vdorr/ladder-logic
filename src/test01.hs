@@ -28,8 +28,9 @@ main = do
             let zp@(Zp zpl zpr) = mkDgZp x
 
 --             print (here, zp)
-            for_ zpl $ \q -> print (here, q)
-            for_ zpr $ \q -> print (here, q)
+--             for_ zpl $ \q -> print (here, q)
+--             for_ zpr $ \q -> print (here, q)
+            forM_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 
 --             print (here, "--------------------------------------------------")
 --             case applyDgp test001 zp of

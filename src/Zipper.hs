@@ -152,6 +152,9 @@ dgTrim (Zp l r) = Zp (filter (not.zpNull.snd) l) (filter (not.zpNull.snd) r)
 setDir :: Next -> DgP ()
 setDir f = modify $ \(DgPSt _ zp ps) -> DgPSt f zp ps
 
+getDir :: DgP Next
+getDir = psNext <$> get
+
 step :: DgP ()
 step = do
 	origin <- currentPos
@@ -487,25 +490,25 @@ name = do
 	Name lbl <- eat'
 	return lbl
 
--- |parse left side of a box
-leftSide = do
-	--VLine, REdge, FEdge, Name, connections (HLine+Name)
-	some leftSideBrick
-	return ()
-
-leftSideBrick = do
-	(ln, co) <- currentPos
--- 	vline <|> edge
-	branch
-		(\case
-			VLine -> True
-			REdge -> True
-			FEdge -> True
-			_ -> False)
-		[ (goLeft, hline *> name)
-		, (goRight, name)
-		]
-	setDir goDown --i guess branch should restore direction
+-- -- |parse left side of a box
+-- leftSide = do
+-- 	--VLine, REdge, FEdge, Name, connections (HLine+Name)
+-- 	some leftSideBrick
+-- 	return ()
+-- 
+-- leftSideBrick = do
+-- 	(ln, co) <- currentPos
+-- -- 	vline <|> edge
+-- 	branch
+-- 		(\case
+-- 			VLine -> True
+-- 			REdge -> True
+-- 			FEdge -> True
+-- 			_ -> False)
+-- 		[ (goLeft, hline *> name)
+-- 		, (goRight, name)
+-- 		]
+-- 	setDir goDown --i guess branch should restore direction
 	
 -- 	setPos (ln, co+1)
 -- 	setDir goRight
@@ -515,6 +518,22 @@ box001 ln = do
 	setPos (ln, (1, 1))
 	box
 
+-- portName :: Int -> DgP a -> DgP (Text, a)
+-- portName d p = do
+-- 	(ln, co) <- currentPos
+-- 	x <- p
+-- 	next <- currentPos
+-- 	setPos (ln, co+d)
+-- 	lbl <- name
+-- 	setPos next
+-- 	return (lbl, x)
+
+lwall = vline <|> void edge
+
+-- negIn = do
+-- 	NegIn <- eat'
+-- 	return ()
+	
 --TODO check clearance
 box = do
 -- 	(ln, (_, co)) <- currentPos
@@ -526,7 +545,7 @@ box = do
 	setDir goUp
 -- 	VLine <- eat'
 -- 	currentPosM >>= (traceShowM . (here, "left wall", ))
-	some vline
+	some lwall -- <|> negIn
 -- 	currentPosM >>= (traceShowM . (here, "left top corner",))
 	setDir goRight
 	node
@@ -567,7 +586,7 @@ box = do
 	node
 
 -- 	currentPosM >>= (traceShowM . (here,"remaining left wall",))
-	many vline --0 or more
+	many lwall --0 or more
 
 	return ()
 
@@ -591,7 +610,7 @@ eat' = do
 				Left _err -> return dg' --nowhere to move
 			put (DgPSt nx dg'' (Just pos))
 			return v
-		 Nothing -> fail here
+		 Nothing -> fail $ show (here, ps)
 
 -- eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
 -- eat _ = Nothing
