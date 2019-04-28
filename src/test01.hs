@@ -6,11 +6,14 @@
 
 import qualified Data.Text.IO as TIO
 import Data.Foldable
+import Data.Traversable
 import System.Environment (getArgs)
 
 import Preprocess
-import Tokenizer
+import Tokenizer (preproc5')
 import Zipper
+
+import LadderParser
 
 --------------------------------------------------------------------------------
 
@@ -23,6 +26,9 @@ data V s = VTrue | VVar s | VOp Int s
 --list of registers, or-ed list of source values
 type St k = [(k, ())]
 -- register number <- or [sources...]
+
+--lookup postion, retrive reg number, add op to or list
+register = undefined
 
 --input of operator is its input wire and zero or more explicit values
 
@@ -45,8 +51,36 @@ g _  _   _ (Label s a) = undefined
 
 #endif
 
+-- Source a
+-- Sink
+-- End
+-- Device s ls a
+-- Jump s
+-- Label s a
+-- Node la
+
+ff src (p :< x) = do
+    case x of
+        Source a -> do
+            print (here, "Source", src)
+            ff p a
+        Sink -> do
+            print (here, "Sink", src)
+        End -> print (here, "End", src)
+        Device _s [n] a -> do
+            print (here, "Device", n, src)
+            ff p a
+        Jump s -> do
+            print (here, "Jump", src)
+        Label s a -> undefined
+        Node la -> do
+            print (here, "Node", src)
+            for_ la (ff p)
+
 testAst ast = do
     print (here, ast)
+    ff (-1,(-1,-1)) ast
+    print (here)
 
 --------------------------------------------------------------------------------
 
@@ -83,6 +117,7 @@ main = do
 
                     print (here, "--------------------------------------------------")
                     testAst ast
+                    print (here, "--------------------------------------------------")
 
 
 

@@ -22,19 +22,6 @@ import DiagramParser
 
 --------------------------------------------------------------------------------
 
--- data Symbol
--- 	= Source { location :: Pos, succ :: Symbol }
--- 	| Sink { location :: Pos }
--- 	| Device { location :: Pos, body :: String, options :: [String]
--- 		, output :: Pos, succ :: Symbol }
--- 	| Jump { location :: Pos, target :: String }
--- 	| Label { location :: Pos, labelName :: String, nextRung :: Symbol }
--- 	| Node { location :: Pos, succs :: [Symbol] } --output is implied
--- 	| Node' { location :: Pos } --already visited Node
--- 	deriving Show
-
---------------------------------------------------------------------------------
-
 data Symbol_ s a
 	= Source a
 	| Sink -- ^where wire connects to (implied) right rail
@@ -44,7 +31,6 @@ data Symbol_ s a
 	| Jump s
 	| Label s a --FIXME should not be here
 	| Node [a]
--- 	| Node' --already visited Node
 	deriving (Show, Functor, Foldable, Traversable, Eq)
 
 data Cofree f a = a :< f (Cofree f a)
