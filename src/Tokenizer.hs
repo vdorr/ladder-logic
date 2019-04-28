@@ -5,6 +5,7 @@ module Tokenizer where
 
 -- import Data.Char
 
+--FIXME FIXME get rid of megaparsec
 import Text.Megaparsec --as P hiding (runParser', Pos)
 import Text.Megaparsec.Char --as PC
 -- import Text.Megaparsec.Char.Lexer (symbol)
@@ -130,25 +131,24 @@ data Tok a
     deriving (Show, Eq, Functor)
 
 token7 :: Parsec ParseErr Text (Tok Text)
-token7 = tok
-    where
-    tok
-        =   Label'       <$> try (labelName <* char ':')
-        <|> Negated      <$  char '0'
-        <|> VLine        <$  char '|'
-        <|> Node         <$  char '+'
-        <|> Continuation <$> try (between' ">" ">" name)
-        <|> HLine        <$  some (char '-')
-        <|> Jump'        <$> (try (chunk ">>") *> labelName)
+token7
+    =   Label'       <$> try (labelName <* char ':')
+    <|> Negated      <$  char '0'
+    <|> VLine        <$  char '|'
+    <|> Node         <$  char '+'
+    <|> Continuation <$> try (between' ">" ">" name)
+    <|> HLine        <$  some (char '-')
+    <|> Jump'        <$> (try (chunk ">>") *> labelName)
 --         <|> Return            <$  try (between' "<" ">" labelName)
-        <|> Return       <$  try (chunk "<RETURN>")
-        <|> Contact      <$> between' "[" "]" innards
-        <|> Coil         <$> between' "(" ")" innards
+    <|> Return       <$  try (chunk "<RETURN>")
+    <|> Contact      <$> between' "[" "]" innards
+    <|> Coil         <$> between' "(" ")" innards
 --         <|> Connector        <$> try (between ">" ">" name)
-        <|> REdge        <$  char '>'
-        <|> FEdge        <$  char '<'
-        <|> Name         <$> name
+    <|> REdge        <$  char '>'
+    <|> FEdge        <$  char '<'
+    <|> Name         <$> name
 
+    where
     labelName = T.pack <$> some alphaNumChar
     name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '%')
     innards = T.pack <$> some (satisfy (\c -> notElem c [')', ']']))
@@ -169,7 +169,7 @@ test7 = breakLines <$> test7'
 
 breakLines
     :: [((SourcePos, SourcePos), Tok Text)]
-    -> [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+    -> [(SourcePos, [((SourcePos, SourcePos), Tok Text)])]
 breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
     where
     (a, b) = span ((sourceLine p==).sourceLine.fst.fst) xs

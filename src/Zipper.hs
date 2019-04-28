@@ -356,8 +356,9 @@ toPos2 = fmap extToPos
 test002 :: DgP (Cofree (Symbol_ String) Pos)
 test002 = do
 -- 	setDir goDown *> vline2 <* dgIsEmpty
-	q <- setDir goDown *> vline2
-	Zp zpl zpr <- psStr <$> get
+	p <- currentPos2
+	q <- setDir goDown *> ( ((p:<).Source) <$> vline2)
+-- 	Zp zpl zpr <- psStr <$> get
 -- 	traceShowM (here, zp)
 -- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 	dgIsEmpty
@@ -379,7 +380,9 @@ vline'2 :: DgP (Cofree (Symbol_ String) Pos)
 vline'2 = many vline2 *> (end2 <|> node2)
 
 end2 :: DgP (Cofree (Symbol_ String) Pos)
-end2 = Pos (-1,-1) :< End <$ end
+-- end2 = Pos (-1,-1) :< End <$ end
+end2 = ((:< End) . extToPos) <$> (end *> lastPos)
+
 
 hline'2 :: DgP (Cofree (Symbol_ String) Pos)
 hline'2 = do

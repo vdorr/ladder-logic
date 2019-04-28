@@ -14,8 +14,41 @@ import Zipper
 
 --------------------------------------------------------------------------------
 
+#if 0
+data V s = VTrue | VVar s | VOp Int s
+
+--list of operators, their position, IDs and or-ed
+-- type St k = [(k, (Int, [String]))]
+
+--list of registers, or-ed list of source values
+type St k = [(k, ())]
+-- register number <- or [sources...]
+
+--input of operator is its input wire and zero or more explicit values
+
+ff f (a :< x) = f a (fmap (??) x)
+
+g st src k (Source a) = g 0 a ... put st k VOn
+    register st k VTrue
+
+g st src k (Device s [s] a
+    register st k (VOp src)
+
+g st src k (Node [a]
+    register st k VOn
+
+g st src k (Jump s
+g st src k  Sink --lookup node at same (end of extent) position
+g st src k  End
+
+g _  _   _ (Label s a) = undefined
+
+#endif
+
 testAst ast = do
     print (here, ast)
+
+--------------------------------------------------------------------------------
 
 main :: IO ()
 main = do

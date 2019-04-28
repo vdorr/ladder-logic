@@ -19,7 +19,7 @@ import Zipper
 import Tokenizer
 
 import qualified LadderParser (Symbol_(..))
-import LadderParser (Cofree(..))
+import LadderParser (Cofree(..), Symbol_(End, Source))
 import DiagramParser (Pos(..))
 
 --------------------------------------------------------------------------------
@@ -147,8 +147,9 @@ dgpTests = testGroup "Diagram parser"
 
 ladderTests = testGroup "Ladder parser"
     [ testCase "test00" $
-        fst <$> dgParse t00
-            @?= Right ( Pos (-1,-1) :< LadderParser.End )
+        (fmap (const ()) . fst) <$> dgParse t00
+--             @?= Right ( Pos (-1,-1) :< LadderParser.End )
+            @?= Right (() :< Source (() :< End))
     , testCase "test00" $ fullyConsumed t00
     , testCase "test01" $ fullyConsumed t01
     , testCase "test04" $ fullyConsumed t04

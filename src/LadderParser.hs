@@ -42,7 +42,7 @@ data Symbol_ s a
 	| End -- ^used where left rail ends
 	| Device s [s] a
 	| Jump s
-	| Label s a
+	| Label s a --FIXME should not be here
 	| Node [a]
 -- 	| Node' --already visited Node
 	deriving (Show, Functor, Foldable, Traversable, Eq)
@@ -72,7 +72,7 @@ type Symbol = Cofree (Symbol_ String) Pos
 cof a f = (a :<) . f
 
 instance (forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
-	show (a :< as) = show a ++ " :< (" ++ show as ++ ")"
+	show (a :< as) = "(" ++ show a ++ " :< " ++ show as ++ ")"
 
 --------------------------------------------------------------------------------
 
