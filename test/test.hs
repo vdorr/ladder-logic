@@ -163,7 +163,7 @@ ladderTests = testGroup "Ladder parser"
     ]
     where
     
-    dgParse = applyDgp test002 . mkDgZp
+    dgParse = applyDgp test002' . mkDgZp
     getDg = dgTrim.psStr.snd
     fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
     

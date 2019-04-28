@@ -353,8 +353,8 @@ extToPos = (\(ln, co) -> Pos (co, ln)) . fmap fst
 toPos2 :: Cofree (Symbol_ String) DgExt -> Cofree (Symbol_ String) Pos
 toPos2 = fmap extToPos
 
-test002 :: DgP (Cofree (Symbol_ String) Pos)
-test002 = fmap extToPos <$> test002'
+-- test002 :: DgP (Cofree (Symbol_ String) Pos)
+-- test002 = fmap extToPos <$> test002'
 
 test002' :: DgP (Cofree (Symbol_ String) DgExt)
 test002' = do
@@ -665,6 +665,7 @@ mkDgZp = Zp [] . fmap (fmap (Zp []))
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col = moveToLine line >=> moveToCol col
 
+--FIXME merge with moveToLine somehow?
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
 moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
 	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp

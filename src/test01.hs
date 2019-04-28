@@ -38,8 +38,8 @@ g st src k (Node [a]
     register st k VOn
 
 g st src k (Jump s
-g st src k  Sink --lookup node at same (end of extent) position
-g st src k  End
+g st src k  Sink --end of hline, lookup node at same (end of extent) position
+g st src k  End --end of vline, lookup node at same (end of extent) position
 
 g _  _   _ (Label s a) = undefined
 
@@ -75,7 +75,7 @@ main = do
 
             print (here, "--------------------------------------------------")
 
-            case applyDgp test002 zp of
+            case applyDgp test002' zp of
                 Right (ast, (DgPSt _ c@(Zp zpl zpr) _)) -> do
 --                     print (here, a, c)
                     for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
