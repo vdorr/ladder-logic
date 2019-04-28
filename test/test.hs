@@ -97,12 +97,12 @@ tokenizerTests = testGroup "Tokenizer"
             |
             +--0        |]
 
-	, testCase "invalid char" $
-		 simpleResult (testPreproc4 "?") @?= Left True
+    , testCase "invalid char" $
+        simpleResult (testPreproc4 "?") @?= Left True
 
-	, testCase "ehmm" $
-		 show (fmap id (Contact ())) @?= "Contact ()"
-	]
+    , testCase "ehmm" $
+        show (fmap id (Contact ())) @?= "Contact ()"
+    ]
 
 -- simpleResult = bimap ((>0).Data.Text.length) id
 simpleResult :: (Bifunctor f, IsList e) => f e a -> f Bool a
