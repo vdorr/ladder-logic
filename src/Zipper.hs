@@ -348,15 +348,18 @@ currentPos2 :: DgP Pos
 currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
 
 extToPos :: DgExt -> Pos
-extToPos = Pos . fmap fst
+extToPos = (\(ln, co) -> Pos (co, ln)) . fmap fst
 	
 toPos2 :: Cofree (Symbol_ String) DgExt -> Cofree (Symbol_ String) Pos
 toPos2 = fmap extToPos
 
 test002 :: DgP (Cofree (Symbol_ String) Pos)
-test002 = do
+test002 = fmap extToPos <$> test002'
+
+test002' :: DgP (Cofree (Symbol_ String) DgExt)
+test002' = do
 -- 	setDir goDown *> vline2 <* dgIsEmpty
-	p <- currentPos2
+	p <- currentPos
 	q <- setDir goDown *> ( ((p:<).Source) <$> vline2)
 -- 	Zp zpl zpr <- psStr <$> get
 -- 	traceShowM (here, zp)
@@ -364,10 +367,10 @@ test002 = do
 	dgIsEmpty
 	return q
 
-node2 :: DgP (Cofree (Symbol_ String) Pos)
-node2 = (:<) <$> currentPos2 <*> (LadderParser.Node <$> node2')
+node2 :: DgP (Cofree (Symbol_ String) DgExt)
+node2 = (:<) <$> currentPos <*> (LadderParser.Node <$> node2')
 
-node2' :: DgP [Cofree (Symbol_ String) Pos]
+node2' :: DgP [Cofree (Symbol_ String) DgExt]
 node2'
 	= branch
 		(==Tokenizer.Node)
@@ -376,28 +379,30 @@ node2'
 		]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
-vline'2 :: DgP (Cofree (Symbol_ String) Pos)
+vline'2 :: DgP (Cofree (Symbol_ String) DgExt)
 vline'2 = many vline2 *> (end2 <|> node2)
 
-end2 :: DgP (Cofree (Symbol_ String) Pos)
+end2 :: DgP (Cofree (Symbol_ String) DgExt)
 -- end2 = Pos (-1,-1) :< End <$ end
-end2 = ((:< End) . extToPos) <$> (end *> lastPos)
+end2 = (:< End) <$> (end *> lastPos)
 
 
-hline'2 :: DgP (Cofree (Symbol_ String) Pos)
+hline'2 :: DgP (Cofree (Symbol_ String) DgExt)
 hline'2 = do
 	some hline2
 -- 	p <- currentPosM
 -- 	traceShowM (here, p, ">>>>>>>")
 	coil2 <|> contact2 <|> node2 <|> eol2 --TODO vline crossing
 
-eol2 :: DgP (Cofree (Symbol_ String) Pos)
+eol2 :: DgP (Cofree (Symbol_ String) DgExt)
 eol2 = do
 -- 	p <- currentPosM
 -- 	traceShowM (here, p)
-	(:< Sink) <$> (fmap (\(ln, (_, co)) -> Pos (ln, co)) lastPos) <* eol
+--XXX XXX XXX originally end-columns was used as ast node position
+-- 	(:< Sink) <$> (fmap (\(ln, (_, co)) -> Pos (ln, co)) lastPos) <* eol
+	(:< Sink) <$> lastPos <* eol
 
-vline2 :: DgP (Cofree (Symbol_ String) Pos)
+vline2 :: DgP (Cofree (Symbol_ String) DgExt)
 vline2 = do
 	VLine <- eat'
 	vline'2
@@ -407,18 +412,18 @@ hline2 = do
 	HLine <- eat'
 	return ()
 
-device :: DgP String -> DgP (Cofree (Symbol_ String) Pos)
+device :: DgP String -> DgP (Cofree (Symbol_ String) DgExt)
 device p = do
-	pos <- currentPos2
+	pos <- currentPos
 	(lbl, f) <- labelOnTop' p
 	(pos :<) <$> (Device f [lbl] <$> hline'2)
 
-coil2 :: DgP (Cofree (Symbol_ String) Pos)
+coil2 :: DgP (Cofree (Symbol_ String) DgExt)
 coil2 = device $ do
 	Coil f <- eat'
 	return $ "(" ++ unpack f ++ ")"
 
-contact2 :: DgP (Cofree (Symbol_ String) Pos)
+contact2 :: DgP (Cofree (Symbol_ String) DgExt)
 contact2 = do
 -- 	p <- currentPosM
 -- 	traceShowM (here, p)
@@ -428,7 +433,7 @@ contact2 = do
 -- 		traceShowM (here, p)
 		return $ "[" ++ unpack f ++ "]"
 
--- coil2 :: DgP (Cofree Symbol_ Pos)
+-- coil2 :: DgP (Cofree Symbol_ DgExt)
 -- coil2 = do
 -- 	p <- currentPos2
 -- 	(lbl, f) <- labelOnTop $ do
@@ -436,7 +441,7 @@ contact2 = do
 -- 		return f
 -- 	(p :<) <$> (Device ("(" ++ unpack f ++ ")") [unpack lbl] <$> hline'2)
 
--- contact2 :: DgP (Cofree Symbol_ Pos)
+-- contact2 :: DgP (Cofree Symbol_ DgExt)
 -- contact2 = do
 -- 	p <- currentPos2
 -- 	(lbl, f) <- labelOnTop $ do
