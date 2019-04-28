@@ -7,6 +7,7 @@
 import qualified Data.Text.IO as TIO
 import Data.Foldable
 import Data.Traversable
+import Data.List
 import System.Environment (getArgs)
 
 import Preprocess
@@ -17,39 +18,8 @@ import LadderParser
 
 --------------------------------------------------------------------------------
 
-#if 0
-data V s = VTrue | VVar s | VOp Int s
-
---list of operators, their position, IDs and or-ed
--- type St k = [(k, (Int, [String]))]
-
---list of registers, or-ed list of source values
-type St k = [(k, ())]
--- register number <- or [sources...]
-
---lookup postion, retrive reg number, add op to or list
-register = undefined
-
---input of operator is its input wire and zero or more explicit values
-
-ff f (a :< x) = f a (fmap (??) x)
-
-g st src k (Source a) = g 0 a ... put st k VOn
-    register st k VTrue
-
-g st src k (Device s [s] a
-    register st k (VOp src)
-
-g st src k (Node [a]
-    register st k VOn
-
-g st src k (Jump s
-g st src k  Sink --end of hline, lookup node at same (end of extent) position
-g st src k  End --end of vline, lookup node at same (end of extent) position
-
-g _  _   _ (Label s a) = undefined
-
-#endif
+-- data V s = VTrue | VVar s | VOp Int s [s]
+--     deriving (Show, Eq)
 
 -- Source a
 -- Sink
@@ -59,27 +29,54 @@ g _  _   _ (Label s a) = undefined
 -- Label s a
 -- Node la
 
-ff src (p :< x) = do
+colRight :: DgExt -> DgExt
+colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
+
+colUnder :: DgExt -> DgExt
+colUnder (ln, (_, co)) = (ln + 1, (co, co))
+
+fff (p :< Source a) = do
+    ff [] 0 p a
+fff _ = fail here
+
+ff st r src (p :< x) = do
     case x of
-        Source a -> do
-            print (here, "Source", src)
-            ff p a
+--         Source a -> do
+--             print (here, "Source", src)
+--             ff p a
+        Source a -> undefined
+
         Sink -> do
-            print (here, "Sink", src)
-        End -> print (here, "End", src)
-        Device _s [n] a -> do
-            print (here, "Device", n, src)
-            ff p a
+            print (here, "Sink", r, ">>", (colRight p), lookup (colRight p) st)
+            return $ st ++ [((colRight p), ("Sink", r))]
+
+        End -> do
+            print (here, "End", r, p, lookup (colUnder p) st)
+            return $ st ++ [((colUnder p), ("End ", r))]
+
+        Device s [n] a -> do
+            print (here, "Device", n, r)
+            ff st (r+1) p a
+
         Jump s -> do
-            print (here, "Jump", src)
+            print (here, "Jump", r)
+            return st
         Label s a -> undefined
         Node la -> do
-            print (here, "Node", src)
-            for_ la (ff p)
+            print (here, "Node", r, ">>", p)
+            doNode (st ++ [(p, ("node", r))]) la
+    where
+    doNode st' [] = return st'
+    doNode st' (x' : xs) = do
+        st'' <- ff st' (r+1) p x'
+        doNode st'' xs
 
 testAst ast = do
     print (here, ast)
-    ff (-1,(-1,-1)) ast
+--     ff (-1,(-1,-1)) ast
+    w <- (reverse . nub) <$> fff ast
+    print (here, "-----------------------")
+    for_ w print
     print (here)
 
 --------------------------------------------------------------------------------
