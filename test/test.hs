@@ -31,64 +31,64 @@ testPreproc4 :: Text -> Either Text [[(Tok Text)]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 
 testPreproc5 :: Text -> Either Text [Tok Text]
--- testPreproc5 = fmap (fmap ( snd)) . preproc5
+-- testPreproc5 = fmap (fmap snd) . preproc5
 testPreproc5 = fmap concat . testPreproc4
 
 tokenizerTests = testGroup "Tokenizer"
-	[ testCase "empty string" $
-		(@?= Right []) $ testPreproc4  ""
-	, testCase "one VLine" $
-		(Right [[VLine]] @=?) $ testPreproc4 $ [text|
-			|               |]
-	, testCase "3" $
-		(Right [[VLine], [Node], [VLine]] @=?) $ testPreproc4 $ [text|
-			| (* hello *)
-			+
-			|               |]
-	, testCase "4" $
-		(Right [VLine, Node, VLine] @=?) $ testPreproc5 $ [text|
-			| (* hello *)
-			+
-			|               |]
-	, testCase "5" $
-		(Right [[VLine],[Node,HLine,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
-			| (* hello *)
-			+->>LBL         |]
-	, testCase "label" $
-		(Right [[VLine],[Label' "LBL"],[VLine]] @=?) $ testPreproc4 $ [text|
-			| (* hello *)
-			LBL:
-			|               |]
-	, testCase "label/blocks" $
-		(Right [(Nothing, [[VLine]]),(Just "LBL", [[VLine]])] @=?)
-			$ fmap basicBlocks $ testPreproc4 $ [text|
-				| (* hello *)
-				LBL:
-				|               |]
-	, testCase "continuation" $
-		(Right [[VLine],[Node,HLine,Continuation "X"],[VLine]] @=?)
-			$ testPreproc4 $ [text|
-				| (* hello *)
-				+-->X>
-				|               |]
-	, testCase "return" $
-		(Right [[VLine],[Node,HLine,Return],[VLine]] @=?)
-			$ testPreproc4 $ [text|
-				| (* hello *)
-				+--<RETURN>
-				|               |]
-	, testCase "connector" $
-		(Right [[Continuation "X", HLine]] @=?)
-			$ testPreproc4 $ [text|
-				(* hello *)
-				>X>--           |]
+    [ testCase "empty string" $
+        (@?= Right []) $ testPreproc4  ""
+    , testCase "one VLine" $
+        (Right [[VLine]] @=?) $ testPreproc4 $ [text|
+            |               |]
+    , testCase "3" $
+        (Right [[VLine], [Node], [VLine]] @=?) $ testPreproc4 $ [text|
+            | (* hello *)
+            +
+            |               |]
+    , testCase "4" $
+        (Right [VLine, Node, VLine] @=?) $ testPreproc5 $ [text|
+            | (* hello *)
+            +
+            |               |]
+    , testCase "5" $
+        (Right [[VLine],[Node,HLine,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
+            | (* hello *)
+            +->>LBL         |]
+    , testCase "label" $
+        (Right [[VLine],[Label' "LBL"],[VLine]] @=?) $ testPreproc4 $ [text|
+            | (* hello *)
+            LBL:
+            |               |]
+    , testCase "label/blocks" $
+        (Right [(Nothing, [[VLine]]),(Just "LBL", [[VLine]])] @=?)
+            $ fmap basicBlocks $ testPreproc4 $ [text|
+                | (* hello *)
+                LBL:
+                |               |]
+    , testCase "continuation" $
+        (Right [[VLine],[Node,HLine,Continuation "X"],[VLine]] @=?)
+            $ testPreproc4 $ [text|
+                | (* hello *)
+                +-->X>
+                |               |]
+    , testCase "return" $
+        (Right [[VLine],[Node,HLine,Return],[VLine]] @=?)
+            $ testPreproc4 $ [text|
+                | (* hello *)
+                +--<RETURN>
+                |               |]
+    , testCase "connector" $
+        (Right [[Continuation "X", HLine]] @=?)
+            $ testPreproc4 $ [text|
+                (* hello *)
+                >X>--           |]
 
-	, testCase "device" $
-		(Right [[VLine,Name "a",Name "b"],[Node,HLine,Contact " ",HLine,Coil "/",HLine]]
-			@=?)
-			$ testPreproc4 $ [text|
-				|  a    b
-				+--[ ]--(/)--   |]
+    , testCase "device" $
+        (Right [[VLine,Name "a",Name "b"],[Node,HLine,Contact " ",HLine,Coil "/",HLine]]
+            @=?)
+            $ testPreproc4 $ [text|
+                |  a    b
+                +--[ ]--(/)--   |]
 
     , testCase "negation" $
         (Right [[VLine],[Node,HLine,Negated]]
@@ -110,68 +110,68 @@ simpleResult = bimap ((>0).length.toList) id
 -- simpleResult' = bimap ((>0).length) (const ())
 
 zipperTests = testGroup "Zipper"
-	[ testCase "from/to list" $
-		zpToList <$> (stepRight $ zpFromList [1,2,3,4]) @=? Just [1,2,3,4]
-	,  testCase "length" $
-		zpLength <$> (stepRight $ zpFromList [0,1,2,3]) @=? Just 4
-	,  testCase "bad move" $
-		stepLeft (zpFromList [1::Int,2]) @=? Nothing
-	,  testCase "okay move" $
-		(stepRight (zpFromList [1,2]) >>= tip) @=? Just 2
-	,  testCase "move there and back" $
-		(stepRight (zpFromList [1,2]) >>= stepLeft >>= tip) @=? Just 1
-	,  testCase "okay focus" $
-		tip (foc (Zp [2,1] [])) @=? Just 2
-	,  testCase "nothing to focus to" $
-		tip (foc (zpFromList [])) @=? (Nothing :: Maybe ())
-	]
+    [ testCase "from/to list" $
+        zpToList <$> (stepRight $ zpFromList [1,2,3,4]) @=? Just [1,2,3,4]
+    ,  testCase "length" $
+        zpLength <$> (stepRight $ zpFromList [0,1,2,3]) @=? Just 4
+    ,  testCase "bad move" $
+        stepLeft (zpFromList [1::Int,2]) @=? Nothing
+    ,  testCase "okay move" $
+        (stepRight (zpFromList [1,2]) >>= tip) @=? Just 2
+    ,  testCase "move there and back" $
+        (stepRight (zpFromList [1,2]) >>= stepLeft >>= tip) @=? Just 1
+    ,  testCase "okay focus" $
+        tip (foc (Zp [2,1] [])) @=? Just 2
+    ,  testCase "nothing to focus to" $
+        tip (foc (zpFromList [])) @=? (Nothing :: Maybe ())
+    ]
 
 dgpTests = testGroup "Diagram parser"
-	[ testCase "length" $
-		dgLength (mkDgZp []) @=? 0
-	, testCase "trivial" $
-		fst <$> applyDgp (pure ()) (mkDgZp []) @=? Right ()
-	, testCase "dgIsEmpty positive case" $
-		simpleResult (fst <$> applyDgp dgIsEmpty (mkDgZp [])) @=? Right ()
-	, testCase "dgIsEmpty negative case" $
-		simpleResult (fst <$> applyDgp dgIsEmpty someDg) @=? Left True
-	, testCase "trim 1" $
-		dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp []
-	, testCase "trim 2" $
-		dgTrim someDg
-			@=? mkDgZp [(1, [((1, 1), VLine)])]
-	]
-	where
-	someDg = Zp [] [(1, Zp [] [((1, 1), VLine)])]
+    [ testCase "length" $
+        dgLength (mkDgZp []) @=? 0
+    , testCase "trivial" $
+        fst <$> applyDgp (pure ()) (mkDgZp []) @=? Right ()
+    , testCase "dgIsEmpty positive case" $
+        simpleResult (fst <$> applyDgp dgIsEmpty (mkDgZp [])) @=? Right ()
+    , testCase "dgIsEmpty negative case" $
+        simpleResult (fst <$> applyDgp dgIsEmpty someDg) @=? Left True
+    , testCase "trim 1" $
+        dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp []
+    , testCase "trim 2" $
+        dgTrim someDg
+            @=? mkDgZp [(1, [((1, 1), VLine)])]
+    ]
+    where
+    someDg = Zp [] [(1, Zp [] [((1, 1), VLine)])]
 
 
 ladderTests = testGroup "Ladder parser"
-	[ testCase "test00" $
-		fst <$> dgParse t00
-			@?= Right ( Pos (-1,-1) :< LadderParser.End )
-	, testCase "test00" $ fullyConsumed t00
-	, testCase "test01" $ fullyConsumed t01
-	, testCase "test04" $ fullyConsumed t04
--- 	, testCase "test05" $
--- 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t05))
--- 			@?= Right (Zp [] [])
-	, testCase "test07a" $ fullyConsumed t07a
--- 	, testCase "test07" $
--- 		fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
--- 			@?= Right (Zp [] [])
-	]
-	where
-	
-	dgParse = applyDgp test002 . mkDgZp
-	getDg = dgTrim.psStr.snd
-	fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
-	
-	Right t00 = test00_tokenized
-	Right t01 = test01_tokenized
-	Right t04 = test04_tokenized
-	Right t05 = test05_tokenized
-	Right t07 = test07_tokenized
-	Right t07a = test07a_tokenized
+    [ testCase "test00" $
+        fst <$> dgParse t00
+            @?= Right ( Pos (-1,-1) :< LadderParser.End )
+    , testCase "test00" $ fullyConsumed t00
+    , testCase "test01" $ fullyConsumed t01
+    , testCase "test04" $ fullyConsumed t04
+--     , testCase "test05" $
+--         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t05))
+--             @?= Right (Zp [] [])
+    , testCase "test07a" $ fullyConsumed t07a
+--     , testCase "test07" $
+--         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
+--             @?= Right (Zp [] [])
+    ]
+    where
+    
+    dgParse = applyDgp test002 . mkDgZp
+    getDg = dgTrim.psStr.snd
+    fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
+    
+    Right t00 = test00_tokenized
+    Right t01 = test01_tokenized
+    Right t04 = test04_tokenized
+    Right t05 = test05_tokenized
+    Right t07 = test07_tokenized
+    Right t07a = test07a_tokenized
 
 test00_tokenized = preproc4'' test00
 
@@ -249,28 +249,28 @@ testBox ln input
 -- fmap (dgTrim.psStr.snd) 
 
 boxTests = testGroup "Box parser"
-	[ testCase "1" $
-		fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized))
-			@?= Right (Zp [] [])
--- 	, testCase "1b" $
--- 		box01b_tokenized
--- 			@?= []
--- 	, testCase "1b" $
--- 		fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01b_tokenized))
--- 			@?= Right (Zp [] [])
-	, testCase "2" $
-		fmap (dgTrim.psStr.snd) (testBox 2 box02)
-			@?= Right (Zp [] [])
-	, testCase "2a" $
-		fmap (dgTrim.psStr.snd) (testBox 3 box02)
-			@?= Right (Zp [] [])
-	, testCase "2b" $
-		fmap (dgTrim.psStr.snd) (testBox 4 box02)
-			@?= Right (Zp [] [])
-	]
-	where
-	Right box01_tokenized = preproc4'' box01
--- 	Right box01b_tokenized = preproc4'' box01b
+    [ testCase "1" $
+        fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized))
+            @?= Right (Zp [] [])
+--     , testCase "1b" $
+--         box01b_tokenized
+--             @?= []
+--     , testCase "1b" $
+--         fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01b_tokenized))
+--             @?= Right (Zp [] [])
+    , testCase "2" $
+        fmap (dgTrim.psStr.snd) (testBox 2 box02)
+            @?= Right (Zp [] [])
+    , testCase "2a" $
+        fmap (dgTrim.psStr.snd) (testBox 3 box02)
+            @?= Right (Zp [] [])
+    , testCase "2b" $
+        fmap (dgTrim.psStr.snd) (testBox 4 box02)
+            @?= Right (Zp [] [])
+    ]
+    where
+    Right box01_tokenized = preproc4'' box01
+--     Right box01b_tokenized = preproc4'' box01b
 
 box01 =
     [text|
