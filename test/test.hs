@@ -30,8 +30,9 @@ preproc4'' = fmap stripPos . preproc5'
 testPreproc4 :: Text -> Either Text [[(Tok Text)]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 
-testPreproc5 :: Text -> Either Text [(Tok Text)]
-testPreproc5 = fmap (fmap ( snd)) . preproc5
+testPreproc5 :: Text -> Either Text [Tok Text]
+-- testPreproc5 = fmap (fmap ( snd)) . preproc5
+testPreproc5 = fmap concat . testPreproc4
 
 tokenizerTests = testGroup "Tokenizer"
 	[ testCase "empty string" $
@@ -81,8 +82,26 @@ tokenizerTests = testGroup "Tokenizer"
 			$ testPreproc4 $ [text|
 				(* hello *)
 				>X>--           |]
+
+	, testCase "device" $
+		(Right [[VLine,Name "a",Name "b"],[Node,HLine,Contact " ",HLine,Coil "/",HLine]]
+			@=?)
+			$ testPreproc4 $ [text|
+				|  a    b
+				+--[ ]--(/)--   |]
+
+    , testCase "negation" $
+        (Right [[VLine],[Node,HLine,Negated]]
+            @=?)
+            $ testPreproc4 $ [text|
+            |
+            +--0        |]
+
 	, testCase "invalid char" $
 		 simpleResult (testPreproc4 "?") @?= Left True
+
+	, testCase "ehmm" $
+		 show (fmap id (Contact ())) @?= "Contact ()"
 	]
 
 -- simpleResult = bimap ((>0).Data.Text.length) id
@@ -270,8 +289,16 @@ box02 =
     +-----+
     |     |
     >     |
-    |     |
+    <     |
     +-----+                    |]
+
+box03 =
+    [text|
+    |   +-----+
+    |   |     |
+    +--0|     |
+    |   |     |
+        +-----+                 |]
 
 --------------------------------------------------------------------------------
 

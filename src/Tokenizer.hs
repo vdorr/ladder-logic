@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances, DeriveFunctor #-}
+{-# LANGUAGE OverloadedStrings, DeriveFunctor #-}
 -- #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Tokenizer where
@@ -116,7 +116,7 @@ data Tok a
 	| REdge				-- as block input "--->"
 	| FEdge				-- as block input "---<"
 	| Negated			-- on block i/o "---0|" or "|0---"
-	| Contact a			-- "---[OP]---"
+	| Contact !a			-- "---[OP]---"
 	| Coil a			-- "---(OP)---"
 --as above, but could be mistaken for other things
 -- 	| Connector a		-- "--->NAME>"
@@ -167,17 +167,18 @@ test7' = whitespace7 *> many (withPos token7 <* whitespace7) <* eof
 test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
 test7 = breakLines <$> test7'
 
-breakLines :: [((SourcePos, SourcePos), Tok Text)]
+breakLines
+	:: [((SourcePos, SourcePos), Tok Text)]
 	-> [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
 breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
 	where
 	(a, b) = span ((sourceLine p==).sourceLine.fst.fst) xs
 breakLines [] = []
 
-preproc5 :: Text -> Either Text [((SourcePos, SourcePos), Tok Text)]
-preproc5
-	= bimap (T.pack . errorBundlePretty) id
-	. parse test7' "(file)"
+-- preproc5 :: Text -> Either Text [((SourcePos, SourcePos), Tok Text)]
+-- preproc5
+-- 	= bimap (T.pack . errorBundlePretty) id
+-- 	. parse test7' "(file)"
 
 preproc5' :: Text -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
 preproc5'
