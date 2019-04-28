@@ -46,13 +46,16 @@ ff st r src (p :< x) = do
 --             ff p a
         Source a -> undefined
 
-        Sink -> do
+        Sink -> do --end of hline, may lead to 'Node'
             print (here, "Sink", r, ">>", (colRight p), lookup (colRight p) st)
             return $ st ++ [((colRight p), ("Sink", r))]
 
-        End -> do
+        End -> do --end of vertical line
+--should really appear only once at end of left power rail
+--should test this (exactly one End in rung)
             print (here, "End", r, p, lookup (colUnder p) st)
-            return $ st ++ [((colUnder p), ("End ", r))]
+--             return $ st ++ [((colUnder p), ("End ", r))]
+            return st
 
         Device s [n] a -> do
             print (here, "Device", n, r)
