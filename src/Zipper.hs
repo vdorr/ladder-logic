@@ -223,21 +223,24 @@ branch isFork branches = do
 --  	dir0 <- psNext <$> get
 	origin <- currentPos
 	True <- isFork <$> peek_
+-- 	traceShowM (here, "NODE!", origin) --, fmap (fmap (const ())) stuff)
 	stuff <- for branches $ \(dir, p) -> do
 		setDir dir
-		setPos origin
+-- 		setPos origin
 
 		--XXX fail if there is nothing under/after node!
 -- 		step <|> undefined --with dir
 
 -- 		fmap Just p <|> return Nothing
 -- 		p
-		fmap Just (step *> p) <|> return Nothing --step fail if there's nothing in desired direction
+		(setPos origin *> step *> (Just <$> p))
+		<|> return Nothing --step fail if there's nothing in desired direction
 	setPos origin --eat `fork`
 --  	setDir dir0 --restore direction, good for parsing boxes
 	eat' --FIXME set direction!!!!!!!!!!!!!
 
- 	return $ catMaybes stuff
+-- 	traceShowM (here, origin, fmap (fmap (const ())) stuff)
+	return $ catMaybes stuff
 --	return stuff
 
 -- branch'
@@ -259,7 +262,7 @@ branch isFork branches = do
 -- 	return (f, stuff)
 
 -- |Matches diagram with nothing remaining on current line
-pattern DgEmpty <- Zp _l ((_ln, Zp _ []) : _)
+pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
 
 -- |Succeeds only when positioned on end of line
 eol :: DgP ()
@@ -268,7 +271,7 @@ eol = do
 -- 	traceShowM (here, p)
 	psStr <$> get >>= \case
 -- 		 Zp l ((_ln, Zp _ []) : _) -> return ()
-		 DgEmpty -> return ()
+		 DgLineEnd -> return ()
 		 _ -> fail here
 
 --------------------------------------------------------------------------------
@@ -360,7 +363,7 @@ test002' :: DgP (Cofree (Symbol_ String) DgExt)
 test002' = do
 -- 	setDir goDown *> vline2 <* dgIsEmpty
 	p <- currentPos
-	q <- setDir goDown *> ( ((p:<).Source) <$> vline2)
+	q <- setDir goDown *> ( ((p:<).Source) <$> vline'2)
 -- 	Zp zpl zpr <- psStr <$> get
 -- 	traceShowM (here, zp)
 -- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
@@ -375,7 +378,7 @@ node2'
 	= branch
 		(==Tokenizer.Node)
 		[ (goRight, hline'2) --currentPosM>>=traceShowM>>
-		, (goDown, vline'2)
+		, (goDown,  vline'2)
 		]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
@@ -397,15 +400,23 @@ hline'2 = do
 eol2 :: DgP (Cofree (Symbol_ String) DgExt)
 eol2 = do
 -- 	p <- currentPosM
--- 	traceShowM (here, p)
+-- 	pp <- lastPos
+-- 	Zp _ (ln:_) <- psStr <$> get
+-- 	test <- "yep" <$ eol <|> pure "nope"
+-- 	traceShowM (here, p, pp, test, ln)
 --XXX XXX XXX originally end-columns was used as ast node position
 -- 	(:< Sink) <$> (fmap (\(ln, (_, co)) -> Pos (ln, co)) lastPos) <* eol
-	(:< Sink) <$> lastPos <* eol
+	(:< Sink) <$> lastPos <* (eol <|> undefined)
 
-vline2 :: DgP (Cofree (Symbol_ String) DgExt)
+-- vline2 :: DgP (Cofree (Symbol_ String) DgExt)
+-- vline2 = do
+-- 	VLine <- eat'
+-- 	vline'2
+
+vline2 :: DgP ()
 vline2 = do
 	VLine <- eat'
-	vline'2
+	return ()
 
 hline2 :: DgP ()
 hline2 = do
@@ -416,6 +427,7 @@ device :: DgP String -> DgP (Cofree (Symbol_ String) DgExt)
 device p = do
 	pos <- currentPos
 	(lbl, f) <- labelOnTop' p
+-- 	traceShowM (here, pos, lbl) --, fmap (fmap (const ())) stuff)
 	(pos :<) <$> (Device f [lbl] <$> hline'2)
 
 coil2 :: DgP (Cofree (Symbol_ String) DgExt)

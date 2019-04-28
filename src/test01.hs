@@ -112,6 +112,7 @@ main = do
             case applyDgp test002' zp of
                 Right (ast, (DgPSt _ c@(Zp zpl zpr) _)) -> do
 --                     print (here, a, c)
+                    print (here, "--------------------------------------------------")
                     for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 --                     for_ zpr $ \q -> print (here, q)
 
