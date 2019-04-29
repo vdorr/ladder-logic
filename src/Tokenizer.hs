@@ -48,35 +48,11 @@ jump         : '>>' target
 name         : letter+
 location     : '%' ('I' | 'Q' | 'M') number+
 
-linecomment  : '//' anychar* '\n'
+--linecomment  : '//' anychar* '\n'
 blockcomment : '(*' anychar* '*)'
+pragma       : '{' anychar* '}'
 
 -}
-
--- type LexSt = ((Int, Int), String)
--- 
--- newtype Lexer a = Lexer { lexer :: LexSt -> Either String (a, LexSt) }
--- 
--- instance Functor Lexer where
---     fmap = ap . return
--- 
--- instance Applicative Lexer where
---     pure = return
---     (<*>) = ap
--- 
--- instance Monad Lexer where
---     return a = Lexer $ \s -> return (a, s)
---     a >>= b = Lexer $ \s -> do
---         (y, s') <- lexer a s
---         lexer (b y) s'
--- 
--- getOne :: Lexer Char
--- getOne = Lexer $ \((ln, co), s) -> 
---     case s of
---          c : s' -> case c of
---             '\n'-> Right (c, ((ln + 1, 0), s'))
---             _ -> Right (c, ((ln, co + 1), s'))
---          [] -> Left "empty"
 
 {-
 k ('\n' : s)
@@ -93,19 +69,26 @@ k ('%' : s)
 -}
 
 -- chop by labels, does not look for labels floting among logic, that is left to parser
-basicBlocks :: [[Tok a]] -> [(Maybe a, [[Tok a]])]
+basicBlocks
+    :: [[Tok a]]
+    -> [(Maybe a, [[Tok a]])]
 basicBlocks [] = []
 basicBlocks t = (lbl, this) : basicBlocks rest
     where
     (this, rest) = break isLabel t'
     (lbl, t')
         = case t of
-            ([Label' x] : xs)    -> (Just x, xs)
-            xs                    -> (Nothing, xs)
+            ([Label' x] : xs) -> (Just x, xs)
+            xs                -> (Nothing, xs)
     isLabel [Label' _] = True
-    isLabel _ = False
+    isLabel _          = False
 
---rule: control statements ar followed by EOL
+isWsTok :: Tok a -> Bool
+isWsTok Pragma{}  = True
+isWsTok Comment{} = True
+isWsTok _         = False
+
+--rule: control statements (jump) are followed by EOL
 data Tok a
 --parts without mandatory horizontal component:
     = Node           -- +
@@ -128,11 +111,19 @@ data Tok a
 --others
 --     | Store a            -- FBD only "---VARIABLE"
     | Name a         --inside of block
+--whitespace
+    | Comment a
+    | Pragma a
     deriving (Show, Eq, Functor)
 
 token7 :: Parsec ParseErr Text (Tok Text)
 token7
-    =   Label'       <$> try (labelName <* char ':')
+    =   Pragma       <$> between'' "{" "}"
+    <|> Comment      <$> between'' "(*" "*)"
+--     <|> Pragma       <$> T.pack <$> between' "{" "}" (many anySingle)
+--     <|> Comment      <$> Comment <$> (chunk "(*" *> manyTill anySingle (try (chunk "*)")))
+
+    <|> Label'       <$> try (labelName <* char ':')
     <|> Negated      <$  char '0'
     <|> VLine        <$  char '|'
     <|> Node         <$  char '+'
@@ -141,8 +132,10 @@ token7
     <|> Jump'        <$> (try (chunk ">>") *> labelName)
 --         <|> Return            <$  try (between' "<" ">" labelName)
     <|> Return       <$  try (chunk "<RETURN>")
-    <|> Contact      <$> between' "[" "]" innards
-    <|> Coil         <$> between' "(" ")" innards
+--     <|> Contact      <$> between' "[" "]" innards
+--     <|> Coil         <$> between' "(" ")" innards
+    <|> Contact      <$> between'' "[" "]"
+    <|> Coil         <$> between'' "(" ")"
 --         <|> Connector        <$> try (between ">" ">" name)
     <|> REdge        <$  char '>'
     <|> FEdge        <$  char '<'
@@ -151,21 +144,16 @@ token7
     where
     labelName = T.pack <$> some alphaNumChar
     name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '%')
-    innards = T.pack <$> some (satisfy (\c -> notElem c [')', ']']))
-
+--     innards = T.pack <$> some (satisfy (\c -> notElem c [')', ']']))
     between' a b = between (chunk a) (chunk b)
-
-whitespace7 :: Parsec ParseErr Text ()
-whitespace7 = whitespace
-    where
-    whitespace = label "whitespace" $ space *> many (actualComment *> space) *> space
-    actualComment = chunk "(*" *> manyTill anySingle (try (chunk "*)"))
+    between'' :: Text -> Text -> Parsec ParseErr Text Text
+    between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))
 
 test7' :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
-test7' = whitespace7 *> many (withPos token7 <* whitespace7) <* eof
+test7' = space *> many (withPos token7 <* space) <* eof
 
 test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
-test7 = breakLines <$> test7'
+test7 = (breakLines . filter (not.isWsTok.snd)) <$> test7'
 
 breakLines
     :: [((SourcePos, SourcePos), Tok Text)]
@@ -175,14 +163,22 @@ breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
     (a, b) = span ((sourceLine p==).sourceLine.fst.fst) xs
 breakLines [] = []
 
+preproc5'
+    :: Text
+    -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+preproc5'
+    = bimap (T.pack . errorBundlePretty) id
+    . parse test7 "(file)"
+ 
+-- whitespace7 :: Parsec ParseErr Text ()
+-- whitespace7 = whitespace
+--     where
+--     whitespace = label "whitespace" $ space *> many (actualComment *> space) *> space
+--     actualComment = chunk "(*" *> manyTill anySingle (try (chunk "*)"))
+
 -- preproc5 :: Text -> Either Text [((SourcePos, SourcePos), Tok Text)]
 -- preproc5
 --     = bimap (T.pack . errorBundlePretty) id
 --     . parse test7' "(file)"
-
-preproc5' :: Text -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
-preproc5'
-    = bimap (T.pack . errorBundlePretty) id
-    . parse test7 "(file)"
 
 --------------------------------------------------------------------------------

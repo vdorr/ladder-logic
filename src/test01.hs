@@ -1,6 +1,8 @@
-{-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
+{-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
     PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
     LambdaCase, ScopedTypeVariables, ViewPatterns #-}
+
+-- OverloadedStrings, 
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -29,12 +31,6 @@ import LadderParser
 -- Label s a
 -- Node la
 
-colRight :: DgExt -> DgExt
-colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
-
-colUnder :: DgExt -> DgExt
-colUnder (ln, (_, co)) = (ln + 1, (co, co))
-
 fff (p :< Source a) = do
     ff [] 0 p a
 fff _ = fail here
@@ -45,16 +41,14 @@ ff st r src (p :< x) = do
 --             print (here, "Source", src)
 --             ff p a
         Source a -> undefined
-
         Sink -> do --end of hline, may lead to 'Node'
-            print (here, "Sink", r, ">>", (colRight p), lookup (colRight p) st)
-            return $ st ++ [((colRight p), ("Sink", r))]
+            print (here, "Sink", r, ">>", p, lookup p st)
+            return $ st ++ [(p, ("Sink", r))]
 
         End -> do --end of vertical line
 --should really appear only once at end of left power rail
 --should test this (exactly one End in rung)
-            print (here, "End", r, p, lookup (colUnder p) st)
---             return $ st ++ [((colUnder p), ("End ", r))]
+            print (here, "End", r, p, lookup p st)
             return st
 
         Device s [n] a -> do
@@ -71,15 +65,113 @@ ff st r src (p :< x) = do
     where
     doNode st' [] = return st'
     doNode st' (x' : xs) = do
-        st'' <- ff st' (r+1) p x'
+        st'' <- ff st' r p x'
         doNode st'' xs
+
+
+-- ffff (st, op) r src (p :< x) = f x
+--     where
+--     f (Source a) = undefined --should not happen
+--     f (Label s a) = undefined --should not happen
+-- 
+--     f  Sink = do --end of hline, may lead to 'Node'
+--         print (here, "Sink", r, ">>", p, lookup p st)
+--         return (st ++ [(p, ("Sink", r))], op)
+-- 
+--     f  End = do --end of vertical line
+-- --should really appear only once at end of left power rail
+-- --should test this (exactly one End in rung)
+--         print (here, "End", r, p, lookup p st)
+--         return (st, op)
+-- 
+--     f (Device s [n] a) = do
+--         print (here, "Device", n, r)
+--         ffff (st, op) (r+1) p a
+-- 
+--     f (Jump s) = do
+--         print (here, "Jump", r)
+--         return (st, op)
+--     f (Node la) = do
+--         print (here, "Node", r, ">>", p)
+--         doNode (st ++ [(p, ("node", r))], op) la
+-- 
+--     doNode st' [] = return st'
+--     doNode st' (x' : xs) = do
+--         st'' <- ffff st' r p x'
+--         doNode st'' xs
+
+fffff (p :< Source a) =  ffff ([], ["$0 = #on"], 1) 0 p a
+fffff _ = error here
+
+ffff (st, op, cnt) r src (p :< x) = f x
+    where
+    f (Source a) = undefined --should not happen
+    f (Label s a) = undefined --should not happen
+
+    f  Sink = --end of hline, may lead to 'Node'
+--         print (here, "Sink", r, ">>", p, lookup p st)
+
+--         ( st ++ [(p, ("Sink", r))]
+        ( st
+        , op ++ case lookup p st of
+                     Nothing -> []
+                     Just rr -> [ "$" ++ show rr ++ " |= $" ++ show r ++ ";" ]
+        , cnt
+        )
+
+    f  End = --end of vertical line
+--should really appear only once at end of left power rail
+--should test this (exactly one End in rung)
+--         print (here, "End", r, p, lookup p st)
+--         (st, op)
+        ( st
+        , op 
+--             ++ case lookup p st of
+--                      Nothing -> []
+--                      Just rr -> [ "$" ++ show rr ++ " |= $" ++ show r ++ ";" ]
+        , cnt
+        )
+
+    f (Device s n a) =
+--         print (here, "Device", n, r)
+        ffff
+            (st
+            , op ++ [getop r cnt s n]
+            , cnt + 1) (cnt) p a
+
+
+    f (Jump s) =
+--         print (here, "Jump", r)
+        (st, op ++ ["jump to " ++ s], cnt)
+    f (Node la) =
+--         print (here, "Node", r, ">>", p)
+--         doNode (st ++ [(p, ("node", r))], op) la
+        doNode (st ++ [(p, r)], op, cnt) la
+
+    doNode st' [] = st'
+    doNode st' (x' : xs) =
+        let st'' = ffff st' r p x'
+            in doNode st'' xs
+
+    getop rr rrr "[ ]" [n] = "$" ++ show rrr ++ " = $"++ show rr ++" and " ++ n ++ ""
+    getop rr rrr "( )" [n]
+        = n ++ " = $" ++ show rr ++ "; $" ++ show rrr ++ " = $" ++ show rr
+    getop rr _ s n = error $ show (here, s, n)
 
 testAst ast = do
     print (here, ast)
 --     ff (-1,(-1,-1)) ast
-    w <- (reverse . nub) <$> fff ast
+--     w <- (reverse . nub) <$> fff ast
+--     print (here, "-----------------------")
+--     for_ w print
+--     print (here)
+
+
+    let (st, op, cnt) = fffff ast
+    print (here, cnt, "-----------------------")
+    for_ st print
     print (here, "-----------------------")
-    for_ w print
+    for_ op print
     print (here)
 
 --------------------------------------------------------------------------------

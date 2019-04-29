@@ -78,14 +78,11 @@ moveTo move test zp@(ZpR l foc r) -- = undefined
 	| otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
 
-#if 0
-move'' :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
-move'' f (foc -> zp@(Zp _ (x : xs)))
-	= case f x of
-		LT -> moveTo stepLeft ((==EQ).f) zp
-		_ -> moveTo stepRight ((==EQ).f) zp
-move'' _ _ = Nothing
-#endif
+move2 :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
+move2 f zp@(Zp _ (x : xs))
+	| LT == f x   = moveTo stepLeft  ((==EQ).f) zp
+	| otherwise   = moveTo stepRight ((==EQ).f) zp
+move2 _ _ = Nothing
 
 --------------------------------------------------------------------------------
 
@@ -274,46 +271,11 @@ eol = do
 		 DgLineEnd -> return ()
 		 _ -> fail here
 
---------------------------------------------------------------------------------
+colRight :: DgExt -> DgExt
+colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
 
--- test001 :: DgP ()
--- test001 = do
--- 	setDir goDown
--- 	some vline
--- 	node' <|> end
--- 	dgIsEmpty
--- 
--- node' :: DgP ()
--- node'
--- 	= () <$ branch
--- 		(\case
--- 			Node -> True
--- 			_ -> False)
--- 		[ (goRight, hline')
--- 		, (goDown, vline')
--- 		]
--- 
--- vline' :: DgP ()
--- -- vline' = some (node' <|> vline)
--- vline' = many vline *> (node' <|> end)
--- 
--- hline' = do
--- 	many (coil <|> hline <|> contact <|> node') --TODO vline crossing
--- 	return ()
--- 
--- 
--- coil = do
--- 	labelOnTop $ do
--- 		Coil _ <- eat'
--- 		return ()
--- 	return ()
--- 
--- contact = do
--- -- 	Contact _ <- eat'
--- 	labelOnTop $ do
--- 		Contact _ <- eat'
--- 		return ()
--- 	return ()
+colUnder :: DgExt -> DgExt
+colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 --------------------------------------------------------------------------------
 
@@ -325,6 +287,21 @@ vline = do
 	VLine <- eat'
 	return ()
 	
+--------------------------------------------------------------------------------
+
+--FIXME parse it with DgP's pos type and then fmap it to 'Pos'
+currentPos2 :: DgP Pos
+currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
+
+extToPos :: DgExt -> Pos
+extToPos = (\(ln, co) -> Pos (co, ln)) . fmap fst
+	
+toPos2 :: Cofree (Symbol_ String) DgExt -> Cofree (Symbol_ String) Pos
+toPos2 = fmap extToPos
+
+-- test002 :: DgP (Cofree (Symbol_ String) Pos)
+-- test002 = fmap extToPos <$> test002'
+
 --------------------------------------------------------------------------------
 
 {-
@@ -346,29 +323,11 @@ coilType    : ...
 
 -}
 
---FIXME parse it with DgP's pos type and then fmap it to 'Pos'
-currentPos2 :: DgP Pos
-currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
-
-extToPos :: DgExt -> Pos
-extToPos = (\(ln, co) -> Pos (co, ln)) . fmap fst
-	
-toPos2 :: Cofree (Symbol_ String) DgExt -> Cofree (Symbol_ String) Pos
-toPos2 = fmap extToPos
-
--- test002 :: DgP (Cofree (Symbol_ String) Pos)
--- test002 = fmap extToPos <$> test002'
-
 test002' :: DgP (Cofree (Symbol_ String) DgExt)
-test002' = do
--- 	setDir goDown *> vline2 <* dgIsEmpty
-	p <- currentPos
-	q <- setDir goDown *> ( ((p:<).Source) <$> vline'2)
--- 	Zp zpl zpr <- psStr <$> get
--- 	traceShowM (here, zp)
--- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
-	dgIsEmpty
-	return q
+test002'
+	= setDir goDown
+	*> ((:<) <$> currentPos <*> fmap Source vline'2)
+	<* dgIsEmpty
 
 node2 :: DgP (Cofree (Symbol_ String) DgExt)
 node2 = (:<) <$> currentPos <*> (LadderParser.Node <$> node2')
@@ -378,7 +337,7 @@ node2'
 	= branch
 		(==Tokenizer.Node)
 		[ (goRight, hline'2) --currentPosM>>=traceShowM>>
-		, (goDown,  vline'2)
+		, (goDown , vline'2)
 		]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
@@ -386,39 +345,20 @@ vline'2 :: DgP (Cofree (Symbol_ String) DgExt)
 vline'2 = many vline2 *> (end2 <|> node2)
 
 end2 :: DgP (Cofree (Symbol_ String) DgExt)
--- end2 = Pos (-1,-1) :< End <$ end
-end2 = (:< End) <$> (end *> lastPos)
-
-
-hline'2 :: DgP (Cofree (Symbol_ String) DgExt)
-hline'2 = do
-	some hline2
--- 	p <- currentPosM
--- 	traceShowM (here, p, ">>>>>>>")
-	coil2 <|> contact2 <|> node2 <|> eol2 --TODO vline crossing
+end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 
 eol2 :: DgP (Cofree (Symbol_ String) DgExt)
-eol2 = do
--- 	p <- currentPosM
--- 	pp <- lastPos
--- 	Zp _ (ln:_) <- psStr <$> get
--- 	test <- "yep" <$ eol <|> pure "nope"
--- 	traceShowM (here, p, pp, test, ln)
---XXX XXX XXX originally end-columns was used as ast node position
--- 	(:< Sink) <$> (fmap (\(ln, (_, co)) -> Pos (ln, co)) lastPos) <* eol
-	(:< Sink) <$> lastPos <* (eol <|> undefined)
+eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
--- vline2 :: DgP (Cofree (Symbol_ String) DgExt)
--- vline2 = do
--- 	VLine <- eat'
--- 	vline'2
+hline'2 :: DgP (Cofree (Symbol_ String) DgExt)
+hline'2 = some hline2 *> (coil2 <|> contact2 <|> node2 <|> eol2) --TODO vline crossing
 
 vline2 :: DgP ()
 vline2 = do
 	VLine <- eat'
 	return ()
 
-hline2 :: DgP ()
+hline2 :: DgP () --TODO vline crossing
 hline2 = do
 	HLine <- eat'
 	return ()
@@ -427,7 +367,6 @@ device :: DgP String -> DgP (Cofree (Symbol_ String) DgExt)
 device p = do
 	pos <- currentPos
 	(lbl, f) <- labelOnTop' p
--- 	traceShowM (here, pos, lbl) --, fmap (fmap (const ())) stuff)
 	(pos :<) <$> (Device f [lbl] <$> hline'2)
 
 coil2 :: DgP (Cofree (Symbol_ String) DgExt)
@@ -436,31 +375,10 @@ coil2 = device $ do
 	return $ "(" ++ unpack f ++ ")"
 
 contact2 :: DgP (Cofree (Symbol_ String) DgExt)
-contact2 = do
--- 	p <- currentPosM
--- 	traceShowM (here, p)
-	device $ do
-		Contact f <- eat'
--- 		p <- currentPosM
--- 		traceShowM (here, p)
-		return $ "[" ++ unpack f ++ "]"
+contact2 = device $ do
+	Contact f <- eat'
+	return $ "[" ++ unpack f ++ "]"
 
--- coil2 :: DgP (Cofree Symbol_ DgExt)
--- coil2 = do
--- 	p <- currentPos2
--- 	(lbl, f) <- labelOnTop $ do
--- 		Coil f <- eat'
--- 		return f
--- 	(p :<) <$> (Device ("(" ++ unpack f ++ ")") [unpack lbl] <$> hline'2)
-
--- contact2 :: DgP (Cofree Symbol_ DgExt)
--- contact2 = do
--- 	p <- currentPos2
--- 	(lbl, f) <- labelOnTop $ do
--- 		Contact f <- eat'
--- 		return f
--- 	(p :<) <$> (Device ("[" ++ unpack f ++ "]") [unpack lbl] <$> hline'2)
-	
 --------------------------------------------------------------------------------
 
 {-
@@ -614,9 +532,6 @@ box = do
 
 end :: DgP ()
 end = do
--- 	p <- currentPosM
--- 	x <- (peek . psStr) <$> get
--- 	traceShowM (here, p, x)
 	Nothing <- (peek . psStr) <$> get
 	return ()
 
@@ -632,14 +547,6 @@ eat' = do
 			return v
 		 Nothing -> fail $ show (here, ps)
 
--- eat (Zp us ((ln, Zp l ((_, x) : rs)) : ds)) = Just (x, Zp us ((ln, Zp l rs) : ds))
--- eat _ = Nothing
-
-eat''' :: Dg a -> Maybe (a, DgExt, Dg a)
-eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
-	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
-eat''' _ = Nothing
-
 currentPosM :: DgP (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
 
@@ -653,6 +560,13 @@ peek_ :: DgP (Tok Text)
 peek_ = do
 	Just p <- (peek . psStr) <$> get
 	return p
+
+--------------------------------------------------------------------------------
+
+eat''' :: Dg a -> Maybe (a, DgExt, Dg a)
+eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
+	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
+eat''' _ = Nothing
 
 pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 -- pattern DgH' ln cl x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
@@ -677,23 +591,36 @@ mkDgZp = Zp [] . fmap (fmap (Zp []))
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col = moveToLine line >=> moveToCol col
 
+pattern DgLine us ln zp ds = Zp us ((ln, zp) : ds)
+
 --FIXME merge with moveToLine somehow?
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
-moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
-	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
-	| otherwise = reassemble <$> moveTo stepLeft (isIn . fst) zp
+-- moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
+-- moveToCol col (DgLine us ln zp@(Zp l (((cl, cr), _) : _)) ds)
+-- 	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
+-- 	| otherwise = reassemble <$> moveTo stepLeft (isIn . fst) zp
+-- 	where
+-- 	isIn (a, b) = b >= col && a <= col
+-- -- 	reassemble zp' = Zp us ((ln, zp') : ds)
+-- 	reassemble zp' = DgLine us ln zp' ds
+-- moveToCol _ _ = Nothing
+moveToCol col (DgLine us ln zp ds) = reassemble <$> move2 (dir col . fst) zp
 	where
-	isIn (a, b) = b >= col && a <= col
-	reassemble zp' = Zp us ((ln, zp') : ds)
+	dir x (a, b)
+		| x < a = LT
+		| x > b = GT
+		| otherwise = EQ
+	reassemble zp' = DgLine us ln zp' ds
 moveToCol _ _ = Nothing
 
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
 moveToLine l zp = moveToLine' l (fmap (fmap foc) (foc zp))
 
 moveToLine' :: Int -> Dg a -> Maybe (Dg a)
-moveToLine' line zp@(Zp _ ( (ln, _) : _))
-	| line >= ln = moveTo stepRight ((line==).fst) zp
-	| otherwise = moveTo stepLeft ((line==).fst) zp
-moveToLine' _ _ = Nothing
+moveToLine' ln = move2 (compare ln . fst)
+-- moveToLine' line zp@(Zp _ ( (ln, _) : _))
+-- 	| line >= ln = moveTo stepRight ((line==).fst) zp
+-- 	| otherwise = moveTo stepLeft ((line==).fst) zp
+-- moveToLine' _ _ = Nothing
 
 --------------------------------------------------------------------------------

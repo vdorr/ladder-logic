@@ -191,7 +191,11 @@ test00 =
 test01 =
     [text|
     (* --- test 01 --- *)
-
+    
+    { variables:%IX0,%QX0
+      scan:100ms
+    }
+    
     | %IX0  %QX0
     +--[ ]---( )--
     |                          |]

@@ -23,15 +23,16 @@ import DiagramParser
 --------------------------------------------------------------------------------
 
 data Symbol_ s a
-	= Source a
-	| Sink -- ^where wire connects to (implied) right rail
-		  --maybe i need another case to mark end of left rail.... like 'End'
-	| End -- ^used where left rail ends
-	| Device s [s] a
-	| Jump s
-	| Label s a --FIXME should not be here
-	| Node [a]
-	deriving (Show, Functor, Foldable, Traversable, Eq)
+    = Source a
+    | Sink           -- ^where wire connects to (implied) right rail
+    | End            -- ^used where left rail ends
+    | Device s [s] a --
+    | Jump   s
+    | Label  s a     --FIXME should not be here
+    | Node   [a]     --order matters here
+    deriving (Show, Functor, Foldable, Traversable, Eq)
+
+--------------------------------------------------------------------------------
 
 data Cofree f a = a :< f (Cofree f a)
 	deriving (Functor, Foldable, Traversable)
