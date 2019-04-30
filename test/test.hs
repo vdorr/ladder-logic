@@ -7,9 +7,10 @@ import Test.Tasty.HUnit
 
 import Data.List
 import Data.Ord
+import Control.Monad
 
 import NeatInterpolation
-import Data.Text (Text)
+import Data.Text (Text, pack, unpack)
 import qualified Data.Text
 import Data.Bifunctor
 import GHC.Exts
@@ -26,6 +27,9 @@ import DiagramParser (Pos(..))
 
 preproc4'' :: Text -> Either Text [(Int, [((Int, Int), Tok Text)])]
 preproc4'' = fmap stripPos . preproc5'
+
+preproc5'' :: Text -> Either String [(Int, [((Int, Int), Tok Text)])]
+preproc5'' = bimap unpack stripPos . preproc5'
 
 testPreproc4 :: Text -> Either Text [[(Tok Text)]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
@@ -151,7 +155,7 @@ ladderTests = testGroup "Ladder parser"
 --             @?= Right ( Pos (-1,-1) :< LadderParser.End )
             @?= Right (() :< Source (() :< End))
     , testCase "test00" $ fullyConsumed t00
-    , testCase "test01" $ fullyConsumed t01
+    , testCase "test01" $ fullyConsumed' test01
     , testCase "test04" $ fullyConsumed t04
 --     , testCase "test05" $
 --         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t05))
@@ -160,15 +164,37 @@ ladderTests = testGroup "Ladder parser"
 --     , testCase "test07" $
 --         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
 --             @?= Right (Zp [] [])
+    , testCase "unexpected"
+        $ bimap null id (fmap getDg
+            $ dgParse [ (1, [((1, 1), Return)]) ])
+        @?= Left False
+    , testCase "gap"
+        $ simpleResult (fmap getDg
+            $ dgParse
+                [ (1, [((1, 1), VLine)])
+                , (2, [((1, 1), Node), ((2, 2), HLine), ((4, 4), HLine)])
+                ])
+        @?= Left False
+    , testCase "testN01"
+        $ simpleResult (parse testN01)
+        @?= Left False
     ]
     where
-    
+
     dgParse = applyDgp test002' . mkDgZp
     getDg = dgTrim.psStr.snd
     fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
+
+--     fullyConsumed' tk
+--         = getDg <$> (either (id) (dgParse) (preproc4'' tk))
+--         @?= Right (Zp [] [])
+
+    fullyConsumed' tk = parse tk @?= Right (Zp [] [])
+
+    parse = preproc5'' >=> dgParse >=> return.getDg
     
     Right t00 = test00_tokenized
-    Right t01 = test01_tokenized
+--     Right t01 = test01_tokenized
     Right t04 = test04_tokenized
     Right t05 = test05_tokenized
     Right t07 = test07_tokenized
@@ -176,7 +202,7 @@ ladderTests = testGroup "Ladder parser"
 
 test00_tokenized = preproc4'' test00
 
-test01_tokenized = preproc4'' test01
+-- test01_tokenized = preproc4'' test01
 test04_tokenized = preproc4'' test04
 test05_tokenized = preproc4'' test05
 test07_tokenized = preproc4'' test07
@@ -244,6 +270,14 @@ test07a =
 
     |    %QX0
     +--+--( )--
+    |                          |]
+
+testN01 =
+    [text|
+    (* --- test N01 --- *)
+
+    |    %QX0
+    +-- --( )--
     |                          |]
 
 --------------------------------------------------------------------------------
