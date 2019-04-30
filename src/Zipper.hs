@@ -46,10 +46,10 @@ zpLength (Zp l r) = length l + length r
 zpNull :: Zp a -> Bool
 zpNull = (<=0) . zpLength
 
--- |Bring something into focus
-foc :: Zp a -> Zp a
-foc (Zp (x:xs) []) = Zp xs [x]
-foc zp = zp
+-- |Bring something into focus (cursed)
+focus :: Zp a -> Zp a
+focus (Zp (x:xs) []) = Zp xs [x]
+focus zp = zp
 
 tip :: Zp a -> Maybe a
 tip (Zp _ (x:_)) = Just x
@@ -96,40 +96,62 @@ type DgExt = (Int, (Int, Int))
 dgLength :: Dg a -> Int
 dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 
+--------------------------------------------------------------------------------
+
+newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
+
 -- type DgPSt = (Next, Dg Tok)
 data DgPSt = DgPSt
-	{ psNext :: Next
-	, psStr :: Dg (Tok Text)
-	, psLastBite :: Maybe DgExt -- ^position of last token eaten
-	}
+    { psNext :: Next
+    , psStr :: Dg (Tok Text)
+    , psLastBite :: Maybe DgExt -- ^position of last token eaten
+    , psFocused :: Bool
+    }
+
+instance Functor DgP where
+    fmap = ap . return
+
+instance Applicative DgP where
+    pure = return
+    (<*>) = ap
+
+instance Monad DgP where
+    return a = DgP $ \s -> return (a, s)
+    a >>= b = DgP $ \s -> do
+        (y, s') <- dgp a s
+        dgp (b y) s'
+
+instance MonadFail DgP where
+    fail = DgP . const . Left
+
+instance Alternative DgP where
+    empty = DgP $ const $ Left "alt empty"
+    a <|> b = DgP $ \s -> dgp a s <|> dgp b s
+
+--------------------------------------------------------------------------------
+
+--move in some direction from provided origin
+type Next = (Int, (Int, Int)) -> Dg (Tok Text) -> Either String (Dg (Tok Text))
+
+move_ :: Int -> Int -> Dg a -> Either String (Dg a)
+move_ ln co dg = maybe (Left here) return (move ln co dg)
+-- move_ ln co dg = maybe (Left here) return (moveNotCursed ln co dg)
+
+--FIXME should move only to direct neigbour
+-- (by using single step to exact position it probably works already)
+goRight, goDown, goUp, goLeft :: Next
+goRight (ln, (_, co)) = move_ ln (co+1)
+goDown (ln, (co, _)) = move_ (ln+1) co
+goUp (ln, (co, _)) = move_ (ln-1) co
+goLeft (ln, (co, _)) = move_ ln (co-1)
+
+--------------------------------------------------------------------------------
 
 lastPos :: DgP DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
 
 applyDgp :: DgP a -> Dg (Tok Text) -> Either String (a, DgPSt)
-applyDgp p dg = dgp p (DgPSt goRight dg Nothing)
-
-newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
-
-instance Functor DgP where
-	fmap = ap . return
-
-instance Applicative DgP where
-	pure = return
-	(<*>) = ap
-
-instance Monad DgP where
-	return a = DgP $ \s -> return (a, s)
-	a >>= b = DgP $ \s -> do
-		(y, s') <- dgp a s
-		dgp (b y) s'
-
-instance MonadFail DgP where
-	fail = DgP . const . Left
-
-instance Alternative DgP where
-	empty = DgP $ const $ Left "alt empty"
-	a <|> b = DgP $ \s -> dgp a s <|> dgp b s
+applyDgp p dg = dgp p (DgPSt goRight dg Nothing True)
 
 get :: DgP DgPSt
 get = DgP $ \s -> return (s, s)
@@ -147,98 +169,63 @@ dgTrim (Zp l r) = Zp (filter (not.zpNull.snd) l) (filter (not.zpNull.snd) r)
 --------------------------------------------------------------------------------
 
 setDir :: Next -> DgP ()
-setDir f = modify $ \(DgPSt _ zp ps) -> DgPSt f zp ps
+setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc
 
 getDir :: DgP Next
 getDir = psNext <$> get
 
 step :: DgP ()
 step = do
-	origin <- currentPos
-	DgPSt f zp ps <- get
-	case f origin zp of
-		Right zp' -> put (DgPSt f zp' ps)
-		Left err -> fail here --or not?
+    origin <- currentPos
+    DgPSt f zp ps True <- get --if nothing is focused, currentPos makes no sense
+    case f origin zp of
+        Right zp' -> put (DgPSt f zp' ps True)
+        Left err -> fail here --or not?
 
 setPos :: (Int, (Int, b)) -> DgP ()
 setPos (ln, (co, _)) = do
-	DgPSt b zp ps <- get
-	Just zp' <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
-	put (DgPSt b zp' ps)
-
---move in some direction from provided origin
-type Next = (Int, (Int, Int)) -> Dg (Tok Text) -> Either String (Dg (Tok Text))
-
-move_ :: Int -> Int -> Dg a -> Either String (Dg a)
-move_ ln co dg = maybe (Left here) return (move ln co dg)
-
---FIXME should move only to direct neigbour
--- (by using single step to exact position it probably works already)
-goRight, goDown, goUp, goLeft :: Next
-goRight (ln, (_, co)) = move_ ln (co+1)
-goDown (ln, (co, _)) = move_ (ln+1) co
-goUp (ln, (co, _)) = move_ (ln-1) co
-goLeft (ln, (co, _)) = move_ ln (co-1)
+    DgPSt b zp ps _ <- get
+    Just zp' <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
+    put (DgPSt b zp' ps True)
 
 --------------------------------------------------------------------------------
 
 -- |Fail if input stream is not empty
 dgIsEmpty :: DgP ()
 dgIsEmpty
-	= (dgLength . psStr) <$> get
-	>>= \case
-		 0 -> return ()
-		 _ -> fail $ here ++ "not empty"
+    = (dgLength . psStr) <$> get
+    >>= \case
+        0 -> return ()
+        _ -> fail $ here ++ "not empty"
 
 labelOnTop :: DgP a -> DgP (Text, a)
 labelOnTop p = do
-	(ln, co) <- currentPos
-	x <- p
-	next <- currentPos
-	setPos (ln-1, co)
-	lbl <- name
-	setPos next
-	return (lbl, x)
+    (ln, co) <- currentPos
+    x <- p
+    next <- currentPos
+    setPos (ln-1, co)
+    lbl <- name
+    setPos next
+    return (lbl, x)
 
 labelOnTop' :: DgP a -> DgP (String, a)
 labelOnTop' p = bimap unpack id <$> labelOnTop p
-
---XXX beware setting direction
--- nameAbove :: DgP Text
--- nameAbove = do
--- 	pos@(ln, co) <- currentPos
--- 	setPos (ln-1, co)
--- 	lbl <- name
--- 	setPos pos
--- 	return lbl
 
 branch
 	:: ((Tok Text) -> Bool)
 	-> [(Next, DgP a)]
 	->  DgP [a]
 branch isFork branches = do
---  	dir0 <- psNext <$> get
-	origin <- currentPos
-	True <- isFork <$> peek_
--- 	traceShowM (here, "NODE!", origin) --, fmap (fmap (const ())) stuff)
-	stuff <- for branches $ \(dir, p) -> do
-		setDir dir
--- 		setPos origin
-
-		--XXX fail if there is nothing under/after node!
--- 		step <|> undefined --with dir
-
--- 		fmap Just p <|> return Nothing
--- 		p
-		(setPos origin *> step *> (Just <$> p))
-		<|> return Nothing --step fail if there's nothing in desired direction
-	setPos origin --eat `fork`
---  	setDir dir0 --restore direction, good for parsing boxes
-	eat' --FIXME set direction!!!!!!!!!!!!!
-
--- 	traceShowM (here, origin, fmap (fmap (const ())) stuff)
-	return $ catMaybes stuff
---	return stuff
+    origin <- currentPos
+    True <- isFork <$> peek_
+    stuff <- for branches $ \(dir, p) -> do
+        setDir dir
+        (setPos origin *> step *> (Just <$> p))
+        <|> return Nothing --step fail if there's nothing in desired direction
+    setPos origin --eat `fork`
+--     setDir dir0 --restore direction, good for parsing boxes
+    eat' --FIXME set direction!!!!!!!!!!!!!
+    return $ catMaybes stuff
 
 -- branch'
 -- 	:: ((Tok Text) -> Maybe b)
@@ -264,12 +251,9 @@ pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
 -- |Succeeds only when positioned on end of line
 eol :: DgP ()
 eol = do
--- 	p <- currentPosM
--- 	traceShowM (here, p)
-	psStr <$> get >>= \case
--- 		 Zp l ((_ln, Zp _ []) : _) -> return ()
-		 DgLineEnd -> return ()
-		 _ -> fail here
+    psStr <$> get >>= \case
+        DgLineEnd -> return ()
+        _ -> fail here
 
 colRight :: DgExt -> DgExt
 colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
@@ -280,13 +264,13 @@ colUnder (ln, (_, co)) = (ln + 1, (co, co))
 --------------------------------------------------------------------------------
 
 hline = do
-	HLine <- eat'
-	return ()
+    HLine <- eat'
+    return ()
 
 vline = do
-	VLine <- eat'
-	return ()
-	
+    VLine <- eat'
+    return ()
+
 --------------------------------------------------------------------------------
 
 --FIXME parse it with DgP's pos type and then fmap it to 'Pos'
@@ -532,20 +516,24 @@ box = do
 
 end :: DgP ()
 end = do
-	Nothing <- (peek . psStr) <$> get
-	return ()
+    Nothing <- (peek . psStr) <$> get
+    return ()
 
 eat' :: DgP (Tok Text)
 eat' = do
-	DgPSt nx dg ps <- get
-	case eat''' dg of
-		 Just (v, pos, dg') -> do
-			dg'' <- case nx pos dg' of
-				Right q -> return q
-				Left _err -> return dg' --nowhere to move
-			put (DgPSt nx dg'' (Just pos))
-			return v
-		 Nothing -> fail $ show (here, ps)
+    DgPSt nx dg ps True <- get
+    case eat''' dg of
+        Just (v, pos, dg') -> do
+--             dg'' <- case nx pos dg' of
+--                 Right q -> return q
+--                 Left _err -> return dg' --nowhere to move
+--             put (DgPSt nx dg'' (Just pos))
+            put $ case nx pos dg' of
+                Right q -> DgPSt nx q (Just pos) True
+                Left _err -> DgPSt nx dg' (Just pos) False --nowhere to move
+
+            return v
+        Nothing -> fail $ show (here, ps)
 
 currentPosM :: DgP (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
@@ -588,8 +576,11 @@ mkDgZp = Zp [] . fmap (fmap (Zp []))
 
 --------------------------------------------------------------------------------
 
+moveNotCursed :: Int -> Int -> Dg a -> Maybe (Dg a)
+moveNotCursed line col = moveToLine line >=> moveToCol col
+
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
-move line col = moveToLine line >=> moveToCol col
+move line col = (moveToLine line >=> moveToCol col) . focusDg
 
 pattern DgLine us ln zp ds = Zp us ((ln, zp) : ds)
 
@@ -613,11 +604,11 @@ moveToCol col (DgLine us ln zp ds) = reassemble <$> move2 (dir col . fst) zp
 	reassemble zp' = DgLine us ln zp' ds
 moveToCol _ _ = Nothing
 
-moveToLine :: Int -> Dg a -> Maybe (Dg a)
-moveToLine l zp = moveToLine' l (fmap (fmap foc) (foc zp))
+focusDg :: Dg a -> Dg a
+focusDg = fmap (fmap focus) . focus
 
-moveToLine' :: Int -> Dg a -> Maybe (Dg a)
-moveToLine' ln = move2 (compare ln . fst)
+moveToLine :: Int -> Dg a -> Maybe (Dg a)
+moveToLine ln = move2 (compare ln . fst)
 -- moveToLine' line zp@(Zp _ ( (ln, _) : _))
 -- 	| line >= ln = moveTo stepRight ((line==).fst) zp
 -- 	| otherwise = moveTo stepLeft ((line==).fst) zp

@@ -125,9 +125,9 @@ zipperTests = testGroup "Zipper"
     ,  testCase "move there and back" $
         (stepRight (zpFromList [1,2]) >>= stepLeft >>= tip) @=? Just 1
     ,  testCase "okay focus" $
-        tip (foc (Zp [2,1] [])) @=? Just 2
+        tip (focus (Zp [2,1] [])) @=? Just 2
     ,  testCase "nothing to focus to" $
-        tip (foc (zpFromList [])) @=? (Nothing :: Maybe ())
+        tip (focus (zpFromList [])) @=? (Nothing :: Maybe ())
     ]
 
 dgpTests = testGroup "Diagram parser"
@@ -174,10 +174,10 @@ ladderTests = testGroup "Ladder parser"
                 [ (1, [((1, 1), VLine)])
                 , (2, [((1, 1), Node), ((2, 2), HLine), ((4, 4), HLine)])
                 ])
-        @?= Left False
+        @?= Left True
     , testCase "testN01"
         $ simpleResult (parse testN01)
-        @?= Left False
+        @?= Left True
     ]
     where
 
@@ -276,7 +276,7 @@ testN01 =
     [text|
     (* --- test N01 --- *)
 
-    |    %QX0
+    |     a
     +-- --( )--
     |                          |]
 
