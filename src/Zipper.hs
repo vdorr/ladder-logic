@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
-	PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
-	LambdaCase, ScopedTypeVariables, ViewPatterns #-}
+    PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
+    LambdaCase, ScopedTypeVariables, ViewPatterns #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -32,7 +32,7 @@ import GHC.Exts
 --------------------------------------------------------------------------------
 
 data Zp a = Zp [a] [a]
-	deriving (Show, Functor, Eq) -- , Foldable)
+    deriving (Show, Functor, Eq) -- , Foldable)
 
 zpFromList :: [a] -> Zp a
 zpFromList = Zp []
@@ -69,19 +69,19 @@ stepRight _ = Nothing
 
 -- |Move to first element where predicate holds or fail
 moveTo
-	:: (Zp a -> Maybe (Zp a)) -- ^move function
-	-> (a -> Bool) -- ^predicate
-	-> Zp a
-	-> Maybe (Zp a)
+    :: (Zp a -> Maybe (Zp a)) -- ^move function
+    -> (a -> Bool) -- ^predicate
+    -> Zp a
+    -> Maybe (Zp a)
 moveTo move test zp@(ZpR l foc r) -- = undefined
-	| test foc = pure zp
-	| otherwise = move zp >>= moveTo move test
+    | test foc = pure zp
+    | otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
 
 move2 :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
 move2 f zp@(Zp _ (x : xs))
-	| LT == f x   = moveTo stepLeft  ((==EQ).f) zp
-	| otherwise   = moveTo stepRight ((==EQ).f) zp
+    | LT == f x   = moveTo stepLeft  ((==EQ).f) zp
+    | otherwise   = moveTo stepRight ((==EQ).f) zp
 move2 _ _ = Nothing
 
 --------------------------------------------------------------------------------
@@ -100,12 +100,12 @@ dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
--- type DgPSt = (Next, Dg Tok)
+-- |Parser state
 data DgPSt = DgPSt
-    { psNext :: Next
-    , psStr :: Dg (Tok Text)
+    { psNext :: Next -- ^select next token
+    , psStr :: Dg (Tok Text) -- ^input
     , psLastBite :: Maybe DgExt -- ^position of last token eaten
-    , psFocused :: Bool
+    , psFocused :: Bool -- ^current focus of zp is actual parser current token
     }
 
 instance Functor DgP where
@@ -130,7 +130,7 @@ instance Alternative DgP where
 
 --------------------------------------------------------------------------------
 
---move in some direction from provided origin
+-- |Move in some direction from provided origin
 type Next = (Int, (Int, Int)) -> Dg (Tok Text) -> Either String (Dg (Tok Text))
 
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
@@ -164,7 +164,8 @@ modify f = f <$> get >>= put
 
 -- |Drop empty lines
 dgTrim :: Dg a -> Dg a
-dgTrim (Zp l r) = Zp (filter (not.zpNull.snd) l) (filter (not.zpNull.snd) r)
+dgTrim (Zp l r) = Zp (trim l) (trim r)
+    where trim = filter (not.zpNull.snd)
 
 --------------------------------------------------------------------------------
 
@@ -212,38 +213,38 @@ labelOnTop' :: DgP a -> DgP (String, a)
 labelOnTop' p = bimap unpack id <$> labelOnTop p
 
 branch
-	:: ((Tok Text) -> Bool)
-	-> [(Next, DgP a)]
-	->  DgP [a]
+    :: ((Tok Text) -> Bool)
+    -> [(Next, DgP a)]
+    ->  DgP [a]
 branch isFork branches = do
     origin <- currentPos
-    True <- isFork <$> peek_
+    True <- isFork <$> peek
     stuff <- for branches $ \(dir, p) -> do
         setDir dir
         (setPos origin *> step *> (Just <$> p))
         <|> return Nothing --step fail if there's nothing in desired direction
     setPos origin --eat `fork`
 --     setDir dir0 --restore direction, good for parsing boxes
-    eat' --FIXME set direction!!!!!!!!!!!!!
+    eat --FIXME set direction!!!!!!!!!!!!!
     return $ catMaybes stuff
 
 -- branch'
--- 	:: ((Tok Text) -> Maybe b)
--- 	-> [(Next, DgP a)]
--- 	->  DgP (b, [a])
+--     :: ((Tok Text) -> Maybe b)
+--     -> [(Next, DgP a)]
+--     ->  DgP (b, [a])
 -- branch' isFork branches = do
--- 	origin <- currentPos
--- 	dir0 <- psNext <$> get
--- 	Just f <- isFork <$> peek_
--- 	stuff <- for branches $ \(dir, p) -> do
--- 		setDir dir
--- 		setPos origin
--- 		step --with dir
--- 		p
--- 	setPos origin --eat `fork`
--- 	setDir dir0 --restore direction, good for parsing boxes
--- 	eat'
--- 	return (f, stuff)
+--     origin <- currentPos
+--     dir0 <- psNext <$> get
+--     Just f <- isFork <$> peek_
+--     stuff <- for branches $ \(dir, p) -> do
+--         setDir dir
+--         setPos origin
+--         step --with dir
+--         p
+--     setPos origin --eat `fork`
+--     setDir dir0 --restore direction, good for parsing boxes
+--     eat
+--     return (f, stuff)
 
 -- |Matches diagram with nothing remaining on current line
 pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
@@ -264,11 +265,11 @@ colUnder (ln, (_, co)) = (ln + 1, (co, co))
 --------------------------------------------------------------------------------
 
 hline = do
-    HLine <- eat'
+    HLine <- eat
     return ()
 
 vline = do
-    VLine <- eat'
+    VLine <- eat
     return ()
 
 --------------------------------------------------------------------------------
@@ -279,7 +280,7 @@ currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
 
 extToPos :: DgExt -> Pos
 extToPos = (\(ln, co) -> Pos (co, ln)) . fmap fst
-	
+    
 toPos2 :: Cofree (Symbol_ String) DgExt -> Cofree (Symbol_ String) Pos
 toPos2 = fmap extToPos
 
@@ -309,20 +310,20 @@ coilType    : ...
 
 test002' :: DgP (Cofree (Symbol_ String) DgExt)
 test002'
-	= setDir goDown
-	*> ((:<) <$> currentPos <*> fmap Source vline'2)
-	<* dgIsEmpty
+    = setDir goDown
+    *> ((:<) <$> currentPos <*> fmap Source vline'2)
+    <* dgIsEmpty
 
 node2 :: DgP (Cofree (Symbol_ String) DgExt)
 node2 = (:<) <$> currentPos <*> (LadderParser.Node <$> node2')
 
 node2' :: DgP [Cofree (Symbol_ String) DgExt]
 node2'
-	= branch
-		(==Tokenizer.Node)
-		[ (goRight, hline'2) --currentPosM>>=traceShowM>>
-		, (goDown , vline'2)
-		]
+    = branch
+        (==Tokenizer.Node)
+        [ (goRight, hline'2) --currentPosM>>=traceShowM>>
+        , (goDown , vline'2)
+        ]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
 vline'2 :: DgP (Cofree (Symbol_ String) DgExt)
@@ -339,29 +340,29 @@ hline'2 = some hline2 *> (coil2 <|> contact2 <|> node2 <|> eol2) --TODO vline cr
 
 vline2 :: DgP ()
 vline2 = do
-	VLine <- eat'
-	return ()
+    VLine <- eat
+    return ()
 
 hline2 :: DgP () --TODO vline crossing
 hline2 = do
-	HLine <- eat'
-	return ()
+    HLine <- eat
+    return ()
 
 device :: DgP String -> DgP (Cofree (Symbol_ String) DgExt)
 device p = do
-	pos <- currentPos
-	(lbl, f) <- labelOnTop' p
-	(pos :<) <$> (Device f [lbl] <$> hline'2)
+    pos <- currentPos
+    (lbl, f) <- labelOnTop' p
+    (pos :<) <$> (Device f [lbl] <$> hline'2)
 
 coil2 :: DgP (Cofree (Symbol_ String) DgExt)
 coil2 = device $ do
-	Coil f <- eat'
-	return $ "(" ++ unpack f ++ ")"
+    Coil f <- eat
+    return $ "(" ++ unpack f ++ ")"
 
 contact2 :: DgP (Cofree (Symbol_ String) DgExt)
 contact2 = device $ do
-	Contact f <- eat'
-	return $ "[" ++ unpack f ++ "]"
+    Contact f <- eat
+    return $ "[" ++ unpack f ++ "]"
 
 --------------------------------------------------------------------------------
 
@@ -386,9 +387,9 @@ right  : name? '|' '0'?
 {-
 
 smallest possible box:
-	+-+
-	| |
-	+-+
+    +-+
+    | |
+    +-+
 
 clearance (example of incorrect box):
      |    // <--- reject!
@@ -399,130 +400,131 @@ clearance (example of incorrect box):
 -}
 
 node = do
-	Tokenizer.Node <- eat'
-	return ()
+    Tokenizer.Node <- eat
+    return ()
 
 edge
-	= eat' >>= \t -> case t of
-		REdge -> return t
-		FEdge -> return t
-		_ -> fail here
+    = eat >>= \t -> case t of
+        REdge -> return t
+        FEdge -> return t
+        _ -> fail here
 
 name = do
-	Name lbl <- eat'
-	return lbl
+    Name lbl <- eat
+    return lbl
 
 -- -- |parse left side of a box
 -- leftSide = do
--- 	--VLine, REdge, FEdge, Name, connections (HLine+Name)
--- 	some leftSideBrick
--- 	return ()
+--     --VLine, REdge, FEdge, Name, connections (HLine+Name)
+--     some leftSideBrick
+--     return ()
 -- 
 -- leftSideBrick = do
--- 	(ln, co) <- currentPos
--- -- 	vline <|> edge
--- 	branch
--- 		(\case
--- 			VLine -> True
--- 			REdge -> True
--- 			FEdge -> True
--- 			_ -> False)
--- 		[ (goLeft, hline *> name)
--- 		, (goRight, name)
--- 		]
--- 	setDir goDown --i guess branch should restore direction
-	
--- 	setPos (ln, co+1)
--- 	setDir goRight
+--     (ln, co) <- currentPos
+-- --     vline <|> edge
+--     branch
+--         (\case
+--             VLine -> True
+--             REdge -> True
+--             FEdge -> True
+--             _ -> False)
+--         [ (goLeft, hline *> name)
+--         , (goRight, name)
+--         ]
+--     setDir goDown --i guess branch should restore direction
+    
+--     setPos (ln, co+1)
+--     setDir goRight
 
 box001 :: Int -> DgP ()
 box001 ln = do
-	setPos (ln, (1, 1))
-	box
+    setPos (ln, (1, 1))
+    box
 
 -- portName :: Int -> DgP a -> DgP (Text, a)
 -- portName d p = do
--- 	(ln, co) <- currentPos
--- 	x <- p
--- 	next <- currentPos
--- 	setPos (ln, co+d)
--- 	lbl <- name
--- 	setPos next
--- 	return (lbl, x)
+--     (ln, co) <- currentPos
+--     x <- p
+--     next <- currentPos
+--     setPos (ln, co+d)
+--     lbl <- name
+--     setPos next
+--     return (lbl, x)
 
 lwall = vline <|> void edge
 
 -- negIn = do
--- 	NegIn <- eat'
--- 	return ()
-	
+--     NegIn <- eat
+--     return ()
+    
 --TODO check clearance
 box = do
--- 	(ln, (_, co)) <- currentPos
+--     (ln, (_, co)) <- currentPos
 
--- 	traceShowM (here, ln, co, "------------->")
--- 	Zp zpl zpr <- psStr <$> get
--- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+--     traceShowM (here, ln, co, "------------->")
+--     Zp zpl zpr <- psStr <$> get
+--     forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 
-	setDir goUp
--- 	VLine <- eat'
--- 	currentPosM >>= (traceShowM . (here, "left wall", ))
-	some lwall -- <|> negIn
--- 	currentPosM >>= (traceShowM . (here, "left top corner",))
-	setDir goRight
-	node
--- 	currentPosM >>= (traceShowM . (here,"top wall",))
-	hline
+    setDir goUp
+--     VLine <- eat
+--     currentPosM >>= (traceShowM . (here, "left wall", ))
+    some lwall -- <|> negIn
+--     currentPosM >>= (traceShowM . (here, "left top corner",))
+    setDir goRight
+    node
+--     currentPosM >>= (traceShowM . (here,"top wall",))
+    hline
 
-	setDir goDown --parsing right side, look for output line position
--- 	currentPosM >>= (traceShowM . (here,"right top corner",))
-	node
+    setDir goDown --parsing right side, look for output line position
+--     currentPosM >>= (traceShowM . (here,"right top corner",))
+    node
 
--- 	currentPosM >>= (traceShowM . (here,"right wall",))
-	--TODO parse box instance name
-	some $ do
--- 		(ln, co) <- currentPos
-		vline
--- 		setPos (ln, co+1)
--- 		??? peek & record position
+--     currentPosM >>= (traceShowM . (here,"right wall",))
+    --TODO parse box instance name
+    some $ do
+--         (ln, co) <- currentPos
+        vline
+--         setPos (ln, co+1)
+--         ??? peek & record position
 
--- 	currentPosM >>= (traceShowM . (here,"bottom right corner",))
-	setDir goLeft
-	node
+--     currentPosM >>= (traceShowM . (here,"bottom right corner",))
+    setDir goLeft
+    node
 
--- 	currentPosM >>= (traceShowM . (here,"bottom wall",))
+--     currentPosM >>= (traceShowM . (here,"bottom wall",))
 
--- 	Zp zpl zpr <- psStr <$> get
--- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+--     Zp zpl zpr <- psStr <$> get
+--     forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 
 
-	hline
-	
-	
--- 	currentPosM >>= (traceShowM . (here,))
--- 	Zp zpl zpr <- psStr <$> get
--- 	forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+    hline
+    
+    
+--     currentPosM >>= (traceShowM . (here,))
+--     Zp zpl zpr <- psStr <$> get
+--     forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
 
--- 	currentPosM >>= (traceShowM . (here,"bottom left corner",))
-	setDir goUp
-	node
+--     currentPosM >>= (traceShowM . (here,"bottom left corner",))
+    setDir goUp
+    node
 
--- 	currentPosM >>= (traceShowM . (here,"remaining left wall",))
-	many lwall --0 or more
+--     currentPosM >>= (traceShowM . (here,"remaining left wall",))
+    many lwall --0 or more
 
-	return ()
+    return ()
 
 --------------------------------------------------------------------------------
 
+-- |Succeeds FIXME FIXME i am not sure when
 end :: DgP ()
 end = do
-    Nothing <- (peek . psStr) <$> get
+    Nothing <- (cursor . psStr) <$> get
     return ()
 
-eat' :: DgP (Tok Text)
-eat' = do
+eat :: DgP (Tok Text)
+eat = do
     DgPSt nx dg ps True <- get
-    case eat''' dg of
+    case dgPop dg of
         Just (v, pos, dg') -> do
 --             dg'' <- case nx pos dg' of
 --                 Right q -> return q
@@ -540,35 +542,35 @@ currentPosM = (pos . psStr) <$> get
 
 currentPos :: DgP DgExt --(Int, (Int, Int))
 currentPos = do
-	Just p <- (pos . psStr) <$> get
-	return p
--- 	maybe (fail "empty") (return . (,zp)) (pos zp)
+    Just p <- (pos . psStr) <$> get
+    return p
 
-peek_ :: DgP (Tok Text)
-peek_ = do
-	Just p <- (peek . psStr) <$> get
-	return p
+peek :: DgP (Tok Text)
+peek = do
+    Just p <- (cursor . psStr) <$> get
+    return p
 
 --------------------------------------------------------------------------------
 
-eat''' :: Dg a -> Maybe (a, DgExt, Dg a)
-eat''' (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
-	= Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
-eat''' _ = Nothing
+-- |Pop focused item, its extent and updated zipper
+dgPop :: Dg a -> Maybe (a, DgExt, Dg a)
+dgPop (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
+    = Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
+dgPop _ = Nothing
 
-pattern DgH x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
+pattern DgFocused x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 -- pattern DgH' ln cl x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
 --pattern DgM = (Zp u ((ln, Zp l ((_, x) : rs)) : ds))
 
-peek :: Dg a -> Maybe a
-peek (DgH x) = Just x
-peek _ = Nothing
+cursor :: Dg a -> Maybe a
+cursor (DgFocused x) = Just x
+cursor _ = Nothing
 
 -- |Match on current token position
-pattern DgPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
+pattern DgFocusedPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 
 pos :: Dg a -> Maybe (Int, (Int, Int))
-pos (DgPos ln cl cr) = Just (ln, (cl, cr))
+pos (DgFocusedPos ln cl cr) = Just (ln, (cl, cr))
 pos _ = Nothing
 
 mkDgZp :: [(Int, [((Int, Int), (Tok Text))])] -> Dg (Tok Text)
@@ -588,20 +590,20 @@ pattern DgLine us ln zp ds = Zp us ((ln, zp) : ds)
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
 -- moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
 -- moveToCol col (DgLine us ln zp@(Zp l (((cl, cr), _) : _)) ds)
--- 	| col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
--- 	| otherwise = reassemble <$> moveTo stepLeft (isIn . fst) zp
--- 	where
--- 	isIn (a, b) = b >= col && a <= col
--- -- 	reassemble zp' = Zp us ((ln, zp') : ds)
--- 	reassemble zp' = DgLine us ln zp' ds
+--     | col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
+--     | otherwise = reassemble <$> moveTo stepLeft (isIn . fst) zp
+--     where
+--     isIn (a, b) = b >= col && a <= col
+-- --     reassemble zp' = Zp us ((ln, zp') : ds)
+--     reassemble zp' = DgLine us ln zp' ds
 -- moveToCol _ _ = Nothing
 moveToCol col (DgLine us ln zp ds) = reassemble <$> move2 (dir col . fst) zp
-	where
-	dir x (a, b)
-		| x < a = LT
-		| x > b = GT
-		| otherwise = EQ
-	reassemble zp' = DgLine us ln zp' ds
+    where
+    dir x (a, b)
+        | x < a = LT
+        | x > b = GT
+        | otherwise = EQ
+    reassemble zp' = DgLine us ln zp' ds
 moveToCol _ _ = Nothing
 
 focusDg :: Dg a -> Dg a
@@ -610,8 +612,8 @@ focusDg = fmap (fmap focus) . focus
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
 moveToLine ln = move2 (compare ln . fst)
 -- moveToLine' line zp@(Zp _ ( (ln, _) : _))
--- 	| line >= ln = moveTo stepRight ((line==).fst) zp
--- 	| otherwise = moveTo stepLeft ((line==).fst) zp
+--     | line >= ln = moveTo stepRight ((line==).fst) zp
+--     | otherwise = moveTo stepLeft ((line==).fst) zp
 -- moveToLine' _ _ = Nothing
 
 --------------------------------------------------------------------------------
