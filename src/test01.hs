@@ -66,16 +66,19 @@ import LadderParser
 
 --------------------------------------------------------------------------------
 
-data D = R Int | M String
-    deriving Show
+data D
+    = R Int
+    | M String
+    | DD -- dummy
+    deriving (Show, Eq, Ord)
 
 -- data E = Op String [E] | Data D | C Bool
 --     deriving Show
 
-data E = Op String [D] -- and, or, ld #true, ...
+data E = Op String [D] -- and, or, ld #on, ...
     deriving Show
 
-fffff (p :< Source a) =  ffff ([], ["$0 = #on"], 1) 0 p a
+fffff (p :< Source a) =  ffff ([], [(R 0, Op "ld #on" [])], 1) 0 p a
 fffff _ = error here
 
 ffff (st, op, cnt) r src (p :< x) = f x
@@ -90,7 +93,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
         ( st
         , op ++ case lookup p st of
                      Nothing -> []
-                     Just rr -> [ "$" ++ show rr ++ " |= $" ++ show r ]
+                     Just rr -> [ (R rr, Op "ld" [R r]) ]
         , cnt
         )
 
@@ -117,7 +120,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
 
     f (Jump s) =
 --         print (here, "Jump", r)
-        (st, op ++ ["jump to " ++ s], cnt)
+        (st, op ++ [(DD, Op ("jump to " ++ s) [])], cnt) --XXX XXX beware wires crossing jump point
     f (Node la) =
 --         print (here, "Node", r, ">>", p)
 --         doNode (st ++ [(p, ("node", r))], op) la
@@ -128,12 +131,40 @@ ffff (st, op, cnt) r src (p :< x) = f x
         let st'' = ffff st' r p x'
             in doNode st'' xs
 
-    getop rr rrr "[ ]" [n] = ["$" ++ show rrr ++ " = $" ++ show rr ++ " and " ++ n]
+    getop rr rrr "[ ]" [n] = [(R rrr, Op "and" [ R rr, M n])]
     getop rr rrr "( )" [n]
-        = [n ++ " = $" ++ show rr, "$" ++ show rrr ++ " = $" ++ show rr]
+        = [(M n, Op "ld" [R rr]), (R rrr, Op "ld" [R rr])]
     getop rr _ s n = error $ show (here, s, n)
 
 --------------------------------------------------------------------------------
+
+{-
+--multiple assignments to same register are or-ed
+--later --wires can cross JUMP, but power flow is strictly top->down
+-}
+
+or'd :: [(D, [a])] -> [(D, a)] -> [(D, [a])]
+or'd out ((r@R{}, x) : xs)
+    | Zp l ((d, a) : rs) <- zpLookup r (zpFromList out)
+                       = or'd (zpToList (Zp l ((d, a ++ [x]) : rs))) xs
+    | otherwise        = or'd ((r, [x]) : out) xs
+or'd out ((d, x) : xs) = or'd ((d, [x]) : out) xs
+or'd out []            = reverse out
+
+-- FIXME later tsort :: [(D, [a])] -> Maybe [(D, [a])]
+tsort :: [Int] -> [(D, [E])] -> [(D, [E])]
+tsort _ [] = []
+tsort ks xs = yes ++ tsort (ks ++ concatMap (getRegN . fst) yes) no
+    where
+    (yes, no) = partition (all test . snd) xs
+
+    test (Op _ a) = all isIn a
+
+    isIn (R n) = elem n ks
+    isIn _     = True
+
+    getRegN (R n) = [n]
+    getRegN _     = []
 
 testAst ast = do
 --     print (here, ast)
@@ -143,21 +174,14 @@ testAst ast = do
 --     for_ w print
 --     print (here)
 
-
     let (st, op, cnt) = fffff ast
     print (here, cnt, "-----------------------")
     for_ st print
     print (here, "-----------------------")
     for_ op print
+    print (here, "-----------------------")
+    for_ (tsort [] $ or'd [] op) print
     print (here)
-
---------------------------------------------------------------------------------
-
--- data Q a = Q String a
--- instance Show a => Show (Q a) where
---     show (Q i a) = i ++ "\n" ++ show a
-
--- printAst i (a :< f) = do
 
 --------------------------------------------------------------------------------
 

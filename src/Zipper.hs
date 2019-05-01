@@ -44,7 +44,9 @@ zpLength :: Zp a -> Int
 zpLength (Zp l r) = length l + length r
 
 zpNull :: Zp a -> Bool
-zpNull = (<=0) . zpLength
+-- zpNull = (<=0) . zpLength
+zpNull (Zp [] []) = True
+zpNull _          = False
 
 -- |Bring something into focus (cursed)
 focus :: Zp a -> Zp a
@@ -54,6 +56,23 @@ focus zp = zp
 tip :: Zp a -> Maybe a
 tip (Zp _ (x:_)) = Just x
 tip _ =  Nothing
+
+zpLookup :: Eq k => k -> Zp (k, v) -> Zp (k, v)
+zpLookup needle (Zp l r@(c@(k, _) : rs))
+    | needle == k   = Zp l r
+    | otherwise     = zpLookup needle (Zp (c : l) rs)
+zpLookup _ haystack = haystack
+
+-- zpInsert :: a -> Zp a -> Zp a
+-- zpInsert x (Zp l r) = Zp l (x : r)
+-- 
+-- zpInsertAfter :: a -> Zp a -> Zp a
+-- zpInsertAfter x (Zp l (r : rs)) = Zp (r : l) (x : rs)
+-- zpInsertAfter x (Zp l []) = Zp l [x]
+-- 
+-- -- |Append item and focus on it
+-- zpAppend :: a -> Zp a -> Zp a
+-- zpAppend x (Zp l r) = Zp (reverse r ++ l) [x]
 
 pattern ZpR' x <- Zp _ (x : _)
 pattern ZpR l f r = Zp l (f : r)
