@@ -100,6 +100,14 @@ ff st r src (p :< x) = do
 --         st'' <- ffff st' r p x'
 --         doNode st'' xs
 
+--------------------------------------------------------------------------------
+
+data D = R Int | M String
+    deriving Show
+
+data E = Op String [E] | Data D | C Bool
+    deriving Show
+
 fffff (p :< Source a) =  ffff ([], ["$0 = #on"], 1) 0 p a
 fffff _ = error here
 
@@ -115,7 +123,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
         ( st
         , op ++ case lookup p st of
                      Nothing -> []
-                     Just rr -> [ "$" ++ show rr ++ " |= $" ++ show r ++ ";" ]
+                     Just rr -> [ "$" ++ show rr ++ " |= $" ++ show r ]
         , cnt
         )
 
@@ -136,7 +144,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
 --         print (here, "Device", n, r)
         ffff
             (st
-            , op ++ [getop r cnt s n]
+            , op ++ getop r cnt s n
             , cnt + 1) (cnt) p a
 
 
@@ -153,13 +161,15 @@ ffff (st, op, cnt) r src (p :< x) = f x
         let st'' = ffff st' r p x'
             in doNode st'' xs
 
-    getop rr rrr "[ ]" [n] = "$" ++ show rrr ++ " = $"++ show rr ++" and " ++ n ++ ""
+    getop rr rrr "[ ]" [n] = ["$" ++ show rrr ++ " = $" ++ show rr ++ " and " ++ n]
     getop rr rrr "( )" [n]
-        = n ++ " = $" ++ show rr ++ "; $" ++ show rrr ++ " = $" ++ show rr
+        = [n ++ " = $" ++ show rr, "$" ++ show rrr ++ " = $" ++ show rr]
     getop rr _ s n = error $ show (here, s, n)
 
+--------------------------------------------------------------------------------
+
 testAst ast = do
-    print (here, ast)
+--     print (here, ast)
 --     ff (-1,(-1,-1)) ast
 --     w <- (reverse . nub) <$> fff ast
 --     print (here, "-----------------------")
@@ -173,6 +183,14 @@ testAst ast = do
     print (here, "-----------------------")
     for_ op print
     print (here)
+
+--------------------------------------------------------------------------------
+
+-- data Q a = Q String a
+-- instance Show a => Show (Q a) where
+--     show (Q i a) = i ++ "\n" ++ show a
+
+-- printAst i (a :< f) = do
 
 --------------------------------------------------------------------------------
 
@@ -209,6 +227,10 @@ main = do
 --                     for_ zpr $ \q -> print (here, q)
 
                     print (here, "--------------------------------------------------")
+                    print (here, ast)
+--                     print (here)
+--                     printAst 0 ast
+                    TIO.putStrLn src
                     testAst ast
                     print (here, "--------------------------------------------------")
 

@@ -68,7 +68,9 @@ k ('(' : s)
 k ('%' : s)
 -}
 
--- chop by labels, does not look for labels floting among logic, that is left to parser
+-- chop by network labels
+-- does not look for labels floating among logic, that is left to parser
+-- produced list of (labeled) networks
 basicBlocks
     :: [[Tok a]]
     -> [(Maybe a, [[Tok a]])]
@@ -94,7 +96,7 @@ data Tok a
     = Node           -- +
     | VLine          -- |
 --sole thing that occupy whole line
-    | Label' a       -- "LABEL:"
+    | Label' a       -- network label "LABEL:"
 --horizontal things
     | HLine          -- Int --repetitions
     | REdge          -- as block input "--->"
