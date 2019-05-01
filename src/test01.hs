@@ -31,43 +31,7 @@ import LadderParser
 -- Label s a
 -- Node la
 
-fff (p :< Source a) = do
-    ff [] 0 p a
-fff _ = fail here
-
-ff st r src (p :< x) = do
-    case x of
---         Source a -> do
---             print (here, "Source", src)
---             ff p a
-        Source a -> undefined
-        Sink -> do --end of hline, may lead to 'Node'
-            print (here, "Sink", r, ">>", p, lookup p st)
-            return $ st ++ [(p, ("Sink", r))]
-
-        End -> do --end of vertical line
---should really appear only once at end of left power rail
---should test this (exactly one End in rung)
-            print (here, "End", r, p, lookup p st)
-            return st
-
-        Device s [n] a -> do
-            print (here, "Device", n, r)
-            ff st (r+1) p a
-
-        Jump s -> do
-            print (here, "Jump", r)
-            return st
-        Label s a -> undefined
-        Node la -> do
-            print (here, "Node", r, ">>", p)
-            doNode (st ++ [(p, ("node", r))]) la
-    where
-    doNode st' [] = return st'
-    doNode st' (x' : xs) = do
-        st'' <- ff st' r p x'
-        doNode st'' xs
-
+--------------------------------------------------------------------------------
 
 -- ffff (st, op) r src (p :< x) = f x
 --     where
@@ -105,7 +69,10 @@ ff st r src (p :< x) = do
 data D = R Int | M String
     deriving Show
 
-data E = Op String [E] | Data D | C Bool
+-- data E = Op String [E] | Data D | C Bool
+--     deriving Show
+
+data E = Op String [D] -- and, or, ld #true, ...
     deriving Show
 
 fffff (p :< Source a) =  ffff ([], ["$0 = #on"], 1) 0 p a
