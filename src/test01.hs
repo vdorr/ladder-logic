@@ -75,21 +75,24 @@ data D
 -- data E = Op String [E] | Data D | C Bool
 --     deriving Show
 
-data E = Op String [D] -- and, or, ld #on, ...
+data E op = Op op [D] -- and, or, ld #on, ...
     deriving Show
+
+data Op dst = And | AndN | St | StN | StOn | StOff | Jmp dst
+    -- | FB String [(String, D)] [(String, D)]
 
 fffff (p :< Source a) =  ffff ([], [(R 0, Op "ld #on" [])], 1) 0 p a
 fffff _ = error here
+-- fffff x@(_ :< Source _) =  ffff ([], [], 0) 0 p a
+-- fffff _ = error here
 
 ffff (st, op, cnt) r src (p :< x) = f x
     where
-    f (Source a) = undefined --should not happen
     f (Label s a) = undefined --should not happen
+    f (Source a) = undefined --should not happen
+--     f (Source a) = ffff (st, op <> [(R r, Op "ld #on" [])], cnt + 1) (cnt + 1) p a
 
     f  Sink = --end of hline, may lead to 'Node'
---         print (here, "Sink", r, ">>", p, lookup p st)
-
---         ( st ++ [(p, ("Sink", r))]
         ( st
         , op ++ case lookup p st of
                      Nothing -> []
@@ -100,30 +103,16 @@ ffff (st, op, cnt) r src (p :< x) = f x
     f  End = --end of vertical line
 --should really appear only once at end of left power rail
 --should test this (exactly one End in rung)
---         print (here, "End", r, p, lookup p st)
---         (st, op)
-        ( st
-        , op 
---             ++ case lookup p st of
---                      Nothing -> []
---                      Just rr -> [ "$" ++ show rr ++ " |= $" ++ show r ++ ";" ]
-        , cnt
-        )
+        (st, op, cnt)
 
     f (Device s n a) =
---         print (here, "Device", n, r)
         ffff
             (st
             , op ++ getop r cnt s n
-            , cnt + 1) (cnt) p a
-
-
+            , cnt + 1) cnt p a
     f (Jump s) =
---         print (here, "Jump", r)
         (st, op ++ [(DD, Op ("jump to " ++ s) [])], cnt) --XXX XXX beware wires crossing jump point
     f (Node la) =
---         print (here, "Node", r, ">>", p)
---         doNode (st ++ [(p, ("node", r))], op) la
         doNode (st ++ [(p, r)], op, cnt) la
 
     doNode st' [] = st'
@@ -151,12 +140,13 @@ or'd out ((r@R{}, x) : xs)
 or'd out ((d, x) : xs) = or'd ((d, [x]) : out) xs
 or'd out []            = reverse out
 
--- FIXME later tsort :: [(D, [a])] -> Maybe [(D, [a])]
-tsort :: [Int] -> [(D, [E])] -> [(D, [E])]
-tsort _ [] = []
-tsort ks xs = yes ++ tsort (ks ++ concatMap (getRegN . fst) yes) no
+--make tail recursive?
+tsort :: [Int] -> [(D, [E op])] -> Maybe [(D, [E op])]
+tsort _ [] = return []
+tsort ks xs = do
+    (yes@(_ : _), no) <- return $ partition (all test . snd) xs
+    (yes ++) <$> tsort (ks ++ foldMap (getRegN . fst) yes) no
     where
-    (yes, no) = partition (all test . snd) xs
 
     test (Op _ a) = all isIn a
 
@@ -165,6 +155,7 @@ tsort ks xs = yes ++ tsort (ks ++ concatMap (getRegN . fst) yes) no
 
     getRegN (R n) = [n]
     getRegN _     = []
+
 
 testAst ast = do
 --     print (here, ast)
@@ -180,7 +171,8 @@ testAst ast = do
     print (here, "-----------------------")
     for_ op print
     print (here, "-----------------------")
-    for_ (tsort [] $ or'd [] op) print
+    Just w <- return $ tsort [] $ or'd [] op
+    for_ (w) print
     print (here)
 
 --------------------------------------------------------------------------------
@@ -193,20 +185,12 @@ main = do
         Left err -> TIO.putStrLn err
         Right x -> do
 --             print $ stripPos x
-            let zp@(Zp zpl zpr) = mkDgZp x
+            let zp = mkDgZp x
 
 --             print (here, zp)
 --             for_ zpl $ \q -> print (here, q)
 --             for_ zpr $ \q -> print (here, q)
-            forM_ (reverse zpl ++ zpr) $ \q -> print (here, q)
-
---             print (here, "--------------------------------------------------")
---             case applyDgp test001 zp of
---                 Right (_, (DgPSt _ c@(Zp zpl zpr) _)) -> do
--- --                     print (here, a, c)
---                     for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
--- --                     for_ zpr $ \q -> print (here, q)
---                 Left err -> print (here, err)
+            forM_ (zpToList zp) (print . (here,))
 
             print (here, "--------------------------------------------------")
 

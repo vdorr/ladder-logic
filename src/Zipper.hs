@@ -51,11 +51,11 @@ zpNull _          = False
 -- |Bring something into focus (cursed)
 focus :: Zp a -> Zp a
 focus (Zp (x:xs) []) = Zp xs [x]
-focus zp = zp
+focus zp             = zp
 
 tip :: Zp a -> Maybe a
 tip (Zp _ (x:_)) = Just x
-tip _ =  Nothing
+tip _            =  Nothing
 
 zpLookup :: Eq k => k -> Zp (k, v) -> Zp (k, v)
 zpLookup needle (Zp l r@(c@(k, _) : rs))
@@ -80,11 +80,11 @@ pattern ZpL l f r = Zp (f : l) r
 
 stepLeft :: Zp a -> Maybe (Zp a)
 stepLeft (ZpL l foc r) = Just (ZpR l foc r)
-stepLeft _ = Nothing
+stepLeft _             = Nothing
 
 stepRight :: Zp a -> Maybe (Zp a)
 stepRight (ZpR l foc r) = Just (ZpL l foc r)
-stepRight _ = Nothing
+stepRight _             = Nothing
 
 -- |Move to first element where predicate holds or fail
 moveTo
@@ -93,7 +93,7 @@ moveTo
     -> Zp a
     -> Maybe (Zp a)
 moveTo move test zp@(ZpR l foc r) -- = undefined
-    | test foc = pure zp
+    | test foc  = pure zp
     | otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing
 
@@ -114,6 +114,14 @@ type DgExt = (Int, (Int, Int))
 -- |Returns number of remaining tokens
 dgLength :: Dg a -> Int
 dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
+
+dgNull :: Dg a -> Bool
+dgNull = (>0) . dgLength --FIXME
+
+-- |Drop empty lines
+dgTrim :: Dg a -> Dg a
+dgTrim (Zp l r) = Zp (trim l) (trim r)
+    where trim = filter (not . zpNull . snd)
 
 --------------------------------------------------------------------------------
 
@@ -181,13 +189,6 @@ put s = DgP $ \_ -> return ((), s)
 modify :: (DgPSt -> DgPSt) -> DgP ()
 modify f = f <$> get >>= put
 
--- |Drop empty lines
-dgTrim :: Dg a -> Dg a
-dgTrim (Zp l r) = Zp (trim l) (trim r)
-    where trim = filter (not.zpNull.snd)
-
---------------------------------------------------------------------------------
-
 setDir :: Next -> DgP ()
 setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc
 
@@ -213,10 +214,12 @@ setPos (ln, (co, _)) = do
 -- |Fail if input stream is not empty
 dgIsEmpty :: DgP ()
 dgIsEmpty
-    = (dgLength . psStr) <$> get
-    >>= \case
-        0 -> return ()
-        _ -> fail $ here ++ "not empty"
+--     = (dgLength . psStr) <$> get
+--     >>= \case
+--         0 -> return ()
+--         _ -> fail $ here ++ "not empty"
+    =   (dgNull . psStr) <$> get
+    >>= flip when (fail $ here ++ "not empty")
 
 labelOnTop :: DgP a -> DgP (Text, a)
 labelOnTop p = do
@@ -230,6 +233,14 @@ labelOnTop p = do
 
 labelOnTop' :: DgP a -> DgP (String, a)
 labelOnTop' p = bimap unpack id <$> labelOnTop p
+
+{-
+   |
+   +-------
+   |\
+   | *-------
+  
+-}
 
 branch
     :: ((Tok Text) -> Bool)
@@ -583,14 +594,14 @@ pattern DgFocused x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 
 cursor :: Dg a -> Maybe a
 cursor (DgFocused x) = Just x
-cursor _ = Nothing
+cursor _             = Nothing
 
 -- |Match on current token position
 pattern DgFocusedPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
 
 pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgFocusedPos ln cl cr) = Just (ln, (cl, cr))
-pos _ = Nothing
+pos _                       = Nothing
 
 mkDgZp :: [(Int, [((Int, Int), (Tok Text))])] -> Dg (Tok Text)
 mkDgZp = Zp [] . fmap (fmap (Zp []))

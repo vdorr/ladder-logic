@@ -169,11 +169,10 @@ ladderTests = testGroup "Ladder parser"
             $ dgParse [ (1, [((1, 1), Return)]) ])
         @?= Left False
     , testCase "gap"
-        $ simpleResult (fmap getDg
-            $ dgParse
-                [ (1, [((1, 1), VLine)])
-                , (2, [((1, 1), Node), ((2, 2), HLine), ((4, 4), HLine)])
-                ])
+        $ simpleResult (fmap getDg $ dgParse
+            [ (1, [((1, 1), VLine)])
+            , (2, [((1, 1), Node), ((2, 2), HLine), ((4, 4), HLine)])
+            ])
         @?= Left True
     , testCase "testN01"
         $ simpleResult (parse testN01)
