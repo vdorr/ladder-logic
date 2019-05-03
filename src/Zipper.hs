@@ -129,7 +129,7 @@ newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
 -- |Parser state
 data DgPSt = DgPSt
-    { psNext :: Next -- ^select next token
+    { psNext :: MoveToNext (Tok Text) -- ^select next token
     , psStr :: Dg (Tok Text) -- ^input
     , psLastBite :: Maybe DgExt -- ^position of last token eaten
     , psFocused :: Bool -- ^current focus of zp is actual parser current token
@@ -158,7 +158,8 @@ instance Alternative DgP where
 --------------------------------------------------------------------------------
 
 -- |Move in some direction from provided origin
-type Next = (Int, (Int, Int)) -> Dg (Tok Text) -> Either String (Dg (Tok Text))
+type MoveToNext tok = (Int, (Int, Int)) -> Dg tok -> Either String (Dg tok)
+type Next = MoveToNext (Tok Text)
 
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
 move_ ln co dg = maybe (Left here) return (move ln co dg)
