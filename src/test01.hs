@@ -68,7 +68,7 @@ import LadderParser
 
 data D
     = R Int
-    | M String
+--     | M String
     | DD -- dummy
     deriving (Show, Eq, Ord)
 
@@ -78,12 +78,14 @@ data D
 data E op = Op op [D] -- and, or, ld #on, ...
     deriving Show
 
-data Op dst
-    = And
-    | AndN
+data Op n
+    = And n -- wire out <- wire in and memory cell
+--     | AndN
     | Ld -- ^ set wire state same as argument
     | LdOn -- ^ set wire state to #on
-    | St | StN | StOn | StOff | Jmp dst
+    | St n
+--     | StN | StOn | StOff
+    | Jmp n
     -- | FB String [(String, D)] [(String, D)]
     deriving Show
 
@@ -100,7 +102,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
 
     f  Sink = --end of hline, may lead to 'Node'
         ( st
-        , op ++ case lookup p st of
+        , op <> case lookup p st of
                      Nothing -> []
                      Just rr -> [ (R rr, Op Ld [R r]) ]
         , cnt
@@ -114,22 +116,30 @@ ffff (st, op, cnt) r src (p :< x) = f x
     f (Device s n a) =
         ffff
             (st
-            , op ++ getop r cnt s n
+            , op <> getop r cnt s n
             , cnt + 1) cnt p a
     f (Jump s) =
-        (st, op ++ [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
+        (st, op <> [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
     f (Node la) =
-        doNode (st ++ [(p, r)], op, cnt) la
+        doNode (st <> [(p, r)], op, cnt) la
 
     doNode st' [] = st'
     doNode st' (x' : xs) =
         let st'' = ffff st' r p x'
             in doNode st'' xs
 
-    getop rr rrr "[ ]" [n] = [(R rrr, Op And [ R rr, M n])]
+    getop rr rrr "[ ]" [n] = [(R rrr, Op (And n) [ R rr ])]
     getop rr rrr "( )" [n]
-        = [(M n, Op Ld [R rr]), (R rrr, Op Ld [R rr])]
+        = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
     getop rr _ s n = error $ show (here, s, n)
+
+rv = or . map op . snd
+
+op (Op (And  c) [R n]) = undefined
+op (Op (St   c) [R n]) = undefined
+op (Op  Ld      [R n]) = undefined
+op (Op  LdOn    [R n]) = undefined
+op _ = error here
 
 --------------------------------------------------------------------------------
 
