@@ -78,10 +78,16 @@ data D
 data E op = Op op [D] -- and, or, ld #on, ...
     deriving Show
 
-data Op dst = And | AndN | St | StN | StOn | StOff | Jmp dst
+data Op dst
+    = And
+    | AndN
+    | Ld -- ^ set wire state same as argument
+    | LdOn -- ^ set wire state to #on
+    | St | StN | StOn | StOff | Jmp dst
     -- | FB String [(String, D)] [(String, D)]
+    deriving Show
 
-fffff (p :< Source a) =  ffff ([], [(R 0, Op "ld #on" [])], 1) 0 p a
+fffff (p :< Source a) =  ffff ([], [(R 0, Op LdOn [])], 1) 0 p a
 fffff _ = error here
 -- fffff x@(_ :< Source _) =  ffff ([], [], 0) 0 p a
 -- fffff _ = error here
@@ -96,7 +102,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
         ( st
         , op ++ case lookup p st of
                      Nothing -> []
-                     Just rr -> [ (R rr, Op "ld" [R r]) ]
+                     Just rr -> [ (R rr, Op Ld [R r]) ]
         , cnt
         )
 
@@ -111,7 +117,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
             , op ++ getop r cnt s n
             , cnt + 1) cnt p a
     f (Jump s) =
-        (st, op ++ [(DD, Op ("jump to " ++ s) [])], cnt) --XXX XXX beware wires crossing jump point
+        (st, op ++ [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
     f (Node la) =
         doNode (st ++ [(p, r)], op, cnt) la
 
@@ -120,9 +126,9 @@ ffff (st, op, cnt) r src (p :< x) = f x
         let st'' = ffff st' r p x'
             in doNode st'' xs
 
-    getop rr rrr "[ ]" [n] = [(R rrr, Op "and" [ R rr, M n])]
+    getop rr rrr "[ ]" [n] = [(R rrr, Op And [ R rr, M n])]
     getop rr rrr "( )" [n]
-        = [(M n, Op "ld" [R rr]), (R rrr, Op "ld" [R rr])]
+        = [(M n, Op Ld [R rr]), (R rrr, Op Ld [R rr])]
     getop rr _ s n = error $ show (here, s, n)
 
 --------------------------------------------------------------------------------
