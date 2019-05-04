@@ -82,14 +82,14 @@ data Op n
     = And n -- wire out <- wire in and memory cell
 --     | AndN
     | Ld -- ^ set wire state same as argument
-    | LdOn -- ^ set wire state to #on
+    | On -- ^ set wire state to #on
     | St n
 --     | StN | StOn | StOff
     | Jmp n
     -- | FB String [(String, D)] [(String, D)]
     deriving Show
 
-fffff (p :< Source a) =  ffff ([], [(R 0, Op LdOn [])], 1) 0 p a
+fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
 fffff _ = error here
 -- fffff x@(_ :< Source _) =  ffff ([], [], 0) 0 p a
 -- fffff _ = error here
@@ -133,13 +133,36 @@ ffff (st, op, cnt) r src (p :< x) = f x
         = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
     getop rr _ s n = error $ show (here, s, n)
 
-rv = or . map op . snd
 
-op (Op (And  c) [R n]) = undefined
-op (Op (St   c) [R n]) = undefined
-op (Op  Ld      [R n]) = undefined
-op (Op  LdOn    [R n]) = undefined
-op _ = error here
+-- rv = or . map op . snd
+-- [(D, [E op])]
+-- network ( (dst, op) )
+network m net = f [] net
+    where
+    f r ( (DD, op) : xs ) = undefined $ or $ fmap (rung m r) op
+    f r ( (R n, op) : xs ) = undefined
+    f _ [] = undefined
+
+rung m r (Op o a) = op o a
+    where
+    op (And c) [R n] = (m      , reg n && ld c)
+    op (St  c) [R n] = (st y c , y)
+        where y = reg n
+    op  Ld     [R n] = (m      , reg n)
+    op  On     []    = (m      , True)
+    op _       _     = error here
+
+    reg n = case lookup n r of
+                 Just v  -> v
+                 Nothing -> error here
+
+    mem f c
+        = case zpLookup c (zpFromList m) of
+            Zp l ((_c, v) : rs) -> (ret, zpToList (Zp l ((c, new) : rs)))
+                where (ret, new) = f v
+            _                   -> error here
+    ld = fst . mem (\v -> (v, v))
+    st x = snd . mem (\v -> ((), x))
 
 --------------------------------------------------------------------------------
 
@@ -189,7 +212,7 @@ testAst ast = do
     print (here, "-----------------------")
     Just w <- return $ tsort [] $ or'd [] op
     for_ (w) print
-    print (here)
+--     print (here)
 
 --------------------------------------------------------------------------------
 
