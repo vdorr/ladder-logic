@@ -74,10 +74,10 @@ data D
 data E op = Op op [D] -- and, or, ld #on, ...
     deriving Show
 
--- data V
---     = X Bool 
---     | I Int
---     deriving (Show, Eq)
+data V
+    = X Bool 
+    | I Int
+    deriving (Show, Eq)
 
 data Op n
     = And n -- wire out <- wire in and memory cell
@@ -130,9 +130,9 @@ ffff (st, op, cnt) r src (p :< x) = f x
 
 
 network
-    :: [(String, Bool)]
+    :: [(String, V)]
     -> [(D, [E (Op String)])]
-    -> ([(Int, Bool)], [(String, Bool)])
+    -> ([(Int, Bool)], [(String, V)])
 network m0 net
     = foldl (\(m, r) -> f m r) ([], m0) net
     where
@@ -144,7 +144,7 @@ network m0 net
         h (m', w) o = fmap (w ||) (rung m' r o)
 
 
-rung :: Eq a0 => [(a0, Bool)] -> [(Int, Bool)] -> E (Op a0) -> ([(a0, Bool)], Bool)
+-- rung :: Eq a0 => [(a0, Bool)] -> [(Int, Bool)] -> E (Op a0) -> ([(a0, Bool)], Bool)
 rung m r (Op o a) = op o a
     where
     op (And c) [R n] = (m      , reg n && ld c)
@@ -163,8 +163,9 @@ rung m r (Op o a) = op o a
             Zp l ((_c, v) : rs) -> (ret, zpToList (Zp l ((c, new) : rs)))
                 where (ret, new) = f v
             _                   -> error here
-    ld = fst . mem (\v -> (v, v))
-    st x = snd . mem (\v -> ((), x))
+
+    ld = fst . mem (\(X v) -> (v, X v)) --load bool
+    st x = snd . mem (\v -> ((), X x))
 
 --------------------------------------------------------------------------------
 
@@ -216,7 +217,7 @@ testAst ast = do
     for_ (w) print
     print (here, "-----------------------")
     print (here
-        , snd . network [("a", False),("b", False),("c", True)]
+        , snd . network [("a", X False),("b", X False),("c", X True)]
             <$> (tsort [] $ or'd [] op)
         )
 
