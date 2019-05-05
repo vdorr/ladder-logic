@@ -68,15 +68,16 @@ import LadderParser
 
 data D
     = R Int
---     | M String
     | DD -- dummy
     deriving (Show, Eq, Ord)
 
--- data E = Op String [E] | Data D | C Bool
---     deriving Show
-
 data E op = Op op [D] -- and, or, ld #on, ...
     deriving Show
+
+-- data V
+--     = X Bool 
+--     | I Int
+--     deriving (Show, Eq)
 
 data Op n
     = And n -- wire out <- wire in and memory cell
@@ -91,15 +92,11 @@ data Op n
 
 fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
 fffff _ = error here
--- fffff x@(_ :< Source _) =  ffff ([], [], 0) 0 p a
--- fffff _ = error here
 
 ffff (st, op, cnt) r src (p :< x) = f x
     where
     f (Label s a) = undefined --should not happen
     f (Source a) = undefined --should not happen
---     f (Source a) = ffff (st, op <> [(R r, Op "ld #on" [])], cnt + 1) (cnt + 1) p a
-
     f  Sink = --end of hline, may lead to 'Node'
         ( st
         , op <> case lookup p st of
@@ -107,12 +104,10 @@ ffff (st, op, cnt) r src (p :< x) = f x
                      Just rr -> [ (R rr, Op Ld [R r]) ]
         , cnt
         )
-
     f  End = --end of vertical line
 --should really appear only once at end of left power rail
 --should test this (exactly one End in rung)
         (st, op, cnt)
-
     f (Device s n a) =
         ffff
             (st
@@ -134,15 +129,22 @@ ffff (st, op, cnt) r src (p :< x) = f x
     getop rr _ s n = error $ show (here, s, n)
 
 
--- rv = or . map op . snd
--- [(D, [E op])]
--- network ( (dst, op) )
-network m net = f [] net
+network
+    :: [(String, Bool)]
+    -> [(D, [E (Op String)])]
+    -> ([(Int, Bool)], [(String, Bool)])
+network m0 net
+    = foldl (\(m, r) -> f m r) ([], m0) net
     where
-    f r ( (DD, op) : xs ) = undefined $ or $ fmap (rung m r) op
-    f r ( (R n, op) : xs ) = undefined
-    f _ [] = undefined
+    f r m (dst, op) = g dst
+        where
+        g (R n) = (r ++ [(n, w')] , m1)
+        g  DD   = (r              , m1)
+        (m1, w') = foldl h (m, True) op
+        h (m', w) o = fmap (w ||) (rung m' r o)
 
+
+rung :: Eq a0 => [(a0, Bool)] -> [(Int, Bool)] -> E (Op a0) -> ([(a0, Bool)], Bool)
 rung m r (Op o a) = op o a
     where
     op (And c) [R n] = (m      , reg n && ld c)
@@ -212,7 +214,11 @@ testAst ast = do
     print (here, "-----------------------")
     Just w <- return $ tsort [] $ or'd [] op
     for_ (w) print
---     print (here)
+    print (here, "-----------------------")
+    print (here
+        , snd . network [("a", False),("b", False),("c", True)]
+            <$> (tsort [] $ or'd [] op)
+        )
 
 --------------------------------------------------------------------------------
 
