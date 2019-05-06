@@ -13,7 +13,7 @@ import Prelude hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Data.Traversable
--- import Data.Foldable
+import Data.Foldable
 import Data.Text (Text, unpack)
 import Data.Bifunctor
 import Data.Maybe
@@ -25,9 +25,9 @@ import DiagramParser (Pos(..))
 import Tokenizer
 
 import Control.Monad hiding (fail)
-import Debug.Trace
-import GHC.Stack
-import GHC.Exts
+-- import Debug.Trace
+-- import GHC.Stack
+-- import GHC.Exts
 
 --------------------------------------------------------------------------------
 
@@ -129,10 +129,10 @@ newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
 -- |Parser state
 data DgPSt = DgPSt
-    { psNext :: MoveToNext (Tok Text) -- ^select next token
-    , psStr :: Dg (Tok Text) -- ^input
+    { psNext     :: MoveToNext (Tok Text) -- ^select next token
+    , psStr      :: Dg (Tok Text) -- ^input
     , psLastBite :: Maybe DgExt -- ^position of last token eaten
-    , psFocused :: Bool -- ^current focus of zp is actual parser current token
+    , psFocused  :: Bool -- ^current focus of zp is actual parser current token
     }
 
 instance Functor DgP where
@@ -168,10 +168,10 @@ move_ ln co dg = maybe (Left here) return (move ln co dg)
 --FIXME should move only to direct neigbour
 -- (by using single step to exact position it probably works already)
 goRight, goDown, goUp, goLeft :: Next
-goRight (ln, (_, co)) = move_ ln (co+1)
-goDown (ln, (co, _)) = move_ (ln+1) co
-goUp (ln, (co, _)) = move_ (ln-1) co
-goLeft (ln, (co, _)) = move_ ln (co-1)
+goRight (ln, (_, co)) = move_ ln     (co+1)
+goDown  (ln, (co, _)) = move_ (ln+1) co
+goUp    (ln, (co, _)) = move_ (ln-1) co
+goLeft  (ln, (co, _)) = move_ ln     (co-1)
 
 --------------------------------------------------------------------------------
 
@@ -198,7 +198,7 @@ getDir = psNext <$> get
 
 step :: DgP ()
 step = do
-    origin <- currentPos
+    origin             <- currentPos
     DgPSt f zp ps True <- get --if nothing is focused, currentPos makes no sense
     case f origin zp of
         Right zp' -> put (DgPSt f zp' ps True)
@@ -207,7 +207,7 @@ step = do
 setPos :: (Int, (Int, b)) -> DgP ()
 setPos (ln, (co, _)) = do
     DgPSt b zp ps _ <- get
-    Just zp' <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
+    Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
     put (DgPSt b zp' ps True)
 
 --------------------------------------------------------------------------------
@@ -222,15 +222,49 @@ dgIsEmpty
     =   (dgNull . psStr) <$> get
     >>= flip when (fail $ here ++ "not empty")
 
-labelOnTop :: DgP a -> DgP (Text, a)
+labelOnTop
+    :: DgP a -- ^Device parser e.g. "(S)"
+    -> DgP (Text, a)
 labelOnTop p = do
     (ln, co) <- currentPos
-    x <- p
-    next <- currentPos
+    x        <- p
+    next     <- currentPos
     setPos (ln-1, co)
-    lbl <- name
+    lbl      <- name
     setPos next
     return (lbl, x)
+
+--TODO
+--TODO
+--TODO
+--vertical combinators
+-- p `withAbove` name
+--   `withBelow` (optional name)
+--TODO
+--TODO
+--TODO
+
+-- |If a succeeds, parse also b positioned above first char of a
+withAbove :: DgP a -> DgP b -> DgP (a, b)
+withAbove a b = undefined
+
+withOperands
+    :: DgP (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presend of second operand
+    -> DgP (Text, Maybe Text, a)
+withOperands p = do
+    (ln, co) <- currentPos
+    (b, x)   <- p
+    next     <- currentPos
+    setPos (ln - 1, co)
+    op       <- name
+    op2 <- if b
+        then do
+            setPos (ln + 1, co)
+            Just <$> name
+        else
+            return Nothing
+    setPos next
+    return (op, op2, x)
 
 labelOnTop' :: DgP a -> DgP (String, a)
 labelOnTop' p = bimap unpack id <$> labelOnTop p
@@ -249,8 +283,8 @@ branch
     ->  DgP [a]
 branch isFork branches = do
     origin <- currentPos
-    True <- isFork <$> peek
-    stuff <- for branches $ \(dir, p) -> do
+    True   <- isFork <$> peek
+    stuff  <- for branches $ \(dir, p) -> do
         setDir dir
         (setPos origin *> step *> (Just <$> p))
         <|> return Nothing --step fail if there's nothing in desired direction
@@ -379,21 +413,38 @@ hline2 = do
     HLine <- eat
     return ()
 
-device :: DgP String -> DgP (Cofree (Symbol_ String) DgExt)
+-- device :: DgP String -> DgP (Cofree (Symbol_ String) DgExt)
+-- device p = do
+--     pos <- currentPos
+--     (lbl, f) <- labelOnTop' p
+--     (pos :<) <$> (Device f [lbl] <$> hline'2)
+-- 
+-- coil2 :: DgP (Cofree (Symbol_ String) DgExt)
+-- coil2 = device $ do
+--     Coil f <- eat
+--     return $ "(" ++ unpack f ++ ")"
+-- 
+-- contact2 :: DgP (Cofree (Symbol_ String) DgExt)
+-- contact2 = device $ do
+--     Contact f <- eat
+--     return $ "[" ++ unpack f ++ "]"
+device :: DgP (Bool, String) -> DgP (Cofree (Symbol_ String) DgExt)
 device p = do
     pos <- currentPos
-    (lbl, f) <- labelOnTop' p
-    (pos :<) <$> (Device f [lbl] <$> hline'2)
+    (op, op2, f) <- withOperands p
+    (pos :<) <$> (Device f (unpack <$> (op : toList op2)) <$> hline'2)
 
 coil2 :: DgP (Cofree (Symbol_ String) DgExt)
 coil2 = device $ do
     Coil f <- eat
-    return $ "(" ++ unpack f ++ ")"
+    return (False, "(" <> unpack f <> ")")
 
-contact2 :: DgP (Cofree (Symbol_ String) DgExt)
+-- contact2 :: DgP (Bool, Cofree (Symbol_ String) DgExt)
 contact2 = device $ do
     Contact f <- eat
-    return $ "[" ++ unpack f ++ "]"
+    return (elem f cmp, "[" <> unpack f <> "]")
+    where
+    cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
 
 --------------------------------------------------------------------------------
 
@@ -487,7 +538,7 @@ lwall = vline <|> void edge
 -- negIn = do
 --     NegIn <- eat
 --     return ()
-    
+
 --TODO check clearance
 box = do
 --     (ln, (_, co)) <- currentPos
@@ -557,14 +608,9 @@ eat = do
     DgPSt nx dg ps True <- get
     case dgPop dg of
         Just (v, pos, dg') -> do
---             dg'' <- case nx pos dg' of
---                 Right q -> return q
---                 Left _err -> return dg' --nowhere to move
---             put (DgPSt nx dg'' (Just pos))
             put $ case nx pos dg' of
-                Right q -> DgPSt nx q (Just pos) True
-                Left _err -> DgPSt nx dg' (Just pos) False --nowhere to move
-
+                Right q -> DgPSt nx q   (Just pos) True
+                Left  _ -> DgPSt nx dg' (Just pos) False --nowhere to move
             return v
         Nothing -> fail $ show (here, ps)
 

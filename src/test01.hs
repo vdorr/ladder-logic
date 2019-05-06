@@ -87,9 +87,23 @@ data Op n
     | St n
 --     | StN | StOn | StOff
     | Jmp n
+    | Cmp CmpOp n n
     -- | FB String [(String, D)] [(String, D)]
     deriving Show
 
+data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
+    deriving Show
+
+--TODO
+--TODO
+--TODO
+
+--convert to some intermediate representation usable outside interpreter
+--that is - extend with node numbering
+
+--TODO
+--TODO
+--TODO
 fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
 fffff _ = error here
 
@@ -124,11 +138,13 @@ ffff (st, op, cnt) r src (p :< x) = f x
             in doNode st'' xs
 
     getop rr rrr "[ ]" [n] = [(R rrr, Op (And n) [ R rr ])]
+    getop rr rrr "[>]" [a, b] = [(R rrr, Op (Cmp Gt a b) [ R rr ])]
     getop rr rrr "( )" [n]
         = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
     getop rr _ s n = error $ show (here, s, n)
 
 
+--TODO replace lookup by iorefs
 network
     :: [(String, V)]
     -> [(D, [E (Op String)])]
@@ -147,11 +163,12 @@ network m0 net
 -- rung :: Eq a0 => [(a0, Bool)] -> [(Int, Bool)] -> E (Op a0) -> ([(a0, Bool)], Bool)
 rung m r (Op o a) = op o a
     where
-    op (And c) [R n] = (m      , reg n && ld c)
-    op (St  c) [R n] = (st y c , y)
+    op (And c)      [R n] = (m      , reg n && ldx c)
+    op (St  c)      [R n] = (st y c , y)
         where y = reg n
-    op  Ld     [R n] = (m      , reg n)
-    op  On     []    = (m      , True)
+    op  Ld          [R n] = (m      , reg n)
+    op  On          []    = (m      , True)
+    op (Cmp Gt a b) [R n] = (m      , ldi a > ldi b)
     op _       _     = error here
 
     reg n = case lookup n r of
@@ -164,7 +181,8 @@ rung m r (Op o a) = op o a
                 where (ret, new) = f v
             _                   -> error here
 
-    ld = fst . mem (\(X v) -> (v, X v)) --load bool
+    ldx = fst . mem (\(X v) -> (v, X v)) --load bool
+    ldi = fst . mem (\(I v) -> (v, I v)) --load bool
     st x = snd . mem (\v -> ((), X x))
 
 --------------------------------------------------------------------------------

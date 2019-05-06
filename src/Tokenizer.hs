@@ -101,7 +101,8 @@ data Tok a
     | HLine          -- Int --repetitions
     | REdge          -- as block input "--->"
     | FEdge          -- as block input "---<"
-    | Negated        -- on block i/o "---0|" or "|0---"
+--     | Negated        -- on block i/o "---0|" or "|0---"
+    | Number Int
     | Contact !a     -- "---[OP]---"
     | Coil a         -- "---(OP)---"
 --as above, but could be mistaken for other things
@@ -126,7 +127,8 @@ token7
 --     <|> Comment      <$> Comment <$> (chunk "(*" *> manyTill anySingle (try (chunk "*)")))
 
     <|> Label'       <$> try (labelName <* char ':')
-    <|> Negated      <$  char '0'
+--     <|> Negated      <$  char '0'
+    <|> Number       <$> (read <$> some digitChar)
     <|> VLine        <$  char '|'
     <|> Node         <$  char '+'
     <|> Continuation <$> try (between' ">" ">" name)

@@ -95,7 +95,7 @@ tokenizerTests = testGroup "Tokenizer"
                 +--[ ]--(/)--   |]
 
     , testCase "negation" $
-        (Right [[VLine],[Node,HLine,Negated]]
+        (Right [[VLine],[Node,HLine,Number 0]]
             @=?)
             $ testPreproc4 $ [text|
             |
@@ -177,6 +177,9 @@ ladderTests = testGroup "Ladder parser"
     , testCase "testN01"
         $ simpleResult (parse testN01)
         @?= Left True
+    , testCase "test10"
+        $ simpleResult (() <$ parse test10)
+        @?= Right ()
     ]
     where
 
@@ -270,6 +273,14 @@ test07a =
     |    %QX0
     +--+--( )--
     |                          |]
+
+test10 =
+    [text|
+    (* --- test 10 --- *)
+
+    | %IW0 %QX0
+    +--[>]--( )--
+    |  300                     |]
 
 testN01 =
     [text|
