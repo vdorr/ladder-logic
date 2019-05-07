@@ -250,19 +250,24 @@ labelOnTop p = do
 withAbove :: DgP a -> DgP b -> DgP (a, b)
 withAbove a b = undefined
 
+operand = ((Var . unpack) <$> name)
+    <|> (do
+            Number n <- eat
+            return $ Lit n)
+
 withOperands
     :: DgP (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presend of second operand
-    -> DgP (Text, Maybe Text, a)
+    -> DgP (Operand, Maybe Operand, a)
 withOperands p = do
     (ln, co) <- currentPos
     (b, x)   <- p
     next     <- currentPos
     setPos (ln - 1, co)
-    op       <- name
+    op       <- (Var . unpack) <$> name
     op2 <- if b
         then do
             setPos (ln + 1, co)
-            Just <$> name
+            Just <$> operand
         else
             return Nothing
     setPos next
@@ -348,10 +353,10 @@ currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
 extToPos :: DgExt -> Pos
 extToPos = (\(ln, co) -> Pos (co, ln)) . fmap fst
     
-toPos2 :: Cofree (Diagram String String String) DgExt -> Cofree (Diagram String String String) Pos
+toPos2 :: Cofree (Diagram String Operand String) DgExt -> Cofree (Diagram String Operand String) Pos
 toPos2 = fmap extToPos
 
--- test002 :: DgP (Cofree (Diagram String String String) Pos)
+-- test002 :: DgP (Cofree (Diagram String Operand String) Pos)
 -- test002 = fmap extToPos <$> test002'
 #endif
 --------------------------------------------------------------------------------
@@ -375,16 +380,21 @@ coilType    : ...
 
 -}
 
-test002' :: DgP (Cofree (Diagram String String String) DgExt)
+data Operand
+    = Var String
+    | Lit Int
+    deriving (Show, Eq)
+
+test002' :: DgP (Cofree (Diagram String Operand String) DgExt)
 test002'
     = setDir goDown
     *> ((:<) <$> currentPos <*> fmap Source vline'2)
     <* dgIsEmpty
 
-node2 :: DgP (Cofree (Diagram String String String) DgExt)
+node2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 node2 = (:<) <$> currentPos <*> (Ladder.LadderParser.Node <$> node2')
 
-node2' :: DgP [Cofree (Diagram String String String) DgExt]
+node2' :: DgP [Cofree (Diagram String Operand String) DgExt]
 node2'
     = branch
         (==Cross)
@@ -393,16 +403,16 @@ node2'
         ]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
-vline'2 :: DgP (Cofree (Diagram String String String) DgExt)
+vline'2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 vline'2 = many vline2 *> (end2 <|> node2)
 
-end2 :: DgP (Cofree (Diagram String String String) DgExt)
+end2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 
-eol2 :: DgP (Cofree (Diagram String String String) DgExt)
+eol2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
-hline'2 :: DgP (Cofree (Diagram String String String) DgExt)
+hline'2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 hline'2 = some hline2 *> (coil2 <|> contact2 <|> node2 <|> eol2) --TODO vline crossing
 
 vline2 :: DgP ()
@@ -415,33 +425,33 @@ hline2 = do
     HLine <- eat
     return ()
 
--- device :: DgP String -> DgP (Cofree (Diagram String String String) DgExt)
+-- device :: DgP String -> DgP (Cofree (Diagram String Operand String) DgExt)
 -- device p = do
 --     pos <- currentPos
 --     (lbl, f) <- labelOnTop' p
 --     (pos :<) <$> (Device f [lbl] <$> hline'2)
 -- 
--- coil2 :: DgP (Cofree (Diagram String String String) DgExt)
+-- coil2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 -- coil2 = device $ do
 --     Coil f <- eat
 --     return $ "(" ++ unpack f ++ ")"
 -- 
--- contact2 :: DgP (Cofree (Diagram String String String) DgExt)
+-- contact2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 -- contact2 = device $ do
 --     Contact f <- eat
 --     return $ "[" ++ unpack f ++ "]"
-device :: DgP (Bool, String) -> DgP (Cofree (Diagram String String String) DgExt)
+device :: DgP (Bool, String) -> DgP (Cofree (Diagram String Operand String) DgExt)
 device p = do
     pos <- currentPos
     (op, op2, f) <- withOperands p
-    (pos :<) <$> (Device f (unpack <$> (op : toList op2)) <$> hline'2)
+    (pos :<) <$> (Device f (op : toList op2) <$> hline'2)
 
-coil2 :: DgP (Cofree (Diagram String String String) DgExt)
+coil2 :: DgP (Cofree (Diagram String Operand String) DgExt)
 coil2 = device $ do
     Coil f <- eat
     return (False, "(" <> unpack f <> ")")
 
--- contact2 :: DgP (Bool, Cofree (Diagram String String String) DgExt)
+-- contact2 :: DgP (Bool, Cofree (Diagram String Operand String) DgExt)
 contact2 = device $ do
     Contact f <- eat
     return (elem f cmp, "[" <> unpack f <> "]")

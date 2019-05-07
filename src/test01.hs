@@ -79,14 +79,14 @@ data V
     | I Int
     deriving (Show, Eq)
 
-data Op n
+data Op n s
     = And n -- wire out <- wire in and memory cell
 --     | AndN
     | Ld -- ^ set wire state same as argument
     | On -- ^ set wire state to #on
     | St n
 --     | StN | StOn | StOff
-    | Jmp n
+    | Jmp s
     | Cmp CmpOp n n
     -- | FB String [(String, D)] [(String, D)]
     deriving Show
@@ -104,9 +104,12 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 --TODO
 --TODO
 --TODO
+-- fffff :: Cofree (Diagram String Operand String) DgExt
+--                       -> _ -- ([(DgExt, Int)], [(D, E (Op Operand))], Int)
 fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
 fffff _ = error here
 
+-- ffff :: _
 ffff (st, op, cnt) r src (p :< x) = f x
     where
 --     f (Label s a) = undefined --should not happen
@@ -147,7 +150,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
 --TODO replace lookup by iorefs
 network
     :: [(String, V)]
-    -> [(D, [E (Op String)])]
+    -> [(D, [E (Op Operand String)])]
     -> ([(Int, Bool)], [(String, V)])
 network m0 net
     = foldl (\(m, r) -> f m r) ([], m0) net
@@ -163,12 +166,13 @@ network m0 net
 -- rung :: Eq a0 => [(a0, Bool)] -> [(Int, Bool)] -> E (Op a0) -> ([(a0, Bool)], Bool)
 rung m r (Op o a) = op o a
     where
-    op (And c)      [R n] = (m      , reg n && ldx c)
-    op (St  c)      [R n] = (st y c , y)
+    op (And (Var c))      [R n] = (m      , reg n && ldx c)
+    op (St  (Var c))      [R n] = (st y c , y)
         where y = reg n
     op  Ld          [R n] = (m      , reg n)
     op  On          []    = (m      , True)
-    op (Cmp Gt a b) [R n] = (m      , ldi a > ldi b)
+    op (Cmp Gt (Var a) (Var b)) [R n] = (m      , ldi a > ldi b)
+    op (Cmp Gt (Var a) (Lit b)) [R n] = (m      , ldi a > b)
     op _       _     = error here
 
     reg n = case lookup n r of
@@ -179,7 +183,7 @@ rung m r (Op o a) = op o a
         = case zpLookup c (zpFromList m) of
             Zp l ((_c, v) : rs) -> (ret, zpToList (Zp l ((c, new) : rs)))
                 where (ret, new) = f v
-            _                   -> error here
+            _                   -> error $ show (here, c)
 
     ldx = fst . mem (\(X v) -> (v, X v)) --load bool
     ldi = fst . mem (\(I v) -> (v, I v)) --load bool
@@ -217,6 +221,8 @@ tsort ks xs = do
     getRegN _     = []
 
 
+testAst :: Cofree (Diagram String Operand String) DgExt
+                      -> IO ()
 testAst ast = do
 --     print (here, ast)
 --     ff (-1,(-1,-1)) ast
@@ -234,8 +240,13 @@ testAst ast = do
     Just w <- return $ tsort [] $ or'd [] op
     for_ (w) print
     print (here, "-----------------------")
+    let memory =
+                [ ("a", X False),("b", X False),("c", X True)
+                , ("%QX0", X True)
+                , ("%IX0", I 0)
+                ]
     print (here
-        , snd . network [("a", X False),("b", X False),("c", X True)]
+        , snd . network memory
             <$> (tsort [] $ or'd [] op)
         )
 
