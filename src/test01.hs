@@ -245,10 +245,17 @@ testAst ast = do
                 , ("%QX0", X True)
                 , ("%IX0", I 0)
                 ]
+    let p01 = tsort [] $ or'd [] op
     print (here
         , snd . network memory
-            <$> (tsort [] $ or'd [] op)
+            <$> p01
         )
+
+--TODO list of watched variables (tags, signals... ?)
+vect01 =
+    [ (1,  [("a", X False)]) --duration, stimuli
+    , (10, [("a", X False)])
+    ]
 
 --------------------------------------------------------------------------------
 
