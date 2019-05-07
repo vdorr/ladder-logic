@@ -27,10 +27,10 @@ import Preprocess (ParseErr(..), withPos)
 letter       : 'A'..'Z' | '_'
 number       : '0'..'9'
 
-token        : node | vline | hline | label ...
+token        : cross | vline | hline | label ...
 
 target       : number+ | letter+
-node         : '+'
+cross         : '+'
 vline        : '|'
 hline        : '-'+ 
 label        : target ':'
@@ -93,7 +93,7 @@ isWsTok _         = False
 --rule: control statements (jump) are followed by EOL
 data Tok a
 --parts without mandatory horizontal component:
-    = Node           -- +
+    = Cross           -- +
     | VLine          -- |
 --sole thing that occupy whole line
     | Label' a       -- network label "LABEL:"
@@ -130,7 +130,7 @@ token7
 --     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
     <|> VLine        <$  char '|'
-    <|> Node         <$  char '+'
+    <|> Cross         <$  char '+'
     <|> Continuation <$> try (between' ">" ">" name)
     <|> HLine        <$  some (char '-')
     <|> Jump'        <$> (try (chunk ">>") *> labelName)

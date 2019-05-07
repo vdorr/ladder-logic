@@ -20,8 +20,9 @@ import Zipper
 import Tokenizer
 
 import qualified LadderParser (Symbol_(..))
-import LadderParser (Cofree(..), Symbol_(End, Source))
-import DiagramParser (Pos(..))
+-- import LadderParser (Cofree(..), Symbol_(End, Source))
+-- import DiagramParser (Pos(..))
+import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
@@ -45,17 +46,17 @@ tokenizerTests = testGroup "Tokenizer"
         (Right [[VLine]] @=?) $ testPreproc4 $ [text|
             |               |]
     , testCase "3" $
-        (Right [[VLine], [Node], [VLine]] @=?) $ testPreproc4 $ [text|
+        (Right [[VLine], [Cross], [VLine]] @=?) $ testPreproc4 $ [text|
             | (* hello *)
             +
             |               |]
     , testCase "4" $
-        (Right [VLine, Node, VLine] @=?) $ testPreproc5 $ [text|
+        (Right [VLine, Cross, VLine] @=?) $ testPreproc5 $ [text|
             | (* hello *)
             +
             |               |]
     , testCase "5" $
-        (Right [[VLine],[Node,HLine,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
+        (Right [[VLine],[Cross,HLine,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
             | (* hello *)
             +->>LBL         |]
     , testCase "label" $
@@ -70,13 +71,13 @@ tokenizerTests = testGroup "Tokenizer"
                 LBL:
                 |               |]
     , testCase "continuation" $
-        (Right [[VLine],[Node,HLine,Continuation "X"],[VLine]] @=?)
+        (Right [[VLine],[Cross,HLine,Continuation "X"],[VLine]] @=?)
             $ testPreproc4 $ [text|
                 | (* hello *)
                 +-->X>
                 |               |]
     , testCase "return" $
-        (Right [[VLine],[Node,HLine,Return],[VLine]] @=?)
+        (Right [[VLine],[Cross,HLine,Return],[VLine]] @=?)
             $ testPreproc4 $ [text|
                 | (* hello *)
                 +--<RETURN>
@@ -88,14 +89,14 @@ tokenizerTests = testGroup "Tokenizer"
                 >X>--           |]
 
     , testCase "device" $
-        (Right [[VLine,Name "a",Name "b"],[Node,HLine,Contact " ",HLine,Coil "/",HLine]]
+        (Right [[VLine,Name "a",Name "b"],[Cross,HLine,Contact " ",HLine,Coil "/",HLine]]
             @=?)
             $ testPreproc4 $ [text|
                 |  a    b
                 +--[ ]--(/)--   |]
 
     , testCase "negation" $
-        (Right [[VLine],[Node,HLine,Number 0]]
+        (Right [[VLine],[Cross,HLine,Number 0]]
             @=?)
             $ testPreproc4 $ [text|
             |
@@ -171,7 +172,7 @@ ladderTests = testGroup "Ladder parser"
     , testCase "gap"
         $ simpleResult (fmap getDg $ dgParse
             [ (1, [((1, 1), VLine)])
-            , (2, [((1, 1), Node), ((2, 2), HLine), ((4, 4), HLine)])
+            , (2, [((1, 1), Cross), ((2, 2), HLine), ((4, 4), HLine)])
             ])
         @?= Left True
     , testCase "testN01"

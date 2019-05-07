@@ -16,7 +16,7 @@ import Preprocess
 import Tokenizer (preproc5')
 import Zipper
 
-import LadderParser
+import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
@@ -109,7 +109,7 @@ fffff _ = error here
 
 ffff (st, op, cnt) r src (p :< x) = f x
     where
-    f (Label s a) = undefined --should not happen
+--     f (Label s a) = undefined --should not happen
     f (Source a) = undefined --should not happen
     f  Sink = --end of hline, may lead to 'Node'
         ( st
