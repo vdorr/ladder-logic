@@ -28,7 +28,8 @@ library
                      , Ladder.Javascript
                      , Zipper
                      , Tokenizer
-  -- other-modules:       
+                     , Ladder.LadderParser
+  -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
                      , PatternSynonyms
