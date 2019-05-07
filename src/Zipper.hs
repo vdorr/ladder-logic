@@ -21,7 +21,7 @@ import Data.Maybe
 -- import Preprocess
 import LadderParser hiding (node, hline, Node, device)
 import qualified LadderParser
-import DiagramParser (Pos(..))
+-- import DiagramParser (Pos(..))
 import Tokenizer
 
 import Control.Monad hiding (fail)
@@ -338,7 +338,7 @@ vline = do
     return ()
 
 --------------------------------------------------------------------------------
-
+#if 0
 --FIXME parse it with DgP's pos type and then fmap it to 'Pos'
 currentPos2 :: DgP Pos
 currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
@@ -351,7 +351,7 @@ toPos2 = fmap extToPos
 
 -- test002 :: DgP (Cofree (Symbol_ String) Pos)
 -- test002 = fmap extToPos <$> test002'
-
+#endif
 --------------------------------------------------------------------------------
 
 {-
