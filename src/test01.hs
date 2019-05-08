@@ -23,19 +23,6 @@ import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
--- data V s = VTrue | VVar s | VOp Int s [s]
---     deriving (Show, Eq)
-
--- Source a
--- Sink
--- End
--- Device s ls a
--- Jump s
--- Label s a
--- Node la
-
---------------------------------------------------------------------------------
-
 data D
     = R Int
     | DD -- dummy
@@ -261,8 +248,6 @@ evalTestVect net watch vect = fst $ foldl step ([], []) vect'
         mem' = updateMemory mem stim
         mem'' = p mem'
         tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
--- foldl :: Foldable t => (b -> a -> b) -> b -> t a -> b 
--- foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
 
 --------------------------------------------------------------------------------
 
