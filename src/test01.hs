@@ -276,7 +276,7 @@ flattenTestVect ((d, v) : xs)
     | otherwise = flattenTestVect xs
 
 updateMemory :: [(VarName, V)] -> [(VarName, V)] -> [(VarName, V)]
-updateMemory old new = undefined
+updateMemory old new = nubBy (on (==) fst) $ old ++ new --yeah performace be damned
 
 type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
@@ -285,12 +285,12 @@ evalTestVect
     -> [VarName]                      -- ^watched memory variables
     -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
-evalTestVect net watch vect = fst $ foldl f ([], []) vect'
+evalTestVect net watch vect = fst $ foldl step ([], []) vect'
     where
     p = snd . network net
     vect' = flattenTestVect vect
 
-    f (tr, mem) stim = (tr ++ [tr'], mem')
+    step (tr, mem) stim = (tr ++ [tr'], mem')
         where
         mem' = p $ updateMemory mem stim
         tr' = [ v | (flip lookup mem' -> Just v) <- watch ]
