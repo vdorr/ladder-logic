@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
     PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
-    LambdaCase, ScopedTypeVariables, ViewPatterns #-}
+    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns #-}
 
 -- OverloadedStrings, 
 
@@ -10,7 +10,10 @@ import qualified Data.Text.IO as TIO
 import Data.Foldable
 import Data.Traversable
 import Data.List
+import Data.Function
 import System.Environment (getArgs)
+
+import Debug.Trace
 
 import Preprocess
 import Tokenizer (preproc5')
@@ -30,39 +33,6 @@ import Ladder.LadderParser
 -- Jump s
 -- Label s a
 -- Node la
-
---------------------------------------------------------------------------------
-
--- ffff (st, op) r src (p :< x) = f x
---     where
---     f (Source a) = undefined --should not happen
---     f (Label s a) = undefined --should not happen
--- 
---     f  Sink = do --end of hline, may lead to 'Node'
---         print (here, "Sink", r, ">>", p, lookup p st)
---         return (st ++ [(p, ("Sink", r))], op)
--- 
---     f  End = do --end of vertical line
--- --should really appear only once at end of left power rail
--- --should test this (exactly one End in rung)
---         print (here, "End", r, p, lookup p st)
---         return (st, op)
--- 
---     f (Device s [n] a) = do
---         print (here, "Device", n, r)
---         ffff (st, op) (r+1) p a
--- 
---     f (Jump s) = do
---         print (here, "Jump", r)
---         return (st, op)
---     f (Node la) = do
---         print (here, "Node", r, ">>", p)
---         doNode (st ++ [(p, ("node", r))], op) la
--- 
---     doNode st' [] = return st'
---     doNode st' (x' : xs) = do
---         st'' <- ffff st' r p x'
---         doNode st'' xs
 
 --------------------------------------------------------------------------------
 
@@ -97,15 +67,8 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 --------------------------------------------------------------------------------
 
 --TODO
---TODO
---TODO
-
 --convert to some intermediate representation usable outside interpreter
 --that is - extend with node numbering
-
---TODO
---TODO
---TODO
 
 fffff
     :: Cofree (Diagram String Operand s) DgExt
@@ -170,18 +133,19 @@ network net m0
         where
         g (R n) = (r ++ [(n, w')] , m1)
         g  DD   = (r              , m1)
-        (m1, w') = foldl h (m, True) op
+        (m1, w') = foldl h (m, False) op
         h (m', w) o = fmap (w ||) (rung m' r o)
 
+network' net = snd . network net
 
 -- rung :: Eq a0 => [(a0, Bool)] -> [(Int, Bool)] -> E (Op a0) -> ([(a0, Bool)], Bool)
 rung m r (Op o a) = op o a
     where
-    op (And (Var c))      [R n] = (m      , reg n && ldx c)
-    op (St  (Var c))      [R n] = (st y c , y)
+    op (And (Var c)) [R n] = (m      , reg n && ldx c)
+    op (St  (Var c)) [R n] = (st y c , y)
         where y = reg n
-    op  Ld          [R n] = (m      , reg n)
-    op  On          []    = (m      , True)
+    op  Ld           [R n] = (m      , reg n)
+    op  On           []    = (m      , True)
     op (Cmp Gt (Var a) (Var b)) [R n] = (m      , ldi a > ldi b)
     op (Cmp Gt (Var a) (Lit b)) [R n] = (m      , ldi a > b)
     op _       _     = error here
@@ -236,12 +200,6 @@ tsort ks xs = do
 testAst :: Cofree (Diagram String Operand String) DgExt
                       -> IO ()
 testAst ast = do
---     print (here, ast)
---     ff (-1,(-1,-1)) ast
---     w <- (reverse . nub) <$> fff ast
---     print (here, "-----------------------")
---     for_ w print
---     print (here)
 
     let (st, op, cnt) = fffff ast
     print (here, cnt, "-----------------------")
@@ -253,20 +211,28 @@ testAst ast = do
     for_ (w) print
     print (here, "-----------------------")
     let memory =
-                [ ("a", X False),("b", X False),("c", X True)
-                , ("%QX0", X True)
-                , ("%IX0", I 0)
+                [ ("a", X True),("b", X False),("c", X False)
+--                 , ("%QX0", X True), ("%IX0", I 0)
                 ]
     let Just p01 = tsort [] $ or'd [] op
-    print (here, snd $ network p01 memory)
+    print (here, network' p01 memory)
+
+    print (here, "-----------------------")
+    for_ p01 print
+
+    print (here, "-----------------------")
+
+    let !q = evalTestVect p01 ["b"] vect01
+    print (here, q)
+--     print (here, flattenTestVect vect01)
 
 --------------------------------------------------------------------------------
 
 vect01 :: TestVect
 vect01 =
     [ (2, [("a", X False),("b", X False),("c", X False)])
-    , (2, [("a", X True)])
-    , (2, [])
+    , (1, [("a", X True)])
+    , (1, [("a", X False)])
     ]
 
 flattenTestVect :: TestVect -> [[(VarName, V)]]
@@ -276,7 +242,7 @@ flattenTestVect ((d, v) : xs)
     | otherwise = flattenTestVect xs
 
 updateMemory :: [(VarName, V)] -> [(VarName, V)] -> [(VarName, V)]
-updateMemory old new = nubBy (on (==) fst) $ old ++ new --yeah performace be damned
+updateMemory old new = nubBy (on (==) fst) $ new ++ old --yeah performace be damned
 
 type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
@@ -287,13 +253,16 @@ evalTestVect
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
 evalTestVect net watch vect = fst $ foldl step ([], []) vect'
     where
-    p = snd . network net
+    p = network' net
     vect' = flattenTestVect vect
 
-    step (tr, mem) stim = (tr ++ [tr'], mem')
+    step (tr, mem) stim = (tr ++ [tr'], mem'')
         where
-        mem' = p $ updateMemory mem stim
-        tr' = [ v | (flip lookup mem' -> Just v) <- watch ]
+        mem' = updateMemory mem stim
+        mem'' = p mem'
+        tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+-- foldl :: Foldable t => (b -> a -> b) -> b -> t a -> b 
+-- foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
 
 --------------------------------------------------------------------------------
 
@@ -304,12 +273,7 @@ main = do
     case stripPos <$> preproc5' src of
         Left err -> TIO.putStrLn err
         Right x -> do
---             print $ stripPos x
             let zp = mkDgZp x
-
---             print (here, zp)
---             for_ zpl $ \q -> print (here, q)
---             for_ zpr $ \q -> print (here, q)
             forM_ (zpToList zp) (print . (here,))
 
             print (here, "--------------------------------------------------")
