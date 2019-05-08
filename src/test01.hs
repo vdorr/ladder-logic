@@ -222,6 +222,8 @@ vect01 =
     , (1, [("a", X False)])
     ]
 
+--------------------------------------------------------------------------------
+
 flattenTestVect :: TestVect -> [[(VarName, V)]]
 flattenTestVect [] = []
 flattenTestVect ((d, v) : xs)
