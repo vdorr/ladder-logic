@@ -112,7 +112,7 @@ fffff
     -> ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
 
 fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
-fffff _ = error here --should not happen
+fffff _               = error here --should not happen
 
 ffff
     :: ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
@@ -123,7 +123,7 @@ ffff
 ffff (st, op, cnt) r src (p :< x) = f x
     where
 --     f (Label s a) = undefined --should not happen
-    f (Source a) = undefined --should not happen
+    f (Source a) = error here --should not happen
     f  Sink = --end of hline, may lead to 'Node'
         ( st
         , op <> case lookup p st of
@@ -231,6 +231,7 @@ tsort ks xs = do
     getRegN (R n) = [n]
     getRegN _     = []
 
+--------------------------------------------------------------------------------
 
 testAst :: Cofree (Diagram String Operand String) DgExt
                       -> IO ()
@@ -268,16 +269,31 @@ vect01 =
     , (2, [])
     ]
 
+flattenTestVect :: TestVect -> [[(VarName, V)]]
+flattenTestVect [] = []
+flattenTestVect ((d, v) : xs)
+    | d >= 1    = [v] ++ replicate (d - 1) [] ++ flattenTestVect xs
+    | otherwise = flattenTestVect xs
+
+updateMemory :: [(VarName, V)] -> [(VarName, V)] -> [(VarName, V)]
+updateMemory old new = undefined
+
 type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
 evalTestVect
     :: [(D, [E (Op Operand String)])] -- ^network to evaluate
-    -> [VarName] -- ^watched memory variables
-    -> [(Int, [(VarName, V)])] -- ^test vector (duration, stimuli)
-    -> [(VarName, V)] -- ^resulting trace
-evalTestVect net watch vect = undefined
+    -> [VarName]                      -- ^watched memory variables
+    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
+    -> [[V]]       -- ^resulting trace, elems are same length as watch list
+evalTestVect net watch vect = fst $ foldl f ([], []) vect'
     where
-    p = network net
+    p = snd . network net
+    vect' = flattenTestVect vect
+
+    f (tr, mem) stim = (tr ++ [tr'], mem')
+        where
+        mem' = p $ updateMemory mem stim
+        tr' = [ v | (flip lookup mem' -> Just v) <- watch ]
 
 --------------------------------------------------------------------------------
 
