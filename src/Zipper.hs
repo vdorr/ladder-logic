@@ -1,6 +1,4 @@
-{-# LANGUAGE CPP, OverloadedStrings, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
-    LambdaCase, ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE OverloadedStrings, PatternSynonyms, DeriveFunctor #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -127,6 +125,7 @@ dgTrim (Zp l r) = Zp (trim l) (trim r)
 
 --------------------------------------------------------------------------------
 
+--XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
 newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
 
 -- |Parser state

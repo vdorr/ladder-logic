@@ -82,8 +82,8 @@ data V
 data Op n s
     = And n -- wire out <- wire in and memory cell
 --     | AndN
-    | Ld -- ^ set wire state same as argument
-    | On -- ^ set wire state to #on
+    | Ld    -- ^ set wire state same as argument
+    | On    -- ^ set wire state to #on
     | St n
 --     | StN | StOn | StOff
     | Jmp s
@@ -93,6 +93,8 @@ data Op n s
 
 data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
     deriving Show
+
+--------------------------------------------------------------------------------
 
 --TODO
 --TODO
@@ -104,12 +106,20 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 --TODO
 --TODO
 --TODO
--- fffff :: Cofree (Diagram String Operand String) DgExt
---                       -> _ -- ([(DgExt, Int)], [(D, E (Op Operand))], Int)
-fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
-fffff _ = error here
 
--- ffff :: _
+fffff
+    :: Cofree (Diagram String Operand s) DgExt
+    -> ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
+
+fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
+fffff _ = error here --should not happen
+
+ffff
+    :: ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
+    -> Int
+    -> DgExt
+    -> Cofree (Diagram String Operand s) DgExt
+    -> ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
 ffff (st, op, cnt) r src (p :< x) = f x
     where
 --     f (Label s a) = undefined --should not happen
@@ -140,19 +150,20 @@ ffff (st, op, cnt) r src (p :< x) = f x
         let st'' = ffff st' r p x'
             in doNode st'' xs
 
-    getop rr rrr "[ ]" [n] = [(R rrr, Op (And n) [ R rr ])]
+    getop rr rrr "[ ]" [n]    = [(R rrr, Op (And n) [ R rr ])]
     getop rr rrr "[>]" [a, b] = [(R rrr, Op (Cmp Gt a b) [ R rr ])]
     getop rr rrr "( )" [n]
         = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
     getop rr _ s n = error $ show (here, s, n)
 
+--------------------------------------------------------------------------------
 
 --TODO replace lookup by iorefs
 network
-    :: [(String, V)]
-    -> [(D, [E (Op Operand String)])]
+    :: [(D, [E (Op Operand String)])]
+    -> [(String, V)]
     -> ([(Int, Bool)], [(String, V)])
-network m0 net
+network net m0
     = foldl (\(m, r) -> f m r) ([], m0) net
     where
     f r m (dst, op) = g dst
@@ -245,17 +256,28 @@ testAst ast = do
                 , ("%QX0", X True)
                 , ("%IX0", I 0)
                 ]
-    let p01 = tsort [] $ or'd [] op
-    print (here
-        , snd . network memory
-            <$> p01
-        )
+    let Just p01 = tsort [] $ or'd [] op
+    print (here, snd $ network p01 memory)
 
---TODO list of watched variables (tags, signals... ?)
+--------------------------------------------------------------------------------
+
+vect01 :: TestVect
 vect01 =
-    [ (1,  [("a", X False)]) --duration, stimuli
-    , (10, [("a", X False)])
+    [ (2, [("a", X False),("b", X False),("c", X False)])
+    , (2, [("a", X True)])
+    , (2, [])
     ]
+
+type TestVect = [(Int, [(VarName, V)])]
+type VarName = String
+evalTestVect
+    :: [(D, [E (Op Operand String)])] -- ^network to evaluate
+    -> [VarName] -- ^watched memory variables
+    -> [(Int, [(VarName, V)])] -- ^test vector (duration, stimuli)
+    -> [(VarName, V)] -- ^resulting trace
+evalTestVect net watch vect = undefined
+    where
+    p = network net
 
 --------------------------------------------------------------------------------
 
