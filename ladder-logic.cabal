@@ -35,7 +35,7 @@ library
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
-                     , PatternSynonyms
+                     , PatternSynonyms, DeriveFunctor
   build-depends:       base >=4.9 && <5
                      , mtl >=2.2
                      , vector >=0.12

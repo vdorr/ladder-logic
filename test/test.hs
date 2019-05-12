@@ -23,6 +23,7 @@ import qualified LadderParser (Symbol_(..))
 -- import LadderParser (Cofree(..), Symbol_(End, Source))
 -- import DiagramParser (Pos(..))
 import Ladder.LadderParser
+import Ladder.Zipper
 
 --------------------------------------------------------------------------------
 

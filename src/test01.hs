@@ -20,6 +20,7 @@ import Tokenizer (preproc5')
 import Zipper
 
 import Ladder.LadderParser
+import Ladder.Zipper
 
 --------------------------------------------------------------------------------
 
