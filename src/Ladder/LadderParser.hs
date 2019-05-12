@@ -18,7 +18,6 @@ import Control.Monad hiding (fail)
 import Data.Bifunctor
 import Data.Foldable
 
-
 import Ladder.Lexer
 import Ladder.DiagramParser
 
