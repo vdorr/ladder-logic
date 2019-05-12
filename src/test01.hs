@@ -92,7 +92,7 @@ deps (Op _ d) = d
 
 fffff
     :: Eq p
-    => Cofree (Diagram String Operand s) p
+    => Cofree (Diagram Dev s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 
 fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
@@ -103,7 +103,7 @@ ffff
     => ([(p, Int)], [(D, E (Op Operand s))], Int)
     -> Int
     -> p
-    -> Cofree (Diagram String Operand s) p
+    -> Cofree (Diagram Dev s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 ffff (st, op, cnt) r src (p :< x) = f x
     where
@@ -120,7 +120,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
 --should really appear only once at end of left power rail
 --should test this (exactly one End in rung)
         (st, op, cnt)
-    f (Device s n a) =
+    f (Device (Dev s n) a) =
         ffff
             (st
             , op <> getop r cnt s n
@@ -221,7 +221,7 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
-testAst :: Cofree (Diagram String Operand String) DgExt
+testAst :: Cofree (Diagram Dev String) DgExt
                       -> IO ()
 testAst ast = do
 
