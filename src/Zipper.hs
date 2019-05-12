@@ -26,7 +26,9 @@ import Ladder.LadderParser
 --------------------------------------------------------------------------------
 
 --XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
-newtype DgP a = DgP { dgp :: DgPSt -> Either String (a, DgPSt) }
+newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
+
+type DgP = SFM DgPSt
 
 -- |Parser state
 data DgPSt = DgPSt
@@ -36,25 +38,25 @@ data DgPSt = DgPSt
     , psFocused  :: Bool -- ^current focus of zp is actual parser current token
     }
 
-instance Functor DgP where
+instance Functor (SFM s) where
     fmap = ap . return
 
-instance Applicative DgP where
+instance Applicative (SFM s) where
     pure = return
     (<*>) = ap
 
-instance Monad DgP where
-    return a = DgP $ \s -> return (a, s)
-    a >>= b = DgP $ \s -> do
-        (y, s') <- dgp a s
-        dgp (b y) s'
+instance Monad (SFM s) where
+    return a = SFM $ \s -> return (a, s)
+    a >>= b = SFM $ \s -> do
+        (y, s') <- sfm a s
+        sfm (b y) s'
 
-instance MonadFail DgP where
-    fail = DgP . const . Left
+instance MonadFail (SFM s) where
+    fail = SFM . const . Left
 
-instance Alternative DgP where
-    empty = DgP $ const $ Left "alt empty"
-    a <|> b = DgP $ \s -> dgp a s <|> dgp b s
+instance Alternative (SFM s) where
+    empty = SFM $ const $ Left "alt empty"
+    a <|> b = SFM $ \s -> sfm a s <|> sfm b s
 
 --------------------------------------------------------------------------------
 
@@ -80,13 +82,13 @@ lastPos :: DgP DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
 
 applyDgp :: DgP a -> Dg (Tok Text) -> Either String (a, DgPSt)
-applyDgp p dg = dgp p (DgPSt goRight dg Nothing True)
+applyDgp p dg = sfm p (DgPSt goRight dg Nothing True)
 
 get :: DgP DgPSt
-get = DgP $ \s -> return (s, s)
+get = SFM $ \s -> return (s, s)
 
 put :: DgPSt -> DgP ()
-put s = DgP $ \_ -> return ((), s)
+put s = SFM $ \_ -> return ((), s)
 
 modify :: (DgPSt -> DgPSt) -> DgP ()
 modify f = f <$> get >>= put
