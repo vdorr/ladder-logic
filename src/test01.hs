@@ -20,6 +20,7 @@ import Zipper
 
 import Ladder.Zipper
 import Ladder.Lexer  (preproc5')
+import Ladder.DiagramParser
 import Ladder.LadderParser
 
 --------------------------------------------------------------------------------

@@ -24,6 +24,7 @@ import Zipper
 
 import Ladder.Zipper
 import Ladder.Lexer
+import Ladder.DiagramParser
 import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
