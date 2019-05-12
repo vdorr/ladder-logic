@@ -34,6 +34,16 @@ data Diagram d v s a
 --     | Label s --i dislike it, but would need it if vline can cross line with label
     deriving (Show, Functor, Eq)
 
+-- mapDg :: (d -> d') -> (v -> v') -> (s -> s') -> Diagram d v s a -> Diagram d' v' s' a
+-- mapDg x y z = f
+--     where
+--     f (Source a)     = Source a
+--     f  Sink          = Sink
+--     f  End           = End
+--     f (Device d v a) = Device (x d) (fmap y v) a
+--     f (Jump s)       = Jump (z s)
+--     f (Node a)       = Node a
+
 --------------------------------------------------------------------------------
 
 -- data Device s
@@ -71,8 +81,6 @@ instance (Eq a, Eq (f (Cofree f a))) => Eq (Cofree f a) where
 
 instance (forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
     show (a :< as) = "(" ++ show a ++ " :< " ++ show as ++ ")"
-
---------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 

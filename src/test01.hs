@@ -73,6 +73,19 @@ deps (Op _ d) = d
 
 --------------------------------------------------------------------------------
 
+-- parseOps
+--     :: Cofree (Diagram String Operand s) p
+--     -> Cofree (Diagram (Op Operand String) Operand s) p
+-- parseOps (a :< n) = a :< fmap parseOps (f n)
+--     where
+-- --     f :: String -> Op Operand String
+-- --     f = undefined
+--     f (Device "[ ]" [n]    a) = And  n
+--     f (Device "[>]" [a, b] a) = Cmp (Gt a b)
+--     f (Device "( )" [n]    a) = Op  (St n)
+--     f (Device {})           = error here
+--     f other = mapDg undefined id id other
+
 --TODO
 --convert to some intermediate representation usable outside interpreter
 --that is - extend with node numbering
