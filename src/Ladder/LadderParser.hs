@@ -34,15 +34,15 @@ data Diagram d s a
 --     | Label s --i dislike it, but would need it if vline can cross line with label
     deriving (Show, Functor, Eq)
 
--- mapDg :: (d -> d') -> (v -> v') -> (s -> s') -> Diagram d v s a -> Diagram d' v' s' a
--- mapDg x y z = f
---     where
---     f (Source a)     = Source a
---     f  Sink          = Sink
---     f  End           = End
---     f (Device d v a) = Device (x d) (fmap y v) a
---     f (Jump s)       = Jump (z s)
---     f (Node a)       = Node a
+mapDg :: (d -> d') -> (s -> s') -> Diagram d s a -> Diagram d' s' a
+mapDg x y = f
+    where
+    f (Source a)     = Source a
+    f  Sink          = Sink
+    f  End           = End
+    f (Device d a) = Device (x d) a
+    f (Jump s)       = Jump (y s)
+    f (Node a)       = Node a
 
 --------------------------------------------------------------------------------
 

@@ -73,18 +73,15 @@ deps (Op _ d) = d
 
 --------------------------------------------------------------------------------
 
--- parseOps
---     :: Cofree (Diagram String Operand s) p
---     -> Cofree (Diagram (Op Operand String) Operand s) p
--- parseOps (a :< n) = a :< fmap parseOps (f n)
---     where
--- --     f :: String -> Op Operand String
--- --     f = undefined
---     f (Device "[ ]" [n]    a) = And  n
---     f (Device "[>]" [a, b] a) = Cmp (Gt a b)
---     f (Device "( )" [n]    a) = Op  (St n)
---     f (Device {})           = error here
---     f other = mapDg undefined id id other
+parseOps
+    :: Cofree (Diagram Dev s) p
+    -> Cofree (Diagram (Op Operand s) s) p
+parseOps (a :< n) = a :< fmap parseOps (mapDg f id n)
+    where
+    f (Dev "[ ]" [n]   ) = And  n
+    f (Dev "[>]" [a, b]) = Cmp Gt a b
+    f (Dev "( )" [n]   ) = St n
+    f _                  = error here
 
 --TODO
 --convert to some intermediate representation usable outside interpreter
@@ -92,7 +89,7 @@ deps (Op _ d) = d
 
 fffff
     :: Eq p
-    => Cofree (Diagram Dev s) p
+    => Cofree (Diagram (Op Operand s) s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 
 fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
@@ -103,7 +100,7 @@ ffff
     => ([(p, Int)], [(D, E (Op Operand s))], Int)
     -> Int
     -> p
-    -> Cofree (Diagram Dev s) p
+    -> Cofree (Diagram (Op Operand s) s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 ffff (st, op, cnt) r src (p :< x) = f x
     where
@@ -120,10 +117,15 @@ ffff (st, op, cnt) r src (p :< x) = f x
 --should really appear only once at end of left power rail
 --should test this (exactly one End in rung)
         (st, op, cnt)
-    f (Device (Dev s n) a) =
+--     f (Device (Dev s n) a) =
+--         ffff
+--             (st
+--             , op <> getop r cnt s n
+--             , cnt + 1) cnt p a
+    f (Device (dev) a) =
         ffff
             (st
-            , op <> getop r cnt s n
+            , op <> [(R cnt, Op dev [ R r ])] --getop r cnt s n
             , cnt + 1) cnt p a
     f (Jump s) =
 --         (st, op <> [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
@@ -136,12 +138,12 @@ ffff (st, op, cnt) r src (p :< x) = f x
         let st'' = ffff st' r p x'
             in doNode st'' xs
 
-    getop rr rrr "[ ]" [n]    = [(R rrr, Op (And n) [ R rr ])]
-    getop rr rrr "[>]" [a, b] = [(R rrr, Op (Cmp Gt a b) [ R rr ])]
-    getop rr rrr "( )" [n]
---         = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
-        = [(R rrr, Op (St n) [R rr])]
-    getop rr _ s n = error $ show (here, s, n)
+--     getop rr rrr "[ ]" [n]    = [(R rrr, Op (And n) [ R rr ])]
+--     getop rr rrr "[>]" [a, b] = [(R rrr, Op (Cmp Gt a b) [ R rr ])]
+--     getop rr rrr "( )" [n]
+-- --         = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
+--         = [(R rrr, Op (St n) [R rr])]
+--     getop rr _ s n = error $ show (here, s, n)
 
 --------------------------------------------------------------------------------
 
@@ -223,7 +225,9 @@ tsort ks xs = do
 
 testAst :: Cofree (Diagram Dev String) DgExt
                       -> IO ()
-testAst ast = do
+testAst ast' = do
+
+    let ast = parseOps ast'
 
     let (st, op, cnt) = fffff ast
     print (here, cnt, "-----------------------")
