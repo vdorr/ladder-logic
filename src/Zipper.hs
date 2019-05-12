@@ -25,42 +25,6 @@ import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
---XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
-newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
-
--- |Move in some direction from provided origin
-type MoveToNext tok = (Int, (Int, Int)) -> Dg tok -> Either String (Dg tok)
-
--- |Parser state
-data DgPState tok = DgPSt
-    { psNext     :: MoveToNext tok -- ^select next token
-    , psStr      :: Dg tok         -- ^input
-    , psLastBite :: Maybe DgExt    -- ^position of last token eaten
-    , psFocused  :: Bool           -- ^current focus of zp is actual parser current token
-    }
-
-instance Functor (SFM s) where
-    fmap = ap . return
-
-instance Applicative (SFM s) where
-    pure = return
-    (<*>) = ap
-
-instance Monad (SFM s) where
-    return a = SFM $ \s -> return (a, s)
-    a >>= b = SFM $ \s -> do
-        (y, s') <- sfm a s
-        sfm (b y) s'
-
-instance MonadFail (SFM s) where
-    fail = SFM . const . Left
-
-instance Alternative (SFM s) where
-    empty = SFM $ const $ Left "alt empty"
-    a <|> b = SFM $ \s -> sfm a s <|> sfm b s
-
---------------------------------------------------------------------------------
-
 type DgP = SFM DgPSt
 type DgPSt = DgPState (Tok Text)
 type Next = MoveToNext (Tok Text)
