@@ -5,9 +5,6 @@
 module Zipper where
 
 import Prelude hiding (fail)
--- import System.Environment (getArgs)
--- import qualified Data.Text.IO as TIO
--- import Control.Monad hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Data.Traversable
@@ -15,18 +12,16 @@ import Data.Foldable
 import Data.Text (Text, unpack)
 import Data.Bifunctor
 import Data.Maybe
-
-import Ladder.LadderParser
-
-import Ladder.Lexer
-
 import Control.Monad hiding (fail)
+
 -- import Debug.Trace
 -- import GHC.Stack
 -- import GHC.Exts
 
 import Ladder.Zipper
+import Ladder.Lexer
 import Ladder.DiagramParser
+import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
@@ -121,10 +116,6 @@ setPos (ln, (co, _)) = do
 -- |Fail if input stream is not empty
 dgIsEmpty :: DgP ()
 dgIsEmpty
---     = (dgLength . psStr) <$> get
---     >>= \case
---         0 -> return ()
---         _ -> fail $ here ++ "not empty"
     =   (dgNull . psStr) <$> get
     >>= flip when (fail $ here ++ "not empty")
 
@@ -329,21 +320,6 @@ hline2 = do
     HLine <- eat
     return ()
 
--- device :: DgP String -> DgP (Cofree (Diagram String Operand String) DgExt)
--- device p = do
---     pos <- currentPos
---     (lbl, f) <- labelOnTop' p
---     (pos :<) <$> (Device f [lbl] <$> hline'2)
--- 
--- coil2 :: DgP (Cofree (Diagram String Operand String) DgExt)
--- coil2 = device $ do
---     Coil f <- eat
---     return $ "(" ++ unpack f ++ ")"
--- 
--- contact2 :: DgP (Cofree (Diagram String Operand String) DgExt)
--- contact2 = device $ do
---     Contact f <- eat
---     return $ "[" ++ unpack f ++ "]"
 device :: DgP (Bool, String) -> DgP (Cofree (Diagram String Operand String) DgExt)
 device p = do
     pos <- currentPos
