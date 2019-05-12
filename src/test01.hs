@@ -53,23 +53,41 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --------------------------------------------------------------------------------
 
+-- data W n s
+--     = WOp (Op n s) [W n s]
+-- --     | WLit Bool --true would be enough
+--     | WReg Int
+-- 
+-- deps :: W n s -> [Int]
+-- deps = undefined
+-- 
+-- ugh
+--     :: Eq p
+--     => Cofree (Diagram String Operand s) p
+--     -> [(Int, Op Operand s)]
+-- ugh = undefined
+
+--------------------------------------------------------------------------------
+
 --TODO
 --convert to some intermediate representation usable outside interpreter
 --that is - extend with node numbering
 
 fffff
-    :: Cofree (Diagram String Operand s) DgExt
-    -> ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
+    :: Eq p
+    => Cofree (Diagram String Operand s) p
+    -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 
 fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
 fffff _               = error here --should not happen
 
 ffff
-    :: ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
+    :: Eq p
+    => ([(p, Int)], [(D, E (Op Operand s))], Int)
     -> Int
-    -> DgExt
-    -> Cofree (Diagram String Operand s) DgExt
-    -> ([(DgExt, Int)], [(D, E (Op Operand s))], Int)
+    -> p
+    -> Cofree (Diagram String Operand s) p
+    -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 ffff (st, op, cnt) r src (p :< x) = f x
     where
 --     f (Label s a) = undefined --should not happen
