@@ -192,7 +192,7 @@ or'd out []            = reverse out
 
 --make tail recursive?
 tsort :: [Int] -> [(D, [E op])] -> Maybe [(D, [E op])]
-tsort _ [] = return []
+tsort _  [] = return []
 tsort ks xs = do
     (yes@(_ : _), no) <- return $ partition (all test . snd) xs
     (yes ++) <$> tsort (ks ++ foldMap (getRegN . fst) yes) no
