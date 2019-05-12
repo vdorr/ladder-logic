@@ -27,7 +27,6 @@ library
                      , Compile
                      , Ladder.Javascript
                      , Zipper
-                     , Tokenizer
                      , Ladder.LadderParser
                      , Ladder.DiagramParser
                      , Ladder.Zipper
