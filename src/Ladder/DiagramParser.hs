@@ -6,6 +6,8 @@ import Prelude hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
 import Control.Monad hiding (fail)
+import Data.Maybe
+import Data.Traversable
 
 import Ladder.Zipper
 
@@ -148,6 +150,72 @@ peek :: SFM (DgPState tok) tok
 peek = do
     Just p <- (cursor . psStr) <$> get
     return p
+
+--------------------------------------------------------------------------------
+
+-- |Fail if input stream is not empty
+dgIsEmpty :: SFM (DgPState tok) ()
+dgIsEmpty
+    =   (dgNull . psStr) <$> get
+    >>= flip when (fail $ here ++ "not empty")
+
+{-
+   |
+   +-------
+   |\
+   | *-------
+  
+-}
+
+branch
+    :: (tok -> Bool)
+    -> [(MoveToNext tok, SFM (DgPState tok) a)]
+    ->  SFM (DgPState tok) [a]
+branch isFork branches = do
+    origin <- currentPos
+    True   <- isFork <$> peek
+    stuff  <- for branches $ \(dir, p) -> do
+        setDir dir
+        (setPos origin *> step *> (Just <$> p))
+        <|> return Nothing --step fail if there's nothing in desired direction
+    setPos origin --eat `fork`
+--     setDir dir0 --restore direction, good for parsing boxes
+    eat --FIXME set direction!!!!!!!!!!!!!
+    return $ catMaybes stuff
+
+-- branch'
+--     :: ((Tok Text) -> Maybe b)
+--     -> [(Next, DgP a)]
+--     ->  DgP (b, [a])
+-- branch' isFork branches = do
+--     origin <- currentPos
+--     dir0 <- psNext <$> get
+--     Just f <- isFork <$> peek_
+--     stuff <- for branches $ \(dir, p) -> do
+--         setDir dir
+--         setPos origin
+--         step --with dir
+--         p
+--     setPos origin --eat `fork`
+--     setDir dir0 --restore direction, good for parsing boxes
+--     eat
+--     return (f, stuff)
+
+-- |Matches diagram with nothing remaining on current line
+pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
+
+-- |Succeeds only when positioned on end of line
+eol :: SFM (DgPState tok) ()
+eol = do
+    psStr <$> get >>= \case
+        DgLineEnd -> return ()
+        _ -> fail here
+
+colRight :: DgExt -> DgExt
+colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
+
+colUnder :: DgExt -> DgExt
+colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 --------------------------------------------------------------------------------
 

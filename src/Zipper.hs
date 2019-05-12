@@ -7,18 +7,16 @@ module Zipper where
 import Prelude hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative hiding (fail)
-import Data.Traversable
 import Data.Foldable
 import Data.Text (Text, unpack)
 import Data.Bifunctor
-import Data.Maybe
 import Control.Monad hiding (fail)
 
 -- import Debug.Trace
 -- import GHC.Stack
 -- import GHC.Exts
 
-import Ladder.Zipper
+-- import Ladder.Zipper
 import Ladder.Lexer
 import Ladder.DiagramParser
 import Ladder.LadderParser
@@ -31,12 +29,8 @@ type Next = MoveToNext (Tok Text)
 
 --------------------------------------------------------------------------------
 
--- |Fail if input stream is not empty
-dgIsEmpty :: SFM (DgPState tok) ()
-dgIsEmpty
-    =   (dgNull . psStr) <$> get
-    >>= flip when (fail $ here ++ "not empty")
-
+--TODO
+--vertical combinators
 labelOnTop
     :: SFM (DgPState (Tok txt)) a -- ^Device parser e.g. "(S)"
     -> SFM (DgPState (Tok txt)) (txt, a)
@@ -88,64 +82,6 @@ withOperands p = do
 
 labelOnTop' :: SFM (DgPState (Tok Text)) a -> SFM (DgPState (Tok Text)) (String, a)
 labelOnTop' p = bimap unpack id <$> labelOnTop p
-
-{-
-   |
-   +-------
-   |\
-   | *-------
-  
--}
-
-branch
-    :: (tok -> Bool)
-    -> [(MoveToNext tok, SFM (DgPState tok) a)]
-    ->  SFM (DgPState tok) [a]
-branch isFork branches = do
-    origin <- currentPos
-    True   <- isFork <$> peek
-    stuff  <- for branches $ \(dir, p) -> do
-        setDir dir
-        (setPos origin *> step *> (Just <$> p))
-        <|> return Nothing --step fail if there's nothing in desired direction
-    setPos origin --eat `fork`
---     setDir dir0 --restore direction, good for parsing boxes
-    eat --FIXME set direction!!!!!!!!!!!!!
-    return $ catMaybes stuff
-
--- branch'
---     :: ((Tok Text) -> Maybe b)
---     -> [(Next, DgP a)]
---     ->  DgP (b, [a])
--- branch' isFork branches = do
---     origin <- currentPos
---     dir0 <- psNext <$> get
---     Just f <- isFork <$> peek_
---     stuff <- for branches $ \(dir, p) -> do
---         setDir dir
---         setPos origin
---         step --with dir
---         p
---     setPos origin --eat `fork`
---     setDir dir0 --restore direction, good for parsing boxes
---     eat
---     return (f, stuff)
-
--- |Matches diagram with nothing remaining on current line
-pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
-
--- |Succeeds only when positioned on end of line
-eol :: SFM (DgPState tok) ()
-eol = do
-    psStr <$> get >>= \case
-        DgLineEnd -> return ()
-        _ -> fail here
-
-colRight :: DgExt -> DgExt
-colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
-
-colUnder :: DgExt -> DgExt
-colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 --------------------------------------------------------------------------------
 
