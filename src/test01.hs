@@ -16,11 +16,11 @@ import System.Environment (getArgs)
 import Debug.Trace
 
 import Preprocess
-import Tokenizer (preproc5')
 import Zipper
 
-import Ladder.LadderParser
 import Ladder.Zipper
+import Ladder.Lexer  (preproc5')
+import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 

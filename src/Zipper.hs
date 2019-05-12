@@ -18,7 +18,7 @@ import Data.Maybe
 
 import Ladder.LadderParser
 
-import Tokenizer
+import Ladder.Lexer
 
 import Control.Monad hiding (fail)
 -- import Debug.Trace

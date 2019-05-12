@@ -17,13 +17,14 @@ import GHC.Exts
 
 import Preprocess
 import Zipper
-import Tokenizer
 
-import qualified LadderParser (Symbol_(..))
+-- import qualified LadderParser (Symbol_(..))
 -- import LadderParser (Cofree(..), Symbol_(End, Source))
 -- import DiagramParser (Pos(..))
-import Ladder.LadderParser
+
 import Ladder.Zipper
+import Ladder.Lexer
+import Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
