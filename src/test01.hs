@@ -25,7 +25,7 @@ import Ladder.LadderParser
 
 data D
     = R Int
-    | DD -- dummy
+--     | DD -- dummy
     deriving (Show, Eq, Ord)
 
 data E op = Op op [D] -- and, or, ld #on, ...
@@ -52,6 +52,9 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
     deriving Show
 
 --------------------------------------------------------------------------------
+
+deps :: E op -> [D]
+deps (Op _ d) = d
 
 -- data W n s
 --     = WOp (Op n s) [W n s]
@@ -109,11 +112,12 @@ ffff (st, op, cnt) r src (p :< x) = f x
             , op <> getop r cnt s n
             , cnt + 1) cnt p a
     f (Jump s) =
-        (st, op <> [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
+--         (st, op <> [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
+        (st, op <> [(R cnt, Op (Jmp s) [R r])], cnt + 1) --XXX XXX beware wires crossing jump point
     f (Node la) =
         doNode (st <> [(p, r)], op, cnt) la
 
-    doNode st' [] = st'
+    doNode st' []        = st'
     doNode st' (x' : xs) =
         let st'' = ffff st' r p x'
             in doNode st'' xs
@@ -121,7 +125,8 @@ ffff (st, op, cnt) r src (p :< x) = f x
     getop rr rrr "[ ]" [n]    = [(R rrr, Op (And n) [ R rr ])]
     getop rr rrr "[>]" [a, b] = [(R rrr, Op (Cmp Gt a b) [ R rr ])]
     getop rr rrr "( )" [n]
-        = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
+--         = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
+        = [(R rrr, Op (St n) [R rr])]
     getop rr _ s n = error $ show (here, s, n)
 
 --------------------------------------------------------------------------------
@@ -137,7 +142,7 @@ network net m0
     f r m (dst, op) = g dst
         where
         g (R n) = (r ++ [(n, w')] , m1)
-        g  DD   = (r              , m1)
+--         g  DD   = (r              , m1)
         (m1, w') = foldl h (m, False) op
         h (m', w) o = fmap (w ||) (rung m' r o)
 

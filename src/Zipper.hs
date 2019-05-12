@@ -16,18 +16,16 @@ import Data.Text (Text, unpack)
 import Data.Bifunctor
 import Data.Maybe
 
--- import LadderParser hiding (node, hline, Node, device)
--- import qualified LadderParser
-
 import Ladder.LadderParser
 
--- import DiagramParser (Pos(..))
 import Tokenizer
 
 import Control.Monad hiding (fail)
 -- import Debug.Trace
 -- import GHC.Stack
 -- import GHC.Exts
+
+import Ladder.Zipper
 
 --------------------------------------------------------------------------------
 
