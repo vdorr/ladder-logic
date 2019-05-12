@@ -31,33 +31,19 @@ type Next = MoveToNext (Tok Text)
 
 --------------------------------------------------------------------------------
 
-move_ :: Int -> Int -> Dg a -> Either String (Dg a)
-move_ ln co dg = maybe (Left here) return (move ln co dg)
--- move_ ln co dg = maybe (Left here) return (moveNotCursed ln co dg)
-
---FIXME should move only to direct neigbour
--- (by using single step to exact position it probably works already)
-goRight, goDown, goUp, goLeft :: Next
-goRight (ln, (_, co)) = move_ ln     (co+1)
-goDown  (ln, (co, _)) = move_ (ln+1) co
-goUp    (ln, (co, _)) = move_ (ln-1) co
-goLeft  (ln, (co, _)) = move_ ln     (co-1)
-
---------------------------------------------------------------------------------
-
 lastPos :: DgP DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
 
-applyDgp :: DgP a -> Dg (Tok Text) -> Either String (a, DgPSt)
+applyDgp :: SFM (DgPState tok) a -> Dg tok -> Either String (a, DgPState tok)
 applyDgp p dg = sfm p (DgPSt goRight dg Nothing True)
 
-get :: DgP DgPSt
+get :: SFM s s
 get = SFM $ \s -> return (s, s)
 
-put :: DgPSt -> DgP ()
+put :: s -> SFM s ()
 put s = SFM $ \_ -> return ((), s)
 
-modify :: (DgPSt -> DgPSt) -> DgP ()
+modify :: (s -> s) -> SFM s ()
 modify f = f <$> get >>= put
 
 setDir :: Next -> DgP ()
@@ -478,12 +464,12 @@ eat = do
 currentPosM :: DgP (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
 
-currentPos :: DgP DgExt --(Int, (Int, Int))
+currentPos :: SFM (DgPState tok) DgExt
 currentPos = do
     Just p <- (pos . psStr) <$> get
     return p
 
-peek :: DgP (Tok Text)
+peek :: SFM (DgPState tok) tok
 peek = do
     Just p <- (cursor . psStr) <$> get
     return p
@@ -497,8 +483,6 @@ dgPop (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
 dgPop _ = Nothing
 
 pattern DgFocused x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
--- pattern DgH' ln cl x <- Zp _ ((ln, Zp _ ((_, x) : _)) : _)
---pattern DgM = (Zp u ((ln, Zp l ((_, x) : rs)) : ds))
 
 cursor :: Dg a -> Maybe a
 cursor (DgFocused x) = Just x
@@ -511,47 +495,7 @@ pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgFocusedPos ln cl cr) = Just (ln, (cl, cr))
 pos _                       = Nothing
 
-mkDgZp :: [(Int, [((Int, Int), (Tok Text))])] -> Dg (Tok Text)
+mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
 mkDgZp = Zp [] . fmap (fmap (Zp []))
-
---------------------------------------------------------------------------------
-
--- moveNotCursed :: Int -> Int -> Dg a -> Maybe (Dg a)
--- moveNotCursed line col = moveToLine line >=> moveToCol col
-
-move :: Int -> Int -> Dg a -> Maybe (Dg a)
-move line col = (moveToLine line >=> moveToCol col) . focusDg
-
-pattern DgLine us ln zp ds = Zp us ((ln, zp) : ds)
-
---FIXME merge with moveToLine somehow?
-moveToCol :: Int -> Dg a -> Maybe (Dg a)
--- moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
--- moveToCol col (DgLine us ln zp@(Zp l (((cl, cr), _) : _)) ds)
---     | col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
---     | otherwise = reassemble <$> moveTo stepLeft (isIn . fst) zp
---     where
---     isIn (a, b) = b >= col && a <= col
--- --     reassemble zp' = Zp us ((ln, zp') : ds)
---     reassemble zp' = DgLine us ln zp' ds
--- moveToCol _ _ = Nothing
-moveToCol col (DgLine us ln zp ds) = reassemble <$> move2 (dir col . fst) zp
-    where
-    dir x (a, b)
-        | x < a = LT
-        | x > b = GT
-        | otherwise = EQ
-    reassemble zp' = DgLine us ln zp' ds
-moveToCol _ _ = Nothing
-
-focusDg :: Dg a -> Dg a
-focusDg = fmap (fmap focus) . focus
-
-moveToLine :: Int -> Dg a -> Maybe (Dg a)
-moveToLine ln = move2 (compare ln . fst)
--- moveToLine' line zp@(Zp _ ( (ln, _) : _))
---     | line >= ln = moveTo stepRight ((line==).fst) zp
---     | otherwise = moveTo stepLeft ((line==).fst) zp
--- moveToLine' _ _ = Nothing
 
 --------------------------------------------------------------------------------

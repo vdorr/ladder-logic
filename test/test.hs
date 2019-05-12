@@ -1,4 +1,4 @@
-{-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes, OverloadedStrings, TypeApplications #-}
 
 import Test.Tasty
 -- import Test.Tasty.SmallCheck as SC
@@ -131,7 +131,7 @@ zipperTests = testGroup "Zipper"
     ,  testCase "okay focus" $
         tip (focus (Zp [2,1] [])) @=? Just 2
     ,  testCase "nothing to focus to" $
-        tip (focus (zpFromList [])) @=? (Nothing :: Maybe ())
+        tip (focus (zpFromList [])) @=? (Nothing @())
     ]
 
 dgpTests = testGroup "Diagram parser"
@@ -144,10 +144,10 @@ dgpTests = testGroup "Diagram parser"
     , testCase "dgIsEmpty negative case" $
         simpleResult (fst <$> applyDgp dgIsEmpty someDg) @=? Left True
     , testCase "trim 1" $
-        dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp []
+        dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp @(Tok Text) []
     , testCase "trim 2" $
         dgTrim someDg
-            @=? mkDgZp [(1, [((1, 1), VLine)])]
+            @=? mkDgZp @(Tok Text) [(1, [((1, 1), VLine)])]
     ]
     where
     someDg = Zp [] [(1, Zp [] [((1, 1), VLine)])]
