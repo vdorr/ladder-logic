@@ -32,14 +32,14 @@ type Next = MoveToNext (Tok Text)
 --------------------------------------------------------------------------------
 
 -- |Fail if input stream is not empty
-dgIsEmpty :: DgP ()
+dgIsEmpty :: SFM (DgPState tok) ()
 dgIsEmpty
     =   (dgNull . psStr) <$> get
     >>= flip when (fail $ here ++ "not empty")
 
 labelOnTop
-    :: DgP a -- ^Device parser e.g. "(S)"
-    -> DgP (Text, a)
+    :: SFM (DgPState (Tok txt)) a -- ^Device parser e.g. "(S)"
+    -> SFM (DgPState (Tok txt)) (txt, a)
 labelOnTop p = do
     (ln, co) <- currentPos
     x        <- p
@@ -60,7 +60,7 @@ labelOnTop p = do
 --TODO
 
 -- |If a succeeds, parse also b positioned above first char of a
-withAbove :: DgP a -> DgP b -> DgP (a, b)
+withAbove :: SFM (DgPState tok) a -> SFM (DgPState tok) b -> SFM (DgPState tok) (a, b)
 withAbove a b = undefined
 
 operand = ((Var . unpack) <$> name)
@@ -69,8 +69,8 @@ operand = ((Var . unpack) <$> name)
             return $ Lit n)
 
 withOperands
-    :: DgP (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presend of second operand
-    -> DgP (Operand, Maybe Operand, a)
+    :: SFM (DgPState (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presend of second operand
+    -> SFM (DgPState (Tok Text)) (Operand, Maybe Operand, a)
 withOperands p = do
     (ln, co) <- currentPos
     (b, x)   <- p
@@ -86,7 +86,7 @@ withOperands p = do
     setPos next
     return (op, op2, x)
 
-labelOnTop' :: DgP a -> DgP (String, a)
+labelOnTop' :: SFM (DgPState (Tok Text)) a -> SFM (DgPState (Tok Text)) (String, a)
 labelOnTop' p = bimap unpack id <$> labelOnTop p
 
 {-
@@ -98,9 +98,9 @@ labelOnTop' p = bimap unpack id <$> labelOnTop p
 -}
 
 branch
-    :: ((Tok Text) -> Bool)
-    -> [(Next, DgP a)]
-    ->  DgP [a]
+    :: (tok -> Bool)
+    -> [(MoveToNext tok, SFM (DgPState tok) a)]
+    ->  SFM (DgPState tok) [a]
 branch isFork branches = do
     origin <- currentPos
     True   <- isFork <$> peek
@@ -135,7 +135,7 @@ branch isFork branches = do
 pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
 
 -- |Succeeds only when positioned on end of line
-eol :: DgP ()
+eol :: SFM (DgPState tok) ()
 eol = do
     psStr <$> get >>= \case
         DgLineEnd -> return ()
