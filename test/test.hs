@@ -16,7 +16,6 @@ import Data.Bifunctor
 import GHC.Exts
 
 import Preprocess
-import Zipper
 
 -- import qualified LadderParser (Symbol_(..))
 -- import LadderParser (Cofree(..), Symbol_(End, Source))

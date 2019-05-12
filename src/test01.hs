@@ -16,7 +16,6 @@ import System.Environment (getArgs)
 import Debug.Trace
 
 import Preprocess
-import Zipper
 
 import Ladder.Zipper
 import Ladder.Lexer  (preproc5')
