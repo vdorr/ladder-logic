@@ -82,6 +82,99 @@ goLeft  (ln, (co, _)) = move_ ln     (co-1)
 
 --------------------------------------------------------------------------------
 
+lastPos :: SFM (DgPState tok) DgExt
+lastPos = psLastBite <$> get >>= maybe (fail here) return
+
+applyDgp :: SFM (DgPState tok) a -> Dg tok -> Either String (a, DgPState tok)
+applyDgp p dg = sfm p (DgPSt goRight dg Nothing True)
+
+get :: SFM s s
+get = SFM $ \s -> return (s, s)
+
+put :: s -> SFM s ()
+put s = SFM $ \_ -> return ((), s)
+
+modify :: (s -> s) -> SFM s ()
+modify f = f <$> get >>= put
+
+setDir :: MoveToNext tok -> SFM (DgPState tok) ()
+setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc
+
+getDir :: SFM (DgPState tok) (MoveToNext tok)
+getDir = psNext <$> get
+
+step :: SFM (DgPState tok) ()
+step = do
+    origin             <- currentPos
+    DgPSt f zp ps True <- get --if nothing is focused, currentPos makes no sense
+    case f origin zp of
+        Right zp' -> put (DgPSt f zp' ps True)
+        Left err -> fail here --or not?
+
+setPos :: (Int, (Int, b)) -> SFM (DgPState tok) ()
+setPos (ln, (co, _)) = do
+    DgPSt b zp ps _ <- get
+    Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
+    put (DgPSt b zp' ps True)
+
+--------------------------------------------------------------------------------
+
+-- |Succeeds FIXME FIXME i am not sure when
+end :: SFM (DgPState tok) ()
+end = do
+    Nothing <- (cursor . psStr) <$> get
+    return ()
+
+eat :: SFM (DgPState tok) tok
+eat = do
+    DgPSt nx dg ps True <- get
+    case dgPop dg of
+        Just (v, pos, dg') -> do
+            put $ case nx pos dg' of
+                Right q -> DgPSt nx q   (Just pos) True
+                Left  _ -> DgPSt nx dg' (Just pos) False --nowhere to move
+            return v
+        Nothing -> fail $ show (here, ps)
+
+currentPosM :: SFM (DgPState tok) (Maybe DgExt)
+currentPosM = (pos . psStr) <$> get
+
+currentPos :: SFM (DgPState tok) DgExt
+currentPos = do
+    Just p <- (pos . psStr) <$> get
+    return p
+
+peek :: SFM (DgPState tok) tok
+peek = do
+    Just p <- (cursor . psStr) <$> get
+    return p
+
+--------------------------------------------------------------------------------
+
+-- |Pop focused item, its extent and updated zipper
+dgPop :: Dg a -> Maybe (a, DgExt, Dg a)
+dgPop (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
+    = Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
+dgPop _ = Nothing
+
+pattern DgFocused x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
+
+cursor :: Dg a -> Maybe a
+cursor (DgFocused x) = Just x
+cursor _             = Nothing
+
+-- |Match on current token position
+pattern DgFocusedPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
+
+pos :: Dg a -> Maybe (Int, (Int, Int))
+pos (DgFocusedPos ln cl cr) = Just (ln, (cl, cr))
+pos _                       = Nothing
+
+mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
+mkDgZp = Zp [] . fmap (fmap (Zp []))
+
+--------------------------------------------------------------------------------
+
 -- moveNotCursed :: Int -> Int -> Dg a -> Maybe (Dg a)
 -- moveNotCursed line col = moveToLine line >=> moveToCol col
 
