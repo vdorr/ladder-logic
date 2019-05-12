@@ -28,14 +28,15 @@ import Ladder.LadderParser
 --XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
 newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
 
-type DgP = SFM DgPSt
+-- |Move in some direction from provided origin
+type MoveToNext tok = (Int, (Int, Int)) -> Dg tok -> Either String (Dg tok)
 
 -- |Parser state
-data DgPSt = DgPSt
-    { psNext     :: MoveToNext (Tok Text) -- ^select next token
-    , psStr      :: Dg (Tok Text) -- ^input
-    , psLastBite :: Maybe DgExt -- ^position of last token eaten
-    , psFocused  :: Bool -- ^current focus of zp is actual parser current token
+data DgPState tok = DgPSt
+    { psNext     :: MoveToNext tok -- ^select next token
+    , psStr      :: Dg tok         -- ^input
+    , psLastBite :: Maybe DgExt    -- ^position of last token eaten
+    , psFocused  :: Bool           -- ^current focus of zp is actual parser current token
     }
 
 instance Functor (SFM s) where
@@ -60,9 +61,11 @@ instance Alternative (SFM s) where
 
 --------------------------------------------------------------------------------
 
--- |Move in some direction from provided origin
-type MoveToNext tok = (Int, (Int, Int)) -> Dg tok -> Either String (Dg tok)
+type DgP = SFM DgPSt
+type DgPSt = DgPState (Tok Text)
 type Next = MoveToNext (Tok Text)
+
+--------------------------------------------------------------------------------
 
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
 move_ ln co dg = maybe (Left here) return (move ln co dg)
