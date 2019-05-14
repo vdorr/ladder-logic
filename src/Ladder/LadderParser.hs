@@ -24,15 +24,15 @@ import Ladder.DiagramParser
 --------------------------------------------------------------------------------
 
 data Diagram d s a
-    = Source a -- ^start of power rail
-    | Sink           -- ^where wire connects to (implied) right rail
-    | End            -- ^where vertical left rail ends at the bottom
+    = Source a   -- ^start of power rail
+    | Sink       -- ^where wire connects to (implied) right rail
+    | End        -- ^where vertical left rail ends at the bottom
 --     | Stub -- maybe better 
     | Device d a --
     | Jump   s
-    | Node   [a]     --order matters here
+    | Node   [a] --order matters here
 --     | Label s --i dislike it, but would need it if vline can cross line with label
-    deriving (Show, Functor, Eq)
+    deriving (Show, Functor, Eq, Foldable, Traversable)
 
 mapDg :: (d -> d') -> (s -> s') -> Diagram d s a -> Diagram d' s' a
 mapDg x y = f

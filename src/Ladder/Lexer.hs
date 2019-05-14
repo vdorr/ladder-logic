@@ -2,22 +2,14 @@
 
 module Ladder.Lexer where
 
--- import Data.Char
-
 --FIXME FIXME get rid of megaparsec
 import Text.Megaparsec --as P hiding (runParser', Pos)
 import Text.Megaparsec.Char --as PC
--- import Text.Megaparsec.Char.Lexer (symbol)
 import Data.Bifunctor
--- import Control.Monad hiding (fail)
-
 import Control.Applicative.Combinators (between)
 
 import qualified Data.Text as T
 import Data.Text (Text)
-
--- import Text.Megaparsec.Debug
--- import Debug.Trace
 
 import Preprocess (ParseErr(..), withPos)
 

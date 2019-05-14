@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    PatternSynonyms, DeriveFunctor, DeriveFoldable, DeriveTraversable,
-    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns #-}
+    PatternSynonyms,
+    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns, FlexibleContexts #-}
 
 -- OverloadedStrings, 
 
@@ -73,6 +73,61 @@ deps (Op _ d) = d
 
 --------------------------------------------------------------------------------
 
+-- 'Diagram' in reverse and without jumps
+-- , [(label,Either (Jump label) [LdF])]
+-- data LdF p d a
+--     = Source
+--     | Stub p --refers to other signal
+--     | Device d a
+--     | Node   [a]     --or operator
+
+-- 'Diagram' without jumps and left rail
+
+--------------------------------------------------------------------------------
+
+--just remove initial Source and tree of Nodes
+--quite useless operation, i think
+forest
+    :: Cofree (Diagram d s) p
+    -> Maybe [Cofree (Diagram d s) p]
+forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
+forest _               = Nothing
+
+merge'
+    :: Cofree (Diagram d s) p
+--     -> ([p], Cofree (Diagram d s) p)
+    -> ([(p, [p])], Cofree (Diagram d s) p)
+-- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
+merge' ast = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] $ merge ast
+    where
+    f ns _ []  = ns
+    f ns p nss = (p, nss) : ns
+
+merge
+    :: Cofree (Diagram d s) p
+    -> Cofree (Diagram d s) ([p], p)
+merge = g
+    where
+    g (p :< Node as) = (ns, p) :< Node (fmap merge as')
+            where
+            (as', ns) = foldMap succs' as
+    g (p :< other)   = ([], p) :< fmap merge other
+
+-- succs
+--     :: Cofree (Diagram d s) p
+--     -> [Cofree (Diagram d s) p]
+-- succs (_ :< Node xs) = foldMap succs xs
+-- succs other          = [other]
+
+succs'
+    :: Cofree (Diagram d s) p
+    -> ([Cofree (Diagram d s) p], [p])
+succs' (p :< Node xs) = fmap (++[p]) $ foldMap succs' xs
+-- succs' (p :< Node xs) = foldMap succs' xs
+succs' other          = ([other], [])
+
+--------------------------------------------------------------------------------
+
 parseOps
     :: Cofree (Diagram Dev s) p
     -> Cofree (Diagram (Op Operand s) s) p
@@ -92,8 +147,10 @@ fffff
     => Cofree (Diagram (Op Operand s) s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 
-fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
-fffff _               = error here --should not happen
+-- fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
+-- fffff _               = error here --should not happen
+
+fffff w@(p :< _a) =  ffff ([], [], 0) 0 p w
 
 ffff
     :: Eq p
@@ -105,7 +162,13 @@ ffff
 ffff (st, op, cnt) r src (p :< x) = f x
     where
 --     f (Label s a) = undefined --should not happen
-    f (Source a) = error here --should not happen
+--     f (Source a) = error here --should not happen
+    f (Source a) = 
+        ffff
+            (st
+            , op <> [(R cnt, Op On [])] --getop r cnt s n
+            , cnt + 1) cnt p a
+    
     f  Sink = --end of hline, may lead to 'Node'
         ( st
         , op <> case lookup p st of
@@ -127,16 +190,18 @@ ffff (st, op, cnt) r src (p :< x) = f x
             (st
             , op <> [(R cnt, Op dev [ R r ])] --getop r cnt s n
             , cnt + 1) cnt p a
+--TODO at this point Jump should be handled separately, only basic blocks here
     f (Jump s) =
 --         (st, op <> [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
         (st, op <> [(R cnt, Op (Jmp s) [R r])], cnt + 1) --XXX XXX beware wires crossing jump point
     f (Node la) =
-        doNode (st <> [(p, r)], op, cnt) la
+--         doNode (st <> [(p, r)], op, cnt) la
+        foldl (\st' x' -> ffff st' r p x') (st <> [(p, r)], op, cnt) la
 
-    doNode st' []        = st'
-    doNode st' (x' : xs) =
-        let st'' = ffff st' r p x'
-            in doNode st'' xs
+--     doNode st' []        = st'
+--     doNode st' (x' : xs) =
+--         let st'' = ffff st' r p x'
+--             in doNode st'' xs
 
 --     getop rr rrr "[ ]" [n]    = [(R rrr, Op (And n) [ R rr ])]
 --     getop rr rrr "[>]" [a, b] = [(R rrr, Op (Cmp Gt a b) [ R rr ])]
@@ -202,7 +267,7 @@ or'd out ((r@R{}, x) : xs)
     | Zp l ((d, a) : rs) <- zpLookup r (zpFromList out)
                        = or'd (zpToList (Zp l ((d, a ++ [x]) : rs))) xs
     | otherwise        = or'd ((r, [x]) : out) xs
-or'd out ((d, x) : xs) = or'd ((d, [x]) : out) xs
+-- or'd out ((d, x) : xs) = or'd ((d, [x]) : out) xs
 or'd out []            = reverse out
 
 --make tail recursive?
@@ -216,10 +281,10 @@ tsort ks xs = do
     test (Op _ a) = all isIn a
 
     isIn (R n) = elem n ks
-    isIn _     = True
+--     isIn _     = True
 
     getRegN (R n) = [n]
-    getRegN _     = []
+--     getRegN _     = []
 
 --------------------------------------------------------------------------------
 
@@ -229,8 +294,22 @@ testAst ast' = do
 
     let ast = parseOps ast'
 
+    print (here, "-----------------------")
+
+--     let (nodes, x0) = merge' ast
+--     print (here, nodes)
+--     let Just x1 = forest x0
+--     for_ x1 (print . (here,))
+
+    let Just x1 = forest ast
+    let (nodes, x2) = unzip $ fmap merge' x1
+    print (here, concat nodes)
+    let Just x3 = sequenceA $ fmap forest x2
+    for_ x3 print
+
+
     let (st, op, cnt) = fffff ast
-    print (here, cnt, "-----------------------")
+    print (here, "-----------------------")
     for_ st print
     print (here, "-----------------------")
     for_ op print
@@ -250,7 +329,7 @@ testAst ast' = do
 
     print (here, "-----------------------")
 
-    let !q = evalTestVect p01 ["b"] vect01
+    let !q = evalTestVect p01 ["b", "d"] vect01
     print (here, q)
 --     print (here, flattenTestVect vect01)
 
