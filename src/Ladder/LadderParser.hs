@@ -37,12 +37,12 @@ data Diagram d s a
 mapDg :: (d -> d') -> (s -> s') -> Diagram d s a -> Diagram d' s' a
 mapDg x y = f
     where
-    f (Source a)     = Source a
-    f  Sink          = Sink
-    f  End           = End
+    f (Source a)   = Source a
+    f  Sink        = Sink
+    f  End         = End
     f (Device d a) = Device (x d) a
-    f (Jump s)       = Jump (y s)
-    f (Node a)       = Node a
+    f (Jump s)     = Jump (y s)
+    f (Node a)     = Node a
 
 --------------------------------------------------------------------------------
 

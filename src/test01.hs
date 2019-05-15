@@ -11,6 +11,7 @@ import Data.Foldable
 import Data.Traversable
 import Data.List
 import Data.Function
+import Data.Bifunctor
 import System.Environment (getArgs)
 
 import Debug.Trace
@@ -80,10 +81,31 @@ deps (Op _ d) = d
 --     | Stub p --refers to other signal
 --     | Device d a
 --     | Node   [a]     --or operator
-
 -- 'Diagram' without jumps and left rail
 
+
+stack = undefined
+    where
+    f (Source a)   = undefined
+    f  Sink        = undefined
+    f  End         = undefined
+    f (Device d a) = undefined
+    f (Jump s)     = undefined
+    f (Node a)     = undefined
+
 --------------------------------------------------------------------------------
+
+stubs
+    :: Cofree (Diagram d s) p
+    -> [p]
+stubs (p :< a) = f a
+    where
+    f (Source a)   = stubs a --ugh what is ungawa for this?
+    f  Sink        = [p]
+    f  End         = []
+    f (Device d a) = stubs a
+    f (Jump s)     = []
+    f (Node a)     = foldMap stubs a
 
 --just remove initial Source and tree of Nodes
 --quite useless operation, i think
@@ -94,11 +116,11 @@ forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
 forest _               = Nothing
 
 merge'
-    :: Cofree (Diagram d s) p
---     -> ([p], Cofree (Diagram d s) p)
+    :: Cofree (Diagram d s) p -- ^input tree
     -> ([(p, [p])], Cofree (Diagram d s) p)
+-- ^pairs of position of 'Node' still in tree and 'Node' positions merged into it and new tree
+merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
 -- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
-merge' ast = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] $ merge ast
     where
     f ns _ []  = ns
     f ns p nss = (p, nss) : ns
@@ -223,7 +245,6 @@ network net m0
     f r m (dst, op) = g dst
         where
         g (R n) = (r ++ [(n, w')] , m1)
---         g  DD   = (r              , m1)
         (m1, w') = foldl h (m, False) op
         h (m', w) o = fmap (w ||) (rung m' r o)
 
@@ -288,56 +309,74 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
-testAst :: Cofree (Diagram Dev String) DgExt
-                      -> IO ()
+testAst :: Cofree (Diagram Dev String) DgExt -> IO ()
 testAst ast' = do
 
     let ast = parseOps ast'
 
     print (here, "-----------------------")
 
---     let (nodes, x0) = merge' ast
---     print (here, nodes)
---     let Just x1 = forest x0
---     for_ x1 (print . (here,))
-
+    --chop
     let Just x1 = forest ast
-    let (nodes, x2) = unzip $ fmap merge' x1
-    print (here, concat nodes)
-    let Just x3 = sequenceA $ fmap forest x2
-    for_ x3 print
+    --collect stubs (per each forest tree)
+    let x1' :: [([DgExt], Cofree (Diagram (Op Operand String) String) DgExt)]
+            = fmap (\x -> (stubs x, x)) x1
+    --merge neighbouring nodes
+    let q = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
+            in ((stbs, nds), tre') --this is result - stubs in subtree, merged nodes and new tree
+                    ) x1'
 
+    let allSinks = foldMap (fst . fst) q --aka stubs
+    let nodesMerged :: [(DgExt, [DgExt])] = foldMap (snd . fst) q
+    let allNodes = nub $ fmap fst nodesMerged ++ foldMap snd nodesMerged
+    let sinksLeadingToNodes = filter (flip elem allNodes) allSinks --aka stubs
+    print (here, "allNodes:", allNodes)
+    print (here, "nodesMerged:", nodesMerged)
+    print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
+
+    print (here, "-----------------------")
+    for_ q $ \((stubs, _), tr) -> do
+        print $ filter (flip elem allNodes) stubs
+        print tr
+
+--     let allNodes = nub $ fmap fst nodesMerged' ++ foldMap snd nodesMerged'
+--     print (here, "-----------------------")
+--     let (nodesMerged, x2) = bimap concat id $ unzip $ fmap merge' x1
+--     print (here, "nodesMerged:", nodesMerged)
+--     let Just x3' = sequenceA $ fmap (\(stb, fo) -> forest) x2'
+--     let Just x3 = sequenceA $ fmap forest x2
+--     for_ x3 print
 
     let (st, op, cnt) = fffff ast
+--     print (here, "-----------------------")
+--     for_ st print
+--     print (here, "-----------------------")
+--     for_ op print
     print (here, "-----------------------")
-    for_ st print
-    print (here, "-----------------------")
-    for_ op print
-    print (here, "-----------------------")
-    Just w <- return $ tsort [] $ or'd [] op
-    for_ (w) print
-    print (here, "-----------------------")
+--     Just w <- return $ tsort [] $ or'd [] op
+--     for_ (w) print
+--     print (here, "-----------------------")
     let memory =
-                [ ("a", X True),("b", X False),("c", X False)
+                [ ("a", X True),("b", X False),("c", X False),("d", X False)
 --                 , ("%QX0", X True), ("%IX0", I 0)
                 ]
     let Just p01 = tsort [] $ or'd [] op
-    print (here, network' p01 memory)
+    print (here, "memory after single eval:", network' p01 memory)
 
     print (here, "-----------------------")
     for_ p01 print
 
     print (here, "-----------------------")
+    print (here, "test trace:")
 
     let !q = evalTestVect p01 ["b", "d"] vect01
     print (here, q)
---     print (here, flattenTestVect vect01)
 
 --------------------------------------------------------------------------------
 
 vect01 :: TestVect
 vect01 =
-    [ (2, [("a", X False),("b", X False),("c", X False)])
+    [ (2, [("a", X False),("b", X False),("c", X False),("d", X False)])
     , (1, [("a", X True)])
     , (1, [("a", X False)])
     ]
@@ -355,14 +394,23 @@ updateMemory old new = nubBy (on (==) fst) $ new ++ old --yeah performace be dam
 
 type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
+
 evalTestVect
     :: [(D, [E (Op Operand String)])] -- ^network to evaluate
     -> [VarName]                      -- ^watched memory variables
     -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
-evalTestVect net watch vect = fst $ foldl step ([], []) vect'
+evalTestVect net = evalTestVect' (network' net)
+
+--Foldable?
+evalTestVect'
+    :: ([(String, V)] -> [(String, V)]) -- ^network to evaluate
+    -> [VarName]                      -- ^watched memory variables
+    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
+    -> [[V]]       -- ^resulting trace, elems are same length as watch list
+evalTestVect' p watch vect = fst $ foldl step ([], []) vect'
     where
-    p = network' net
+
     vect' = flattenTestVect vect
 
     step (tr, mem) stim = (tr ++ [tr'], mem'')
@@ -383,7 +431,7 @@ main = do
             let zp = mkDgZp x
             forM_ (zpToList zp) (print . (here,))
 
-            print (here, "--------------------------------------------------")
+--             print (here, "--------------------------------------------------")
 
             case applyDgp test002' zp of
                 Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
@@ -393,7 +441,7 @@ main = do
 --                     for_ zpr $ \q -> print (here, q)
 
                     print (here, "--------------------------------------------------")
-                    print (here, ast)
+--                     print (here, ast)
 --                     print (here)
 --                     printAst 0 ast
                     TIO.putStrLn src

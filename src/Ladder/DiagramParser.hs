@@ -247,7 +247,7 @@ mkDgZp = Zp [] . fmap (fmap (Zp []))
 -- moveNotCursed line col = moveToLine line >=> moveToCol col
 
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
-move line col = (moveToLine line >=> moveToCol col) . focusDg
+move line col = (moveToLine line >=> moveToCol col) . focusDg --FIXME get rid of focusing
 
 pattern DgLine us ln zp ds = Zp us ((ln, zp) : ds)
 
