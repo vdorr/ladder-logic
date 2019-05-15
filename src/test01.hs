@@ -10,6 +10,7 @@ import qualified Data.Text.IO as TIO
 import Data.Foldable
 import Data.Traversable
 import Data.List
+import Data.Maybe
 import Data.Function
 import Data.Bifunctor
 import System.Environment (getArgs)
@@ -309,6 +310,29 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
+-- emit nodeToSink stack ((stubs, p :< a) : xs) = do
+-- 
+--     print here
+-- 
+--     where
+-- 
+--     f (Source a)   = print "ld #1"
+--     f  Sink        = return () --drop
+--     f  End         = return ()
+--     f (Device d a) = do
+--         print d
+--         emit nodeToSink stack ((stubs, a):xs)
+--     f (Jump s)     = error here --later
+--     f (Node a)     = do
+--         let (yes, no) = partition ((p==).fst) nodeToSink
+--         error here
+-- --         for_ a emit -- will be fold actually
+
+--------------------------------------------------------------------------------
+
+nodeTable :: [(p, [p])] -> [(p, p)]
+nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
+
 testAst :: Cofree (Diagram Dev String) DgExt -> IO ()
 testAst ast' = do
 
@@ -333,6 +357,10 @@ testAst ast' = do
     print (here, "allNodes:", allNodes)
     print (here, "nodesMerged:", nodesMerged)
     print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
+    let oldNodeToNewNode = nodeTable nodesMerged
+    let nodeToSink
+            = fmap (\p -> (fromJust $ lookup p oldNodeToNewNode, p)) sinksLeadingToNodes
+    print (here, "nodeToSink:", nodeToSink)
 
     print (here, "-----------------------")
     for_ q $ \((stubs, _), tr) -> do
