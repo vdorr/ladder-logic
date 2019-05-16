@@ -14,6 +14,7 @@ import Data.Maybe
 import Data.Function
 import Data.Bifunctor
 import System.Environment (getArgs)
+import Data.Tuple
 
 import Debug.Trace
 
@@ -310,23 +311,68 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
--- emit nodeToSink stack ((stubs, p :< a) : xs) = do
--- 
---     print here
--- 
---     where
--- 
---     f (Source a)   = print "ld #1"
---     f  Sink        = return () --drop
---     f  End         = return ()
---     f (Device d a) = do
---         print d
---         emit nodeToSink stack ((stubs, a):xs)
---     f (Jump s)     = error here --later
---     f (Node a)     = do
---         let (yes, no) = partition ((p==).fst) nodeToSink
---         error here
--- --         for_ a emit -- will be fold actually
+--only node may have multiple successors
+--stub(sink) may have one or zero successors
+
+emit nodeToSink = do
+
+    print here
+
+    where
+
+    sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
+
+    go (stack, []) = do
+        print "eeek"
+        return undefined
+    go (stack, (stubs, p :< a) : xs) = f stack a
+
+        where
+
+        f stk (Source b)       = print "ld #1" >> go (p:stk, (stubs, b) : xs)
+--         f (_:stk) Sink         = print "drop" >> go (stk, xs)
+        f (_:stk) Sink             = do
+            case lookup p sinkToNode of
+                Just _ -> return (stk, xs) --not pushing!!
+                Nothing -> print "drop" >> return (stk, xs)
+--             go (stk, xs) -- ???
+--             return (stk, xs)
+        f stk End              = go (stk, xs)
+        f (x:stk) (Device d b) = do
+            print d
+            go (p:stk, (stubs, b):xs)
+        f stk (Jump s)         = error here --later
+        f stk (Node a)         = do
+            --look for stubs coinciding with this node
+            let needToEvalFirst1{-node positions-}
+                    = filter ((p==).fst) nodeToSink
+
+            (stk', xs') <-
+                foldlM
+                    step
+                    (stk, xs)
+                    needToEvalFirst1
+
+    --         replicate (length a - 1) "dup"
+
+-- foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b 
+--             foldlM
+--                 (\(stk', xs') tr -> go (stk', tr)
+--                     )
+--                 (stk, xs)
+--                 dependencies-}
+
+            error here
+    --         for_ a go... -- will be fold actually
+            where
+            step (stk', xs') (_, p') = do
+                case findIndex (p'==) stk' of
+                     Just i -> do
+                         print $ "fetch " ++ show i
+                         undefined
+                     Nothing -> case partition (elem p' .fst) xs' of
+                                    ([tr], rest) -> undefined
+                                    _ -> error here
 
 --------------------------------------------------------------------------------
 
@@ -350,10 +396,10 @@ testAst ast' = do
             in ((stbs, nds), tre') --this is result - stubs in subtree, merged nodes and new tree
                     ) x1'
 
-    let allSinks = foldMap (fst . fst) q --aka stubs
+    let allStubs = foldMap (fst . fst) q --aka sinks
     let nodesMerged :: [(DgExt, [DgExt])] = foldMap (snd . fst) q
     let allNodes = nub $ fmap fst nodesMerged ++ foldMap snd nodesMerged
-    let sinksLeadingToNodes = filter (flip elem allNodes) allSinks --aka stubs
+    let sinksLeadingToNodes = filter (flip elem allNodes) allStubs --aka sinks
     print (here, "allNodes:", allNodes)
     print (here, "nodesMerged:", nodesMerged)
     print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)

@@ -13,39 +13,8 @@ import Ladder.Zipper
 
 --------------------------------------------------------------------------------
 
--- |Diagram parser input stream (or, say, input vortex)
-type Dg a = Zp (Int, Zp ((Int, Int), a))
-
--- |Token position and extent
-type DgExt = (Int, (Int, Int))
-
--- |Returns number of remaining tokens
-dgLength :: Dg a -> Int
-dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
-
-dgNull :: Dg a -> Bool
-dgNull = (>0) . dgLength --FIXME
-
--- |Drop empty lines
-dgTrim :: Dg a -> Dg a
-dgTrim (Zp l r) = Zp (trim l) (trim r)
-    where trim = filter (not . zpNull . snd)
-
---------------------------------------------------------------------------------
-
 --XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
 newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
-
--- |Move in some direction from provided origin
-type MoveToNext tok = (Int, (Int, Int)) -> Dg tok -> Either String (Dg tok)
-
--- |Parser state
-data DgPState tok = DgPSt
-    { psNext     :: MoveToNext tok -- ^select next token
-    , psStr      :: Dg tok         -- ^input
-    , psLastBite :: Maybe DgExt    -- ^position of last token eaten
-    , psFocused  :: Bool           -- ^current focus of zp is actual parser current token
-    }
 
 instance Functor (SFM s) where
     fmap = ap . return
@@ -68,6 +37,48 @@ instance Alternative (SFM s) where
     a <|> b = SFM $ \s -> --sfm a s <|> sfm b s
                 either (const $ sfm b s) Right (sfm a s)
 
+get :: SFM s s
+get = SFM $ \s -> return (s, s)
+
+put :: s -> SFM s ()
+put s = SFM $ \_ -> return ((), s)
+
+modify :: (s -> s) -> SFM s ()
+modify f = f <$> get >>= put
+
+--------------------------------------------------------------------------------
+
+-- |Diagram parser input stream (or, say, input vortex)
+type Dg a = Zp (Int, Zp ((Int, Int), a))
+
+-- |Token position and extent
+type DgExt = (Int, (Int, Int))
+
+-- |Returns number of remaining tokens
+dgLength :: Dg a -> Int
+dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
+
+dgNull :: Dg a -> Bool
+dgNull = (>0) . dgLength --FIXME
+
+-- |Drop empty lines
+dgTrim :: Dg a -> Dg a
+dgTrim (Zp l r) = Zp (trim l) (trim r)
+    where trim = filter (not . zpNull . snd)
+
+--------------------------------------------------------------------------------
+
+-- |Move in some direction from provided origin
+type MoveToNext tok = (Int, (Int, Int)) -> Dg tok -> Either String (Dg tok)
+
+-- |Parser state
+data DgPState tok = DgPSt
+    { psNext     :: MoveToNext tok -- ^select next token
+    , psStr      :: Dg tok         -- ^input
+    , psLastBite :: Maybe DgExt    -- ^position of last token eaten
+    , psFocused  :: Bool           -- ^current focus of zp is actual parser current token
+    }
+
 --------------------------------------------------------------------------------
 
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
@@ -89,15 +100,6 @@ lastPos = psLastBite <$> get >>= maybe (fail here) return
 
 applyDgp :: SFM (DgPState tok) a -> Dg tok -> Either String (a, DgPState tok)
 applyDgp p dg = sfm p (DgPSt goRight dg Nothing True)
-
-get :: SFM s s
-get = SFM $ \s -> return (s, s)
-
-put :: s -> SFM s ()
-put s = SFM $ \_ -> return ((), s)
-
-modify :: (s -> s) -> SFM s ()
-modify f = f <$> get >>= put
 
 setDir :: MoveToNext tok -> SFM (DgPState tok) ()
 setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc

@@ -125,7 +125,7 @@ token7
 --     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
     <|> VLine        <$  char '|'
-    <|> Cross         <$  char '+'
+    <|> Cross        <$  char '+'
     <|> Continuation <$> try (between' ">" ">" name)
     <|> HLine        <$  some (char '-')
     <|> Jump'        <$> (try (chunk ">>") *> labelName)
