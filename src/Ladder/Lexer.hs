@@ -3,7 +3,7 @@
 module Ladder.Lexer where
 
 --FIXME FIXME get rid of megaparsec
-import Text.Megaparsec --as P hiding (runParser', Pos)
+import Text.Megaparsec hiding (Label) --as P hiding (runParser', Pos)
 import Text.Megaparsec.Char --as PC
 import Data.Bifunctor
 import Control.Applicative.Combinators (between)
@@ -59,28 +59,6 @@ k ('(' : s)
 k ('%' : s)
 -}
 
--- |Chop by network labels
--- does not look for labels floating among logic, that is left to parser
--- produced list of (labeled) networks
-basicBlocks
-    :: [[Tok a]]
-    -> [(Maybe a, [[Tok a]])]
-basicBlocks [] = []
-basicBlocks t = (lbl, this) : basicBlocks rest
-    where
-    (this, rest) = break isLabel t'
-    (lbl, t')
-        = case t of
-            ([Label' x] : xs) -> (Just x, xs)
-            xs                -> (Nothing, xs)
-    isLabel [Label' _] = True
-    isLabel _          = False
-
-isWsTok :: Tok a -> Bool
-isWsTok Pragma{}  = True
-isWsTok Comment{} = True
-isWsTok _         = False
-
 -- |Diagram token
 --rule: control statements (jump) are followed by EOL
 data Tok a
@@ -88,14 +66,14 @@ data Tok a
     = Cross           -- ^ "+"
     | VLine          -- ^ "|"
 --sole thing that occupy whole line
-    | Label' a       -- ^ network label "LABEL:"
+    | Label a       -- ^ network label "LABEL:"
 --horizontal things
     | HLine          -- Int --repetitions
     | REdge          -- ^ as block input "--->"
     | FEdge          -- ^ as block input "---<"
 
 --     | Negated        -- on block i/o "---0|" or "|0---"
-    | Number Int
+    | Number Int --should probably be of type 'a'
     | Contact !a     -- ^ "---[OP]---"
     | Coil a         -- ^ "---(OP)---"
 
@@ -121,7 +99,7 @@ token7
 --     <|> Pragma       <$> T.pack <$> between' "{" "}" (many anySingle)
 --     <|> Comment      <$> Comment <$> (chunk "(*" *> manyTill anySingle (try (chunk "*)")))
 
-    <|> Label'       <$> try (labelName <* char ':')
+    <|> Label       <$> try (labelName <* char ':')
 --     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
     <|> VLine        <$  char '|'
@@ -179,5 +157,27 @@ preproc5'
 -- preproc5
 --     = bimap (T.pack . errorBundlePretty) id
 --     . parse test7' "(file)"
+
+isWsTok :: Tok a -> Bool
+isWsTok Pragma{}  = True
+isWsTok Comment{} = True
+isWsTok _         = False
+
+-- |Chop by network labels
+-- does not look for labels floating among logic, that is left to parser
+-- produced list of (labeled) networks
+basicBlocks
+    :: [[Tok a]]
+    -> [(Maybe a, [[Tok a]])]
+basicBlocks [] = []
+basicBlocks t = (lbl, this) : basicBlocks rest
+    where
+    (this, rest) = break isLabel t'
+    (lbl, t')
+        = case t of
+            ([Label x] : xs) -> (Just x, xs)
+            xs                -> (Nothing, xs)
+    isLabel [Label _] = True
+    isLabel _         = False
 
 --------------------------------------------------------------------------------

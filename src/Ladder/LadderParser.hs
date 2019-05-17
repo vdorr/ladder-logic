@@ -46,11 +46,13 @@ mapDg x y = f
 
 --------------------------------------------------------------------------------
 
--- data Device s
---     = Contact s
---     | Coil    s
---     | Block
---     deriving (Show, Eq)
+data Operand
+    = Var String
+    | Lit Int
+    deriving (Show, Eq)
+
+data Dev = Dev String [Operand]
+    deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 
@@ -189,14 +191,6 @@ contactType : ...
 coilType    : ...
 
 -}
-
-data Operand
-    = Var String
-    | Lit Int
-    deriving (Show, Eq)
-
-data Dev = Dev String [Operand]
-    deriving (Show, Eq)
 
 test002' :: DgP (Cofree (Diagram Dev String) DgExt)
 test002'

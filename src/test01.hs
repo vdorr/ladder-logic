@@ -15,6 +15,8 @@ import Data.Function
 import Data.Bifunctor
 import System.Environment (getArgs)
 import Data.Tuple
+import Control.Monad (replicateM_)
+import Data.Semigroup
 
 import Debug.Trace
 
@@ -54,46 +56,6 @@ data Op n s
 
 data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
     deriving Show
-
---------------------------------------------------------------------------------
-
-deps :: E op -> [D]
-deps (Op _ d) = d
-
--- data W n s
---     = WOp (Op n s) [W n s]
--- --     | WLit Bool --true would be enough
---     | WReg Int
--- 
--- deps :: W n s -> [Int]
--- deps = undefined
--- 
--- ugh
---     :: Eq p
---     => Cofree (Diagram String Operand s) p
---     -> [(Int, Op Operand s)]
--- ugh = undefined
-
---------------------------------------------------------------------------------
-
--- 'Diagram' in reverse and without jumps
--- , [(label,Either (Jump label) [LdF])]
--- data LdF p d a
---     = Source
---     | Stub p --refers to other signal
---     | Device d a
---     | Node   [a]     --or operator
--- 'Diagram' without jumps and left rail
-
-
-stack = undefined
-    where
-    f (Source a)   = undefined
-    f  Sink        = undefined
-    f  End         = undefined
-    f (Device d a) = undefined
-    f (Jump s)     = undefined
-    f (Node a)     = undefined
 
 --------------------------------------------------------------------------------
 
@@ -311,12 +273,58 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
+data Instruction
+    = ITrap --merge with invoke? IInvoke Int
+    | ILdOn
+    | IDup
+    | IPick  Int
+    | IDrop
+    | ILdArg Operand
+    | ILdM
+    | IStM
+--     | IJump  String
+    | IAnd
+    | IOr
+    | INot
+    | IEq
+    | ILt
+    | IGt
+
+data ItSt = ItSt [Bool] [Operand] [(String, V)]
+
+eval = f
+    where
+    f st                     ITrap     = Left (st, "trap")
+    f    (ItSt ws     os m)  ILdOn     = pure $ ItSt (True:ws) os m
+    f    (ItSt (w:ws) os m)  IDup      = pure $ ItSt (w:w:ws) os m
+    f st@(ItSt ws     os m) (IPick i)
+        | i >= 0 && i < length ws      = pure $ ItSt (ws!!i:ws) os m
+        | otherwise                    = Left (st, "stk idx out of range")
+    f    (ItSt (_:ws) os m)  IDrop     = pure $ ItSt ws os m
+
+--     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
+--     f st@(ItSt ws     (Var n:os) m)  ILdM
+--         | Just v <- lookup n m                 = undefined --pure $ ItSt ws os m
+--         | otherwise                            = Left (st, "var not found")
+
+--------------------------------------------------------------------------------
+
+--XXX XXX XXX prob want new base functor, without 'End' (and without 'Source'?)
+-- and distinguishing 'Sink' and 'Stub'
+
 --only node may have multiple successors
 --stub(sink) may have one or zero successors
-
-emit nodeToSink = do
+--i should make newtype for nodeToSink elements
+-- emit
+--     :: Show a0
+--     => Eq b0
+--     => [(b0, b0)]
+--     -> [([b0], Cofree (Diagram a0 s) b0)]
+--     -> IO ([b0], [([b0], Cofree (Diagram a0 s) b0)])
+emit nodeToSink asts = do
 
     print here
+    go ([], asts)
 
     where
 
@@ -324,25 +332,24 @@ emit nodeToSink = do
 
     go (stack, []) = do
         print "eeek"
-        return undefined
+        return (stack, [])
+--    go stack (p :< a) xs -- get rid of stubs
     go (stack, (stubs, p :< a) : xs) = f stack a
 
         where
 
         f stk (Source b)       = print "ld #1" >> go (p:stk, (stubs, b) : xs)
---         f (_:stk) Sink         = print "drop" >> go (stk, xs)
-        f (_:stk) Sink             = do
-            case lookup p sinkToNode of
-                Just _ -> return (stk, xs) --not pushing!!
+        f (_:stk) Sink         = do
+            case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
+                Just _  -> return (p:stk, xs) --put value back under name with which is referenced
                 Nothing -> print "drop" >> return (stk, xs)
---             go (stk, xs) -- ???
---             return (stk, xs)
         f stk End              = go (stk, xs)
         f (x:stk) (Device d b) = do
-            print d
+            print $ show d ++ "; " ++ show p
             go (p:stk, (stubs, b):xs)
         f stk (Jump s)         = error here --later
-        f stk (Node a)         = do
+        f (_:stk) (Node b)     = do
+            --at least one value on stack
             --look for stubs coinciding with this node
             let needToEvalFirst1{-node positions-}
                     = filter ((p==).fst) nodeToSink
@@ -353,26 +360,41 @@ emit nodeToSink = do
                     (stk, xs)
                     needToEvalFirst1
 
-    --         replicate (length a - 1) "dup"
+            let dups = replicate (length b - 1) p
+            for_ dups $ const $ print "dup"
 
--- foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b 
---             foldlM
---                 (\(stk', xs') tr -> go (stk', tr)
---                     )
---                 (stk, xs)
---                 dependencies-}
-
-            error here
-    --         for_ a go... -- will be fold actually
+            foldlM
+                (\(stk'', xs'') tr
+                    -> go (stk'', ([{-don't care about stub list here-}], tr) : xs'')
+                    )
+                (dups ++ stk', xs')
+                b
             where
-            step (stk', xs') (_, p') = do
-                case findIndex (p'==) stk' of
+            step (stk', xs') (_, stubP) = do
+                case findIndex (stubP==) stk' of
                      Just i -> do
-                         print $ "fetch " ++ show i
-                         undefined
-                     Nothing -> case partition (elem p' .fst) xs' of
-                                    ([tr], rest) -> undefined
-                                    _ -> error here
+                         case i of
+                            0 -> return ()
+                            _ -> print $ "fetch " ++ show i ++ "; " ++ show stubP
+                         print "or"
+                         return (stubP:stk', xs')
+                     Nothing ->
+                        case partition (elem stubP .fst) xs' of
+                          --stub must appear in exactly one subtree
+                            ([tr@(_, _:< _)], rest) -> do
+                                s@(stk'', _) <- go (stk', tr : rest)
+                                --now fetch and or??
+                                case findIndex (stubP==) stk'' of --check latest stack
+                                    Just i ->
+                                        case i of
+                                            0 -> return ()
+                                            _ -> print $ "fetch " ++ show i
+                                    Nothing
+                                        -> error $ show (here, stubP, stk'') --should not happen
+                                print "or"
+                                return s
+                            other -> error $ show (here, other) --should not happen
+        f stk n = error $ show (here, stk, n)
 
 --------------------------------------------------------------------------------
 
@@ -413,6 +435,9 @@ testAst ast' = do
         print $ filter (flip elem allNodes) stubs
         print tr
 
+    print (here, "-----------------------")
+    emit nodeToSink $ fmap (\((stubs, _), tr) -> (stubs, tr)) q
+
 --     let allNodes = nub $ fmap fst nodesMerged' ++ foldMap snd nodesMerged'
 --     print (here, "-----------------------")
 --     let (nodesMerged, x2) = bimap concat id $ unzip $ fmap merge' x1
@@ -443,8 +468,10 @@ testAst ast' = do
     print (here, "-----------------------")
     print (here, "test trace:")
 
-    let !q = evalTestVect p01 ["b", "d"] vect01
-    print (here, q)
+    let watch = ["b", "d"]
+    let !trace = evalTestVect p01 watch vect01
+    print (here, trace)
+    putStrLn $ unlines $ prettyTrace $ zip watch $ transpose trace
 
 --------------------------------------------------------------------------------
 
@@ -456,6 +483,49 @@ vect01 =
     ]
 
 --------------------------------------------------------------------------------
+
+--generates one screen, chopping might be done outside
+prettyTrace :: [(VarName, [V])] -> [String]
+prettyTrace trace = x
+    where
+--     (names, values) = bimap (fmap pad) (fmap sparkline) $ unzip trace
+    x = fmap (\(n, l) -> pad n ++ "|" ++ sparkline l) trace
+    Max w = foldMap (Max . length . fst) trace
+    pad s = replicate (w - length s) ' ' ++ s
+
+-- "_▅_▅▅▅_"
+sparkline :: [V] -> String
+sparkline trace = fmap (bar.asInt) trace
+    where
+--     trace' = fmap asInt trace
+    asInt (X True)  = 7
+    asInt (X False) = 0
+--     asInt (I i)     = i
+    bar = ("_▂▃▄▅▆▇█" !!)
+
+{-
+
+  |_▅_▅▅▅_
+  |_▅▅_▅__
+  ╵ 
+ ▕10
+
+│ │ 
+┼───
+│ │ 
+
+   │
+V1 │_▂▃▄▅▆▇█________
+  0|   ╵   ╵   ╵   ╵4s
+V0 │_▂▃▄▅▆▇█▇▆▅▄▃▂__
+
+   │
+V1_│_▂▃▄▅▆▇█________
+V0_│_▂▃▄▅▆▇█▇▆▅▄▃▂__
+   ╵   ╵   ╵   ╵   ╵
+              1s/div
+
+-}
 
 flattenTestVect :: TestVect -> [[(VarName, V)]]
 flattenTestVect [] = []

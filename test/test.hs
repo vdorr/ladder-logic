@@ -62,7 +62,7 @@ tokenizerTests = testGroup "Tokenizer"
             | (* hello *)
             +->>LBL         |]
     , testCase "label" $
-        (Right [[VLine],[Label' "LBL"],[VLine]] @=?) $ testPreproc4 $ [text|
+        (Right [[VLine],[Label "LBL"],[VLine]] @=?) $ testPreproc4 $ [text|
             | (* hello *)
             LBL:
             |               |]
