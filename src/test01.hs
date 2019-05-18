@@ -318,9 +318,9 @@ eval = f
         | Just (X v) <- lookup a m  = pure (v:ws, os, m)
         | otherwise                 = Left (st, "invalid memory access")
     f st@(w:ws, os, m)  (IStBit a)
-        | (m0,(_,X _):m1) <- break ((==a).fst) m = pure (w:ws, os, (m0 ++ (a, X w) : m1))
-        | otherwise                              = Left (st, "invalid memory access")
-
+        | (m0,(_,X _):m1) <- break ((==a).fst) m
+                                    = pure (w:ws, os, (m0 ++ (a, X w) : m1))
+        | otherwise                 = Left (st, "invalid memory access")
     f st@(a:b:ws, os, m) IAnd       = pure ((a&&b):ws, os, m)
     f st@(a:b:ws, os, m) IOr        = pure ((a||b):ws, os, m)
     f st@(a:ws,   os, m) INot       = pure (not a:ws,  os, m)

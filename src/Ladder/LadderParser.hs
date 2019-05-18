@@ -149,7 +149,7 @@ labelOnTop' p = bimap unpack id <$> labelOnTop p
 --------------------------------------------------------------------------------
 
 hline = do
-    HLine <- eat
+    HLine _ <- eat
     return ()
 
 vline = do
@@ -229,7 +229,7 @@ vline2 = do
 
 hline2 :: DgP () --TODO vline crossing
 hline2 = do
-    HLine <- eat
+    HLine _ <- eat
     return ()
 
 device :: DgP (Bool, String) -> DgP (Cofree (Diagram Dev String) DgExt)

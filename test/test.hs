@@ -58,7 +58,7 @@ tokenizerTests = testGroup "Tokenizer"
             +
             |               |]
     , testCase "5" $
-        (Right [[VLine],[Cross,HLine,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
+        (Right [[VLine],[Cross,HLine 1,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
             | (* hello *)
             +->>LBL         |]
     , testCase "label" $
@@ -73,32 +73,32 @@ tokenizerTests = testGroup "Tokenizer"
                 LBL:
                 |               |]
     , testCase "continuation" $
-        (Right [[VLine],[Cross,HLine,Continuation "X"],[VLine]] @=?)
+        (Right [[VLine],[Cross,HLine 2,Continuation "X"],[VLine]] @=?)
             $ testPreproc4 $ [text|
                 | (* hello *)
                 +-->X>
                 |               |]
     , testCase "return" $
-        (Right [[VLine],[Cross,HLine,Return],[VLine]] @=?)
+        (Right [[VLine],[Cross,HLine 2,Return],[VLine]] @=?)
             $ testPreproc4 $ [text|
                 | (* hello *)
                 +--<RETURN>
                 |               |]
     , testCase "connector" $
-        (Right [[Continuation "X", HLine]] @=?)
+        (Right [[Continuation "X", HLine 2]] @=?)
             $ testPreproc4 $ [text|
                 (* hello *)
                 >X>--           |]
 
     , testCase "device" $
-        (Right [[VLine,Name "a",Name "b"],[Cross,HLine,Contact " ",HLine,Coil "/",HLine]]
+        (Right [[VLine,Name "a",Name "b"],[Cross,HLine 2,Contact " ",HLine 2,Coil "/",HLine 2]]
             @=?)
             $ testPreproc4 $ [text|
                 |  a    b
                 +--[ ]--(/)--   |]
 
     , testCase "negation" $
-        (Right [[VLine],[Cross,HLine,Number 0]]
+        (Right [[VLine],[Cross,HLine 2,Number 0]]
             @=?)
             $ testPreproc4 $ [text|
             |
@@ -174,7 +174,7 @@ ladderTests = testGroup "Ladder parser"
     , testCase "gap"
         $ simpleResult (fmap getDg $ dgParse
             [ (1, [((1, 1), VLine)])
-            , (2, [((1, 1), Cross), ((2, 2), HLine), ((4, 4), HLine)])
+            , (2, [((1, 1), Cross), ((2, 2), HLine 2), ((4, 4), HLine 2)])
             ])
         @?= Left True
     , testCase "testN01"

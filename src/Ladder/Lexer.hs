@@ -63,34 +63,37 @@ k ('%' : s)
 --rule: control statements (jump) are followed by EOL
 data Tok a
 --parts without mandatory horizontal component:
-    = Cross           -- ^ "+"
-    | VLine          -- ^ "|"
+    = Cross            -- ^ "+"
+    | VLine            -- ^ "|"
 --sole thing that occupy whole line
-    | Label a       -- ^ network label "LABEL:"
+    | Label        a   -- ^ network label "LABEL:"
 --horizontal things
-    | HLine          -- Int --repetitions
-    | REdge          -- ^ as block input "--->"
-    | FEdge          -- ^ as block input "---<"
+    | HLine        Int
+    | REdge            -- ^ as block input "--->"
+    | FEdge            -- ^ as block input "---<"
 
 --     | Negated        -- on block i/o "---0|" or "|0---"
-    | Number Int --should probably be of type 'a'
-    | Contact !a     -- ^ "---[OP]---"
-    | Coil a         -- ^ "---(OP)---"
+    | Number       Int --should probably be of type 'a'
+    | Contact      a   -- ^ "---[OP]---"
+    | Coil         a   -- ^ "---(OP)---"
 
 --as above, but could be mistaken for other things
 --     | Connector a        -- "--->NAME>"
-    | Continuation a -- ^ ">NAME>---" -- same as Connector
-    | Return         -- ^ "---\<RETURN>"
+    | Continuation a   -- ^ ">NAME>---" -- same as Connector
+    | Return           -- ^ "---\<RETURN>"
 --Jump additionaly is followed by end of line
-    | Jump' a        -- ^ "--->>LABEL"
+    | Jump'        a   -- ^ "--->>LABEL"
 
 --others
 --     | Store a            -- FBD only "---VARIABLE"
-    | Name a         -- ^inside of block
+    | Name         a   -- ^inside of block
 --whitespace
-    | Comment a      -- ^ (* ... *)
-    | Pragma a       -- ^ { ... }
+    | Comment      a   -- ^ (* ... *)
+    | Pragma       a   -- ^ { ... }
     deriving (Show, Eq, Functor)
+
+renderLexeme :: Tok a -> String
+renderLexeme = undefined
 
 token7 :: Parsec ParseErr Text (Tok Text)
 token7
@@ -105,7 +108,7 @@ token7
     <|> VLine        <$  char '|'
     <|> Cross        <$  char '+'
     <|> Continuation <$> try (between' ">" ">" name)
-    <|> HLine        <$  some (char '-')
+    <|> HLine        <$>  (length <$> some (char '-'))
     <|> Jump'        <$> (try (chunk ">>") *> labelName)
 --         <|> Return            <$  try (between' "<" ">" labelName)
     <|> Return       <$  try (chunk "<RETURN>")
