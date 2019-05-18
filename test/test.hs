@@ -4,6 +4,11 @@ import Test.Tasty
 -- import Test.Tasty.SmallCheck as SC
 -- import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
+import Test.Tasty.Hedgehog
+
+import           Hedgehog
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import Data.List
 import Data.Ord
@@ -109,7 +114,26 @@ tokenizerTests = testGroup "Tokenizer"
 
     , testCase "ehmm" $
         show (fmap id (Contact ())) @?= "Contact ()"
+
+    , testProperty "hedgehog 1" prop_trip
+
     ]
+
+prop_trip :: Property
+prop_trip =
+    withTests 1000 . property $ do
+        toks <- forAll genToken
+        tripping toks (renderLexeme . fmap unpack) parse
+    where
+    parse = const $ Just VLine
+
+genToken :: Gen (Tok Text)
+genToken =
+    Gen.choice
+        [ Number <$> Gen.int (Range.linear 0 maxBound)
+        , pure Cross
+        , Name <$> Gen.text (Range.linear 1 20) Gen.alpha
+        ]
 
 -- simpleResult = bimap ((>0).Data.Text.length) id
 simpleResult :: (Bifunctor f, IsList e) => f e a -> f Bool a
