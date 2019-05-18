@@ -275,15 +275,16 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
-data Instruction
+data Instruction a w
     = ITrap --invoke debugger
+    | ISysRq
     | ILdOn -- push #1 onto wire stack {- w: -- #1 -}
     | IDup -- coudl be replaced by IPick 0, dup value on top of wire stack {- w: x -- x x -}
     | IPick  Int -- push wire stack value at index onto wire stack {- w: -- x -}
     | IDrop --drop value from wire stack {- w: x -- -}
 
-    | ILdBit String -- push bit from address onto wire stack
-    | IStBit String -- dtto for store
+    | ILdBit a -- push bit from address onto wire stack
+    | IStBit a -- dtto for store
 
 --     | IJump  String
     | IAnd -- and two values on wire stack, push result back
@@ -291,7 +292,7 @@ data Instruction
     | INot -- negate value on top of wire stack
 --     | IXor
 
-    | ILdCnA Int {- push int const onto argument stack, a: -- l -}
+    | ILdCnA w {- push int const onto argument stack, a: -- l -}
     | ILdM {- a: size addr -- <value> -}
     | IStM
 
@@ -304,7 +305,7 @@ data Instruction
 -- data ItSt = ItSt [Bool] [V] [(String, V)]
 type ItpSt = ([Bool], [V], [(String, V)])
 
-eval :: ItpSt -> Instruction -> Either (ItpSt, String) ItpSt
+eval :: ItpSt -> Instruction String Int -> Either (ItpSt, String) ItpSt
 eval = f
     where
     f st                 ITrap      = Left (st, "trap")
@@ -475,8 +476,11 @@ testAst ast' = do
 --         subTrees
     xxx <- execWriterT $ generate tell nodeToSink subTrees
     for_ xxx print
-    let xxy = evalTestVect'' xxx watch vect01
+    let watch2 = ["a","b","c","d"]
+    let xxy = evalTestVect'' xxx watch2 vect01
     print (here, xxy)
+    let Right tr2 = xxy
+    putStrLn $ unlines $ prettyTrace $ zip watch2 $ transpose tr2
 
 --     let allNodes = nub $ fmap fst nodesMerged' ++ foldMap snd nodesMerged'
 --     print (here, "-----------------------")
@@ -584,11 +588,11 @@ evalTestVect
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
 evalTestVect net = evalTestVect' (network' net)
 
-evalBlock :: [Instruction] -> ItpSt -> Either (ItpSt, String) ItpSt
+evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
 evalBlock p st = foldlM eval st p
 
 evalTestVect''
-    :: [Instruction]
+    :: [Instruction String Int]
     -> [VarName]
     -> [(Int, [(VarName, V)])]
     -> Either (ItpSt, String) [[V]]
