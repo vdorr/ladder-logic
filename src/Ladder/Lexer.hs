@@ -45,19 +45,6 @@ pragma       : '{' anychar* '}'
 
 -}
 
-{-
-k ('\n' : s)
-k ('+' : s)
-k ('|' : s)
-k ('-' : s)
-k ('>' : s)
-k ('<' : s)
---k ('0' : '|' : s)
-k ('0' : s) -- : '|'
-k ('[' : s)
-k ('(' : s)
-k ('%' : s)
--}
 
 -- |Diagram token
 --rule: control statements (jump) are followed by EOL
@@ -92,8 +79,23 @@ data Tok a
     | Pragma       a   -- ^ { ... }
     deriving (Show, Eq, Functor)
 
-renderLexeme :: Tok a -> String
-renderLexeme = undefined
+renderLexeme :: Tok String -> String
+renderLexeme t = case t of
+    Cross          -> "+"
+    VLine          -> "|"
+    Label        a -> a ++ ":"
+    HLine        n -> replicate n '-'
+    REdge          -> ">"
+    FEdge          -> "<"
+    Number       n -> show n
+    Contact      a -> "[" ++ a ++ "]"
+    Coil         a -> "(" ++ a ++ ")"
+    Continuation a -> ">" ++ a ++ ">"
+    Return         -> "<RETURN>"
+    Jump'        a -> ">>" ++ a
+    Name         a -> a
+    Comment      a -> "(*" ++ a ++ "*)"
+    Pragma       a -> "(" ++ a ++ "}"
 
 token7 :: Parsec ParseErr Text (Tok Text)
 token7
@@ -149,17 +151,6 @@ preproc5'
 preproc5'
     = bimap (T.pack . errorBundlePretty) id
     . parse test7 "(file)"
- 
--- whitespace7 :: Parsec ParseErr Text ()
--- whitespace7 = whitespace
---     where
---     whitespace = label "whitespace" $ space *> many (actualComment *> space) *> space
---     actualComment = chunk "(*" *> manyTill anySingle (try (chunk "*)"))
-
--- preproc5 :: Text -> Either Text [((SourcePos, SourcePos), Tok Text)]
--- preproc5
---     = bimap (T.pack . errorBundlePretty) id
---     . parse test7' "(file)"
 
 isWsTok :: Tok a -> Bool
 isWsTok Pragma{}  = True
