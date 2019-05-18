@@ -307,19 +307,25 @@ type ItpSt = ([Bool], [V], [(String, V)])
 eval :: ItpSt -> Instruction -> Either (ItpSt, String) ItpSt
 eval = f
     where
-    f st                ITrap      = Left (st, "trap")
-    f    (  ws, os, m)  ILdOn      = pure (True:ws, os, m)
-    f    (w:ws, os, m)  IDup       = pure (w:w:ws, os, m)
-    f st@(  ws, os, m) (IPick i)
-        | i >= 0 && i < length ws  = pure (ws!!i:ws, os, m)
-        | otherwise                = Left (st, "st@Instructionk idx out of range")
-    f    (_:ws, os, m)  IDrop      = pure (ws, os, m)
-    f st@(ws,   os, m) (ILdBit a)
-        | Just (X v) <- lookup a m = pure (v:ws, os, m)
-        | otherwise                = Left (st, "invalid memory access")
-    f st@(w:ws, os, m) (IStBit a)
+    f st                 ITrap      = Left (st, "trap")
+    f    (  ws, os, m)   ILdOn      = pure (True:ws, os, m)
+    f    (w:ws, os, m)   IDup       = pure (w:w:ws, os, m)
+    f st@(  ws, os, m)  (IPick i)
+        | i >= 0 && i < length ws   = pure (ws!!i:ws, os, m)
+        | otherwise                 = Left (st, "stk idx out of range")
+    f    (_:ws, os, m)   IDrop      = pure (ws, os, m)
+    f st@(ws,   os, m)  (ILdBit a)
+        | Just (X v) <- lookup a m  = pure (v:ws, os, m)
+        | otherwise                 = Left (st, "invalid memory access")
+    f st@(w:ws, os, m)  (IStBit a)
         | (m0,(_,X _):m1) <- break ((==a).fst) m = pure (w:ws, os, (m0 ++ (a, X w) : m1))
         | otherwise                              = Left (st, "invalid memory access")
+
+    f st@(a:b:ws, os, m) IAnd       = pure ((a&&b):ws, os, m)
+    f st@(a:b:ws, os, m) IOr        = pure ((a||b):ws, os, m)
+    f st@(a:ws,   os, m) INot       = pure (not a:ws,  os, m)
+
+--     f _ i = error $ show (here, i)
 
 --     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
 --     f st@(ItSt ws     (Var n:os) m)  ILdM
@@ -426,6 +432,12 @@ nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 testAst :: Cofree (Diagram Dev String) DgExt -> IO ()
 testAst ast' = do
 
+    let watch = ["b", "d"]
+    let memory =
+                [ ("a", X True),("b", X False),("c", X False),("d", X False)
+--                 , ("%QX0", X True), ("%IX0", I 0)
+                ]
+
     let ast = parseOps ast'
 
     print (here, "-----------------------")
@@ -463,6 +475,8 @@ testAst ast' = do
 --         subTrees
     xxx <- execWriterT $ generate tell nodeToSink subTrees
     for_ xxx print
+    let xxy = evalTestVect'' xxx watch vect01
+    print (here, xxy)
 
 --     let allNodes = nub $ fmap fst nodesMerged' ++ foldMap snd nodesMerged'
 --     print (here, "-----------------------")
@@ -481,10 +495,6 @@ testAst ast' = do
 --     Just w <- return $ tsort [] $ or'd [] op
 --     for_ (w) print
 --     print (here, "-----------------------")
-    let memory =
-                [ ("a", X True),("b", X False),("c", X False),("d", X False)
---                 , ("%QX0", X True), ("%IX0", I 0)
-                ]
     let Just p01 = tsort [] $ or'd [] op
     print (here, "memory after single eval:", network' p01 memory)
 
@@ -494,7 +504,6 @@ testAst ast' = do
     print (here, "-----------------------")
     print (here, "test trace:")
 
-    let watch = ["b", "d"]
     let !trace = evalTestVect p01 watch vect01
     print (here, trace)
     putStrLn $ unlines $ prettyTrace $ zip watch $ transpose trace
@@ -554,7 +563,6 @@ V1_│_▂▃▄▅▆▇█________
 V0_│_▂▃▄▅▆▇█▇▆▅▄▃▂__
    ╵   ╵   ╵   ╵   ╵
               1s/div
-
 -}
 
 flattenTestVect :: TestVect -> [[(VarName, V)]]
@@ -576,13 +584,33 @@ evalTestVect
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
 evalTestVect net = evalTestVect' (network' net)
 
+evalBlock :: [Instruction] -> ItpSt -> Either (ItpSt, String) ItpSt
+evalBlock p st = foldlM eval st p
+
+evalTestVect''
+    :: [Instruction]
+    -> [VarName]
+    -> [(Int, [(VarName, V)])]
+    -> Either (ItpSt, String) [[V]]
+evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
+    where
+
+    vect' = flattenTestVect vect
+
+    step (tr, st@(w, o, mem)) stim = do
+        st'@(_, _, mem'') <- evalBlock prog (w, o, mem')
+        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+        return (tr ++ [tr'], st')
+        where
+        mem' = updateMemory mem stim
+
 --Foldable?
 evalTestVect'
-    :: ([(String, V)] -> [(String, V)]) -- ^network to evaluate
+    :: ([(String, V)] -> [(VarName, V)]) -- ^network to evaluate
     -> [VarName]                      -- ^watched memory variables
     -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
-evalTestVect' p watch vect = fst $ foldl step ([], []) vect'
+evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
     where
 
     vect' = flattenTestVect vect
@@ -590,7 +618,7 @@ evalTestVect' p watch vect = fst $ foldl step ([], []) vect'
     step (tr, mem) stim = (tr ++ [tr'], mem'')
         where
         mem' = updateMemory mem stim
-        mem'' = p mem'
+        mem'' = prog mem'
         tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
 
 --------------------------------------------------------------------------------
