@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    PatternSynonyms,
+    PatternSynonyms,TypeApplications,
     LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns, FlexibleContexts #-}
 
 -- OverloadedStrings, 
@@ -17,6 +17,8 @@ import System.Environment (getArgs)
 import Data.Tuple
 import Control.Monad (replicateM_)
 import Data.Semigroup
+
+import Control.Monad.Writer.Strict
 
 import Debug.Trace
 
@@ -293,33 +295,30 @@ data Instruction
     | ILdM {- a: size addr -- <value> -}
     | IStM
 
+--     | IOp Operator --instead of lt,gt,etc
     | IEq -- compare two value on arg stack and push result onto wire stack
     | ILt
     | IGt
-
+    deriving Show
 
 -- data ItSt = ItSt [Bool] [V] [(String, V)]
-type ItSt = ([Bool], [V], [(String, V)])
+type ItpSt = ([Bool], [V], [(String, V)])
 
+eval :: ItpSt -> Instruction -> Either (ItpSt, String) ItpSt
 eval = f
     where
     f st                ITrap      = Left (st, "trap")
-    f    (ws,   os, m)  ILdOn      = pure (True:ws, os, m)
+    f    (  ws, os, m)  ILdOn      = pure (True:ws, os, m)
     f    (w:ws, os, m)  IDup       = pure (w:w:ws, os, m)
-    f st@(ws,   os, m) (IPick i)
+    f st@(  ws, os, m) (IPick i)
         | i >= 0 && i < length ws  = pure (ws!!i:ws, os, m)
-        | otherwise                = Left (st, "stk idx out of range")
+        | otherwise                = Left (st, "st@Instructionk idx out of range")
     f    (_:ws, os, m)  IDrop      = pure (ws, os, m)
-
     f st@(ws,   os, m) (ILdBit a)
         | Just (X v) <- lookup a m = pure (v:ws, os, m)
         | otherwise                = Left (st, "invalid memory access")
-
---     f st@(ItSt (w:ws) os m) (IStBit a)
---         | (m0,(_,X _):m1) <- break ((==a).fst) m = pure $ ItSt ws os (m0 ++ (a, X w) : m1)
---         | otherwise                              = Left (st, "invalid memory access")
     f st@(w:ws, os, m) (IStBit a)
-        | (m0,(_,X _):m1) <- break ((==a).fst) m = pure (ws, os, (m0 ++ (a, X w) : m1))
+        | (m0,(_,X _):m1) <- break ((==a).fst) m = pure (w:ws, os, (m0 ++ (a, X w) : m1))
         | otherwise                              = Left (st, "invalid memory access")
 
 --     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
@@ -341,31 +340,34 @@ eval = f
 --     => [(b0, b0)]
 --     -> [([b0], Cofree (Diagram a0 s) b0)]
 --     -> IO ([b0], [([b0], Cofree (Diagram a0 s) b0)])
-emit nodeToSink asts = do
-
-    print here
-    go ([], asts)
+--TODO allow ading annotations in 'emit'
+generate emit nodeToSink asts = go ([], asts)
 
     where
 
     sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
 
     go (stack, []) = do
-        print "eeek"
         return (stack, [])
 --    go stack (p :< a) xs -- get rid of stubs
     go (stack, (stubs, p :< a) : xs) = f stack a
 
         where
 
-        f stk (Source b)       = print "ld #1" >> go (p:stk, (stubs, b) : xs)
+        f stk (Source b)       = do
+            emit [ILdOn]
+            go (p:stk, (stubs, b) : xs)
         f (_:stk) Sink         = do
             case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
                 Just _  -> return (p:stk, xs) --put value back under name with which is referenced
-                Nothing -> print "drop" >> return (stk, xs)
+                Nothing -> do
+                    emit [IDrop]
+                    return (stk, xs)
         f stk End              = go (stk, xs)
         f (x:stk) (Device d b) = do
-            print $ show d ++ "; " ++ show p
+            case d of
+                 And (Var addr) -> emit [ILdBit addr, IAnd]
+                 St (Var addr)  -> emit [IStBit addr]
             go (p:stk, (stubs, b):xs)
         f stk (Jump s)         = error here --later
         f (_:stk) (Node b)     = do
@@ -381,7 +383,7 @@ emit nodeToSink asts = do
                     needToEvalFirst1
 
             let dups = replicate (length b - 1) p
-            for_ dups $ const $ print "dup"
+            for_ dups $ const $ emit [IDup]
 
             foldlM
                 (\(stk'', xs'') tr
@@ -395,8 +397,8 @@ emit nodeToSink asts = do
                      Just i -> do
                          case i of
                             0 -> return ()
-                            _ -> print $ "fetch " ++ show i ++ "; " ++ show stubP
-                         print "or"
+                            _ -> emit [IPick i]
+                         emit [IOr]
                          return (stubP:stk', xs')
                      Nothing ->
                         case partition (elem stubP .fst) xs' of
@@ -408,10 +410,10 @@ emit nodeToSink asts = do
                                     Just i ->
                                         case i of
                                             0 -> return ()
-                                            _ -> print $ "fetch " ++ show i
+                                            _ -> emit [IPick i]
                                     Nothing
                                         -> error $ show (here, stubP, stk'') --should not happen
-                                print "or"
+                                emit [IOr]
                                 return s
                             other -> error $ show (here, other) --should not happen
         f stk n = error $ show (here, stk, n)
@@ -456,7 +458,11 @@ testAst ast' = do
         print tr
 
     print (here, "-----------------------")
-    emit nodeToSink $ fmap (\((stubs, _), tr) -> (stubs, tr)) q
+    let subTrees = fmap (\((stubs, _), tr) -> (stubs, tr)) q
+--     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
+--         subTrees
+    xxx <- execWriterT $ generate tell nodeToSink subTrees
+    for_ xxx print
 
 --     let allNodes = nub $ fmap fst nodesMerged' ++ foldMap snd nodesMerged'
 --     print (here, "-----------------------")
@@ -522,7 +528,7 @@ sparkline :: [V] -> String
 sparkline trace = fmap (bar.asInt) trace
     where
 --     trace' = fmap asInt trace
-    asInt (X True)  = 7
+    asInt (X True)  = 6
     asInt (X False) = 0
 --     asInt (I i)     = i
     bar = ("_▂▃▄▅▆▇█" !!)
