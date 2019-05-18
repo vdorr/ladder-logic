@@ -274,33 +274,53 @@ tsort ks xs = do
 --------------------------------------------------------------------------------
 
 data Instruction
-    = ITrap --merge with invoke? IInvoke Int
-    | ILdOn
-    | IDup
-    | IPick  Int
-    | IDrop
-    | ILdArg Operand
-    | ILdM
-    | IStM
+    = ITrap --invoke debugger
+    | ILdOn -- push #1 onto wire stack {- w: -- #1 -}
+    | IDup -- coudl be replaced by IPick 0, dup value on top of wire stack {- w: x -- x x -}
+    | IPick  Int -- push wire stack value at index onto wire stack {- w: -- x -}
+    | IDrop --drop value from wire stack {- w: x -- -}
+
+    | ILdBit String -- push bit from address onto wire stack
+    | IStBit String -- dtto for store
+
 --     | IJump  String
-    | IAnd
-    | IOr
-    | INot
-    | IEq
+    | IAnd -- and two values on wire stack, push result back
+    | IOr -- dtto, or
+    | INot -- negate value on top of wire stack
+--     | IXor
+
+    | ILdCnA Int {- push int const onto argument stack, a: -- l -}
+    | ILdM {- a: size addr -- <value> -}
+    | IStM
+
+    | IEq -- compare two value on arg stack and push result onto wire stack
     | ILt
     | IGt
 
-data ItSt = ItSt [Bool] [Operand] [(String, V)]
+
+-- data ItSt = ItSt [Bool] [V] [(String, V)]
+type ItSt = ([Bool], [V], [(String, V)])
 
 eval = f
     where
-    f st                     ITrap     = Left (st, "trap")
-    f    (ItSt ws     os m)  ILdOn     = pure $ ItSt (True:ws) os m
-    f    (ItSt (w:ws) os m)  IDup      = pure $ ItSt (w:w:ws) os m
-    f st@(ItSt ws     os m) (IPick i)
-        | i >= 0 && i < length ws      = pure $ ItSt (ws!!i:ws) os m
-        | otherwise                    = Left (st, "stk idx out of range")
-    f    (ItSt (_:ws) os m)  IDrop     = pure $ ItSt ws os m
+    f st                ITrap      = Left (st, "trap")
+    f    (ws,   os, m)  ILdOn      = pure (True:ws, os, m)
+    f    (w:ws, os, m)  IDup       = pure (w:w:ws, os, m)
+    f st@(ws,   os, m) (IPick i)
+        | i >= 0 && i < length ws  = pure (ws!!i:ws, os, m)
+        | otherwise                = Left (st, "stk idx out of range")
+    f    (_:ws, os, m)  IDrop      = pure (ws, os, m)
+
+    f st@(ws,   os, m) (ILdBit a)
+        | Just (X v) <- lookup a m = pure (v:ws, os, m)
+        | otherwise                = Left (st, "invalid memory access")
+
+--     f st@(ItSt (w:ws) os m) (IStBit a)
+--         | (m0,(_,X _):m1) <- break ((==a).fst) m = pure $ ItSt ws os (m0 ++ (a, X w) : m1)
+--         | otherwise                              = Left (st, "invalid memory access")
+    f st@(w:ws, os, m) (IStBit a)
+        | (m0,(_,X _):m1) <- break ((==a).fst) m = pure (ws, os, (m0 ++ (a, X w) : m1))
+        | otherwise                              = Left (st, "invalid memory access")
 
 --     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
 --     f st@(ItSt ws     (Var n:os) m)  ILdM
@@ -486,8 +506,12 @@ vect01 =
 
 --generates one screen, chopping might be done outside
 prettyTrace :: [(VarName, [V])] -> [String]
-prettyTrace trace = x
+prettyTrace trace = x ++ ticks
     where
+    ticks = case trace of
+        ((_, l):_) -> [ pad "" ++ " " ++ replicate (length l) '╵']
+        _          -> []
+
 --     (names, values) = bimap (fmap pad) (fmap sparkline) $ unzip trace
     x = fmap (\(n, l) -> pad n ++ "|" ++ sparkline l) trace
     Max w = foldMap (Max . length . fst) trace
