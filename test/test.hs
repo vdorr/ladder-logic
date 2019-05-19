@@ -45,6 +45,14 @@ testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 testPreproc5 :: Text -> Either Text [Tok Text]
 testPreproc5 = fmap concat . testPreproc4
 
+--keep comments and pragmas
+testPreproc6 :: Text -> Either Text [[(Tok Text)]]
+testPreproc6 = fmap (fmap (snd . fmap (fmap snd))) . runLexer
+
+--keep comments and pragmas
+testLexer :: Text -> Either Text [Tok Text]
+testLexer = fmap concat . testPreproc6
+
 tokenizerTests = testGroup "Tokenizer"
     [ testCase "empty string" $
         (@?= Right []) $ testPreproc4  ""
@@ -114,17 +122,27 @@ tokenizerTests = testGroup "Tokenizer"
     , testCase "ehmm" $
         show (fmap id (Contact ())) @?= "Contact ()"
 
-    , testProperty "lexer roundtrip" prop_trip
+    , testProperty "lexeme roundtrip" prop_lexeme_trip
+--     , testProperty "lexer roundtrip" prop_trip
 
     ]
 
+prop_lexeme_trip :: Property
+prop_lexeme_trip =
+    withTests 1000 . property $ do
+        tok <- forAll genToken
+        tripping [tok]
+            (pack . foldMap (renderLexeme . fmap unpack))
+            testLexer
+
+--TODO
 prop_trip :: Property
 prop_trip =
     withTests 1000 . property $ do
         toks <- forAll genTokens
         tripping toks
             (pack . foldMap (renderLexeme . fmap unpack))
-            testPreproc5
+            testLexer
 
 genTokens :: Gen [Tok Text]
 genTokens = Gen.list (Range.linear 0 100) genToken

@@ -97,15 +97,12 @@ renderLexeme t = case t of
     Jump'        a -> ">>" ++ a
     Name         a -> a
     Comment      a -> "(*" ++ a ++ "*)"
-    Pragma       a -> "(" ++ a ++ "}"
+    Pragma       a -> "{" ++ a ++ "}"
 
 lexeme :: Parsec ParseErr Text (Tok Text)
 lexeme
     =   Pragma       <$> between'' "{" "}"
     <|> Comment      <$> between'' "(*" "*)"
---     <|> Pragma       <$> T.pack <$> between' "{" "}" (many anySingle)
---     <|> Comment      <$> Comment <$> (chunk "(*" *> manyTill anySingle (try (chunk "*)")))
-
     <|> Label       <$> try (labelName <* char ':')
 --     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
@@ -114,10 +111,7 @@ lexeme
     <|> Continuation <$> try (between' ">" ">" name)
     <|> HLine        <$>  (length <$> some (char '-'))
     <|> Jump'        <$> (try (chunk ">>") *> labelName)
---         <|> Return            <$  try (between' "<" ">" labelName)
     <|> Return       <$  try (chunk "<RETURN>")
---     <|> Contact      <$> between' "[" "]" innards
---     <|> Coil         <$> between' "(" ")" innards
     <|> Contact      <$> between'' "[" "]"
     <|> Coil         <$> between'' "(" ")"
 --         <|> Connector        <$> try (between ">" ">" name)
@@ -128,7 +122,6 @@ lexeme
     where
     labelName = T.pack <$> some alphaNumChar
     name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '%')
---     innards = T.pack <$> some (satisfy (\c -> notElem c [')', ']']))
     between' a b = between (chunk a) (chunk b)
     between'' :: Text -> Text -> Parsec ParseErr Text Text
     between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))
