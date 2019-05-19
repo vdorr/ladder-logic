@@ -126,6 +126,7 @@ lexeme
     between'' :: Text -> Text -> Parsec ParseErr Text Text
     between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))
 
+    --escape with backlsash, allow curly braces in pragmas
     between''' :: Text -> Text -> Parsec ParseErr Text Text
     between''' a b = mconcat <$> (chunk a *> manyTill interm (try (chunk b)))
         where

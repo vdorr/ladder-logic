@@ -19,6 +19,9 @@ import System.Environment (getArgs)
 import Data.Tuple
 import Control.Monad (replicateM_)
 import Data.Semigroup
+import Data.Int
+import Data.Word
+import Data.Bits
 
 import Control.Monad.Writer.Strict
 
@@ -637,17 +640,6 @@ data LadderTest = T01
     , expected :: [[V]]
     } deriving (Show, Read)
 
--- tst02 :: String
--- tst02 = T.unpack [text|T01
---   { testVect = [ (1, [("IX0", X False),("QX0", X False)])
---                , (1, [("IX0", X True)])
---                , (1, [("IX0", X False)])
---                ]
---   , watch    = ["QX0"]
---   , expected = [[X False], [X True], [X False]]
---   }
---       |]
-
 getPragma :: [Tok a] -> Maybe a
 getPragma (Pragma p : xs) = Just p
 getPragma (_ : xs)        = getPragma xs
@@ -673,8 +665,8 @@ main = do
         Right x -> do
 --             print (here, getPragma $ tokens x)
 --             let Just pgma = fmap (filter (/='\\') . T.unpack) $getPragma $ tokens x
-            let Just pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ tokens x
-            print ((read pgma) :: LadderTest)
+            let pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ tokens x
+            print (here, (pgma>>=readMaybe ) :: Maybe LadderTest)
 
             let zp = mkDgZp $ dropWhitespace x
             forM_ (zpToList zp) (print . (here,))
