@@ -70,7 +70,7 @@ tokenizerTests = testGroup "Tokenizer"
             +
             |               |]
     , testCase "5" $
-        (Right [[VLine],[Cross,HLine 1,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
+        (Right [[VLine],[Cross,HLine 0,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
             | (* hello *)
             +->>LBL         |]
     , testCase "label" $
@@ -85,32 +85,32 @@ tokenizerTests = testGroup "Tokenizer"
                 LBL:
                 |               |]
     , testCase "continuation" $
-        (Right [[VLine],[Cross,HLine 2,Continuation "X"],[VLine]] @=?)
+        (Right [[VLine],[Cross,HLine 1,Continuation "X"],[VLine]] @=?)
             $ testPreproc4 $ [text|
                 | (* hello *)
                 +-->X>
                 |               |]
     , testCase "return" $
-        (Right [[VLine],[Cross,HLine 2,Return],[VLine]] @=?)
+        (Right [[VLine],[Cross,HLine 1,Return],[VLine]] @=?)
             $ testPreproc4 $ [text|
                 | (* hello *)
                 +--<RETURN>
                 |               |]
     , testCase "connector" $
-        (Right [[Continuation "X", HLine 2]] @=?)
+        (Right [[Continuation "X", HLine 1]] @=?)
             $ testPreproc4 $ [text|
                 (* hello *)
                 >X>--           |]
 
     , testCase "device" $
-        (Right [[VLine,Name "a",Name "b"],[Cross,HLine 2,Contact " ",HLine 2,Coil "/",HLine 2]]
+        (Right [[VLine,Name "a",Name "b"],[Cross,HLine 1,Contact " ",HLine 1,Coil "/",HLine 1]]
             @=?)
             $ testPreproc4 $ [text|
                 |  a    b
                 +--[ ]--(/)--   |]
 
     , testCase "negation" $
-        (Right [[VLine],[Cross,HLine 2,Number 0]]
+        (Right [[VLine],[Cross,HLine 1,Number 0]]
             @=?)
             $ testPreproc4 $ [text|
             |

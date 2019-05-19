@@ -86,7 +86,7 @@ renderLexeme t = case t of
     Cross          -> "+"
     VLine          -> "|"
     Label        a -> a ++ ":"
-    HLine        n -> replicate n '-'
+    HLine        n -> replicate (n+1) '-'
     REdge          -> ">"
     FEdge          -> "<"
     Number       n -> show n
@@ -103,13 +103,13 @@ lexeme :: Parsec ParseErr Text (Tok Text)
 lexeme
     =   Pragma       <$> between'' "{" "}"
     <|> Comment      <$> between'' "(*" "*)"
-    <|> Label       <$> try (labelName <* char ':')
+    <|> Label        <$> try (labelName <* char ':')
 --     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
     <|> VLine        <$  char '|'
     <|> Cross        <$  char '+'
     <|> Continuation <$> try (between' ">" ">" name)
-    <|> HLine        <$>  (length <$> some (char '-'))
+    <|> HLine        <$> (((+(-1)).length) <$> some (char '-'))
     <|> Jump'        <$> (try (chunk ">>") *> labelName)
     <|> Return       <$  try (chunk "<RETURN>")
     <|> Contact      <$> between'' "[" "]"
