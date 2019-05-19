@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    PatternSynonyms,TypeApplications,
+    QuasiQuotes, PatternSynonyms,TypeApplications,
     LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns, FlexibleContexts #-}
 
 -- OverloadedStrings, 
@@ -7,9 +7,11 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO
+import qualified Data.Text as T
 import Data.Foldable
 import Data.Traversable
 import Data.List
+import Text.Read
 import Data.Maybe
 import Data.Function
 import Data.Bifunctor
@@ -29,6 +31,8 @@ import Ladder.Lexer  (preproc5')
 import Ladder.DiagramParser
 import Ladder.LadderParser
 
+import NeatInterpolation
+
 --------------------------------------------------------------------------------
 
 data D
@@ -42,7 +46,7 @@ data E op = Op op [D] -- and, or, ld #on, ...
 data V
     = X Bool 
     | I Int
-    deriving (Show, Eq)
+    deriving (Show, Read, Eq)
 
 data Op n s
     = And n -- wire out <- wire in and memory cell
@@ -627,8 +631,31 @@ evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
 
 --------------------------------------------------------------------------------
 
+data LadderTest = T01
+    { testVect :: [(Int, [(String, V)])]
+    , watch :: [String]
+    , expected :: [[V]]
+    } deriving (Show, Read)
+
+tst02 :: String
+tst02 = T.unpack [text|T01
+  { testVect = [ (1, [("IX0", X False),("QX0", X False)])
+               , (1, [("IX0", X True)])
+               , (1, [("IX0", X False)])
+               ]
+  , watch    = ["QX0"]
+  , expected = [[X False], [X True], [X False]]
+  }
+      |]
+
+--------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
+--     print ((readEither tst01):: Either String LadderTest)
+    print $ T01 [] [] []
+    print ((read tst02):: LadderTest)
+
     [file] <- getArgs
     src <- TIO.readFile file
     case stripPos <$> preproc5' src of

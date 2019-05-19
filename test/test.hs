@@ -135,7 +135,7 @@ genToken =
     Gen.choice
         [ pure Cross
         , pure VLine
-        ,      Label        <$> name
+        ,      Label        <$> name --TODO numeric label
         ,      HLine        <$> smallNumber
         , pure REdge
         , pure FEdge
@@ -144,10 +144,10 @@ genToken =
         ,      Coil         <$> name
         ,      Continuation <$> name
         , pure Return
-        ,      Jump'        <$> name
+        ,      Jump'        <$> name --TODO numeric label
         ,      Name         <$> name
-        ,      Comment      <$> name
-        ,      Pragma       <$> name
+        ,      Comment      <$> name --TODO richer alphabet
+        ,      Pragma       <$> name --TODO richer alphabet
         ]
     where
     name = Gen.text (Range.linear 1 20) Gen.alpha
