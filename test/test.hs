@@ -43,7 +43,6 @@ testPreproc4 :: Text -> Either Text [[(Tok Text)]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 
 testPreproc5 :: Text -> Either Text [Tok Text]
--- testPreproc5 = fmap (fmap snd) . preproc5
 testPreproc5 = fmap concat . testPreproc4
 
 tokenizerTests = testGroup "Tokenizer"
@@ -115,30 +114,48 @@ tokenizerTests = testGroup "Tokenizer"
     , testCase "ehmm" $
         show (fmap id (Contact ())) @?= "Contact ()"
 
-    , testProperty "hedgehog 1" prop_trip
+    , testProperty "lexer roundtrip" prop_trip
 
     ]
 
 prop_trip :: Property
 prop_trip =
     withTests 1000 . property $ do
-        toks <- forAll genToken
-        tripping toks (renderLexeme . fmap unpack) parse
-    where
-    parse = const $ Just VLine
+        toks <- forAll genTokens
+        tripping toks
+            (pack . foldMap (renderLexeme . fmap unpack))
+            testPreproc5
 
+genTokens :: Gen [Tok Text]
+genTokens = Gen.list (Range.linear 0 100) genToken
+
+-- HLine 0 - prob should use 'Natural'
 genToken :: Gen (Tok Text)
 genToken =
     Gen.choice
-        [ Number <$> Gen.int (Range.linear 0 maxBound)
-        , pure Cross
-        , Name <$> Gen.text (Range.linear 1 20) Gen.alpha
+        [ pure Cross
+        , pure VLine
+        ,      Label        <$> name
+        ,      HLine        <$> smallNumber
+        , pure REdge
+        , pure FEdge
+        ,      Number       <$> number
+        ,      Contact      <$> name
+        ,      Coil         <$> name
+        ,      Continuation <$> name
+        , pure Return
+        ,      Jump'        <$> name
+        ,      Name         <$> name
+        ,      Comment      <$> name
+        ,      Pragma       <$> name
         ]
+    where
+    name = Gen.text (Range.linear 1 20) Gen.alpha
+    smallNumber = Gen.int (Range.linear 0 999999)
+    number = Gen.int (Range.linear 0 maxBound)
 
--- simpleResult = bimap ((>0).Data.Text.length) id
 simpleResult :: (Bifunctor f, IsList e) => f e a -> f Bool a
 simpleResult = bimap ((>0).length.toList) id
--- simpleResult' = bimap ((>0).length) (const ())
 
 zipperTests = testGroup "Zipper"
     [ testCase "from/to list" $
