@@ -27,7 +27,7 @@ import Debug.Trace
 import Preprocess
 
 import Ladder.Zipper
-import Ladder.Lexer  (preproc5')
+import Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
 import Ladder.DiagramParser
 import Ladder.LadderParser
 
@@ -545,7 +545,7 @@ sparkline :: [V] -> String
 sparkline trace = fmap (bar.asInt) trace
     where
 --     trace' = fmap asInt trace
-    asInt (X True)  = 6
+    asInt (X True)  = 5
     asInt (X False) = 0
 --     asInt (I i)     = i
     bar = ("_▂▃▄▅▆▇█" !!)
@@ -648,20 +648,31 @@ tst02 = T.unpack [text|T01
   }
       |]
 
+getPragma :: [Tok a] -> Maybe a
+getPragma (Pragma p : xs) = Just p
+getPragma (_ : xs)        = getPragma xs
+getPragma _               = Nothing
+
+tokens
+    :: [(p, [((p, p), Tok a)])]
+    -> [Tok a]
+tokens = foldMap (fmap snd . snd)
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
 --     print ((readEither tst01):: Either String LadderTest)
-    print $ T01 [] [] []
-    print ((read tst02):: LadderTest)
+--     print $ T01 [] [] []
+--     print ((read tst02):: LadderTest)
 
     [file] <- getArgs
     src <- TIO.readFile file
-    case stripPos <$> preproc5' src of
+    case stripPos <$> runLexer src of
         Left err -> TIO.putStrLn err
         Right x -> do
-            let zp = mkDgZp x
+            print (here, getPragma $ tokens x)
+            let zp = mkDgZp $ dropWhitespace x
             forM_ (zpToList zp) (print . (here,))
 
 --             print (here, "--------------------------------------------------")

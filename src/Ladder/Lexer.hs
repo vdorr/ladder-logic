@@ -79,6 +79,8 @@ data Tok a
     | Pragma       a   -- ^ { ... }
     deriving (Show, Eq, Functor)
 
+--------------------------------------------------------------------------------
+
 renderLexeme :: Tok String -> String
 renderLexeme t = case t of
     Cross          -> "+"
@@ -97,8 +99,8 @@ renderLexeme t = case t of
     Comment      a -> "(*" ++ a ++ "*)"
     Pragma       a -> "(" ++ a ++ "}"
 
-token7 :: Parsec ParseErr Text (Tok Text)
-token7
+lexeme :: Parsec ParseErr Text (Tok Text)
+lexeme
     =   Pragma       <$> between'' "{" "}"
     <|> Comment      <$> between'' "(*" "*)"
 --     <|> Pragma       <$> T.pack <$> between' "{" "}" (many anySingle)
@@ -131,11 +133,37 @@ token7
     between'' :: Text -> Text -> Parsec ParseErr Text Text
     between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))
 
-test7' :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
-test7' = space *> many (withPos token7 <* space) <* eof
+lexerP :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
+lexerP = space *> many (withPos lexeme <* space) <* eof
+
+lexerLinesP :: Parsec ParseErr Text [(SourcePos, [((SourcePos, SourcePos), Tok Text)])]
+lexerLinesP = breakLines <$> lexerP
+
+runLexer
+    :: Text
+    -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+runLexer
+    = bimap (T.pack . errorBundlePretty) id
+    . parse lexerLinesP "(file)"
+
+--------------------------------------------------------------------------------
 
 test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
-test7 = (breakLines . filter (not.isWsTok.snd)) <$> test7'
+test7 = (breakLines . filter (not.isWsTok.snd)) <$> lexerP
+
+preproc5'
+    :: Text
+    -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+preproc5'
+    = bimap (T.pack . errorBundlePretty) id
+    . parse test7 "(file)"
+
+--------------------------------------------------------------------------------
+
+dropWhitespace
+    :: [(p, [((p, p), Tok a)])]
+    -> [(p, [((p, p), Tok a)])]
+dropWhitespace = filter (not.null.snd) . fmap (fmap (filter (not.isWsTok.snd)))
 
 breakLines
     :: [((SourcePos, SourcePos), tok)]
@@ -144,13 +172,6 @@ breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
     where
     (a, b) = span ((sourceLine p==).sourceLine.fst.fst) xs
 breakLines [] = []
-
-preproc5'
-    :: Text
-    -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
-preproc5'
-    = bimap (T.pack . errorBundlePretty) id
-    . parse test7 "(file)"
 
 isWsTok :: Tok a -> Bool
 isWsTok Pragma{}  = True
