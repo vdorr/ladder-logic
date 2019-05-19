@@ -101,8 +101,8 @@ renderLexeme t = case t of
 
 lexeme :: Parsec ParseErr Text (Tok Text)
 lexeme
-    =   Pragma       <$> between'' "{" "}"
-    <|> Comment      <$> between'' "(*" "*)"
+    =   Pragma       <$> between''' "{" "}"
+    <|> Comment      <$> between''' "(*" "*)"
     <|> Label        <$> try (labelName <* char ':')
 --     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
@@ -125,6 +125,15 @@ lexeme
     between' a b = between (chunk a) (chunk b)
     between'' :: Text -> Text -> Parsec ParseErr Text Text
     between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))
+
+    between''' :: Text -> Text -> Parsec ParseErr Text Text
+    between''' a b = mconcat <$> (chunk a *> manyTill interm (try (chunk b)))
+        where
+        interm = do
+            c <- anySingle
+            if '\\' == c
+            then chunk b <|> return (T.singleton c)
+            else return (T.singleton c)
 
 lexerP :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
 lexerP = space *> many (withPos lexeme <* space) <* eof
