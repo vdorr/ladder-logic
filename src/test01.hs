@@ -40,16 +40,6 @@ import Tooling
 
 --------------------------------------------------------------------------------
 
-parseOps
-    :: Cofree (Diagram Dev s) p
-    -> Cofree (Diagram (Op Operand s) s) p
-parseOps (a :< n) = a :< fmap parseOps (mapDg f id n)
-    where
-    f (Dev "[ ]" [n]   ) = And  n
-    f (Dev "[>]" [a, b]) = Cmp Gt a b
-    f (Dev "( )" [n]   ) = St n
-    f _                  = error here
-
 --TODO
 --convert to some intermediate representation usable outside interpreter
 --that is - extend with node numbering
@@ -130,26 +120,6 @@ evalTestVect
     -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
 evalTestVect net = evalTestVect' (network' net)
-
-evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
-evalBlock p st = foldlM eval st p
-
-evalTestVect''
-    :: [Instruction String Int]
-    -> [VarName]
-    -> [(Int, [(VarName, V)])]
-    -> Either (ItpSt, String) [[V]]
-evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
-    where
-
-    vect' = flattenTestVect vect
-
-    step (tr, st@(w, o, mem)) stim = do
-        st'@(_, _, mem'') <- evalBlock prog (w, o, mem')
-        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
-        return (tr ++ [tr'], st')
-        where
-        mem' = updateMemory mem stim
 
 --Foldable?
 evalTestVect'
@@ -248,6 +218,10 @@ tsort ks xs = do
 nodeTable :: [(p, [p])] -> [(p, p)]
 nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
+generateStk :: Cofree (Diagram Dev String) DgExt -> IO [Instruction String Int]
+generateStk = do
+    undefined
+
 testAst :: Cofree (Diagram Dev String) DgExt -> IO ()
 testAst ast' = do
 
@@ -293,6 +267,8 @@ testAst ast' = do
 --     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
 --         subTrees
     xxx <- execWriterT $ generate tell nodeToSink subTrees
+
+
     for_ xxx print
     let watch2 = ["a","b","c","d"]
     let xxy = evalTestVect'' xxx watch2 vect01

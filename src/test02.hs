@@ -37,6 +37,14 @@ import Tooling
 
 --------------------------------------------------------------------------------
 
+data LadderTest = T01
+    { testVect :: [(Int, [(String, V)])]
+    , watch :: [String]
+    , expected :: [[V]]
+    } deriving (Show, Read)
+
+--------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
 --     print ((readEither tst01):: Either String LadderTest)

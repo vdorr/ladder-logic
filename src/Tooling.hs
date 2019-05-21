@@ -52,12 +52,6 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --------------------------------------------------------------------------------
 
-data LadderTest = T01
-    { testVect :: [(Int, [(String, V)])]
-    , watch :: [String]
-    , expected :: [[V]]
-    } deriving (Show, Read)
-
 getPragma :: [Tok a] -> Maybe a
 getPragma (Pragma p : xs) = Just p
 getPragma (_ : xs)        = getPragma xs
@@ -136,8 +130,6 @@ vect01 =
     , (1, [("a", X True)])
     , (1, [("a", X False)])
     ]
-
---------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 
@@ -365,3 +357,37 @@ generate emit nodeToSink asts = go ([], asts)
                                 return s
                             other -> error $ show (here, other) --should not happen
         f stk n = error $ show (here, stk, n)
+
+--------------------------------------------------------------------------------
+
+evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
+evalBlock p st = foldlM eval st p
+
+evalTestVect''
+    :: [Instruction String Int]
+    -> [VarName]
+    -> [(Int, [(VarName, V)])]
+    -> Either (ItpSt, String) [[V]]
+evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
+    where
+
+    vect' = flattenTestVect vect
+
+    step (tr, st@(w, o, mem)) stim = do
+        st'@(_, _, mem'') <- evalBlock prog (w, o, mem')
+        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+        return (tr ++ [tr'], st')
+        where
+        mem' = updateMemory mem stim
+
+--------------------------------------------------------------------------------
+
+parseOps
+    :: Cofree (Diagram Dev s) p
+    -> Cofree (Diagram (Op Operand s) s) p
+parseOps (a :< n) = a :< fmap parseOps (mapDg f id n)
+    where
+    f (Dev "[ ]" [n]   ) = And  n
+    f (Dev "[>]" [a, b]) = Cmp Gt a b
+    f (Dev "( )" [n]   ) = St n
+    f _                  = error here
