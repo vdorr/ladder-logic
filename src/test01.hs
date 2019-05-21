@@ -19,9 +19,9 @@ import System.Environment (getArgs)
 import Data.Tuple
 import Control.Monad (replicateM_)
 import Data.Semigroup
+
 import Data.Int
 import Data.Word
-import Data.Bits
 
 import Control.Monad.Writer.Strict
 
@@ -34,37 +34,9 @@ import Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
 import Ladder.DiagramParser
 import Ladder.LadderParser
 
-import NeatInterpolation
+-- import NeatInterpolation
 
---------------------------------------------------------------------------------
-
-data D
-    = R Int
---     | DD -- dummy
-    deriving (Show, Eq, Ord)
-
-data E op = Op op [D] -- and, or, ld #on, ...
-    deriving Show
-
-data V
-    = X Bool 
-    | I Int
-    deriving (Show, Read, Eq)
-
-data Op n s
-    = And n -- wire out <- wire in and memory cell
---     | AndN
-    | Ld    -- ^ set wire state same as argument
-    | On    -- ^ set wire state to #on
-    | St n
---     | StN | StOn | StOff
-    | Jmp s
-    | Cmp CmpOp n n
-    -- | FB String [(String, D)] [(String, D)]
-    deriving Show
-
-data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
-    deriving Show
+import Tooling
 
 --------------------------------------------------------------------------------
 
@@ -281,6 +253,26 @@ tsort ks xs = do
 --     getRegN _     = []
 
 --------------------------------------------------------------------------------
+
+-- http://hackage.haskell.org/package/bits
+-- http://hackage.haskell.org/package/haskell-modbus
+-- https://github.com/yaacov/ArduinoModbusSlave/blob/master/examples/full/full.ino
+
+ --wire stack count, wire stack, arg stack, memory???
+type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
+
+eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
+eval2 = undefined
+
+run2
+    :: ItpSt2
+    -> [(String, [ExtendedInstruction String Int Int16])]
+    -> Either (ItpSt2, String) ItpSt2
+run2 = undefined
+
+data ExtendedInstruction ca a w
+    = EIJump ca
+    | Simple (Instruction a w)
 
 data Instruction a w
     = ITrap --invoke debugger
@@ -530,64 +522,6 @@ vect01 =
 
 --------------------------------------------------------------------------------
 
---generates one screen, chopping might be done outside
-prettyTrace :: [(VarName, [V])] -> [String]
-prettyTrace trace = x ++ ticks
-    where
-    ticks = case trace of
-        ((_, l):_) -> [ pad "" ++ " " ++ replicate (length l) '╵']
-        _          -> []
-
---     (names, values) = bimap (fmap pad) (fmap sparkline) $ unzip trace
-    x = fmap (\(n, l) -> pad n ++ "|" ++ sparkline l) trace
-    Max w = foldMap (Max . length . fst) trace
-    pad s = replicate (w - length s) ' ' ++ s
-
--- "_▅_▅▅▅_"
-sparkline :: [V] -> String
-sparkline trace = fmap (bar.asInt) trace
-    where
---     trace' = fmap asInt trace
-    asInt (X True)  = 5
-    asInt (X False) = 0
---     asInt (I i)     = i
-    bar = ("_▂▃▄▅▆▇█" !!)
-
-{-
-
-  |_▅_▅▅▅_
-  |_▅▅_▅__
-  ╵ 
- ▕10
-
-│ │ 
-┼───
-│ │ 
-
-   │
-V1 │_▂▃▄▅▆▇█________
-  0|   ╵   ╵   ╵   ╵4s
-V0 │_▂▃▄▅▆▇█▇▆▅▄▃▂__
-
-   │
-V1_│_▂▃▄▅▆▇█________
-V0_│_▂▃▄▅▆▇█▇▆▅▄▃▂__
-   ╵   ╵   ╵   ╵   ╵
-              1s/div
--}
-
-flattenTestVect :: TestVect -> [[(VarName, V)]]
-flattenTestVect [] = []
-flattenTestVect ((d, v) : xs)
-    | d >= 1    = [v] ++ replicate (d - 1) [] ++ flattenTestVect xs
-    | otherwise = flattenTestVect xs
-
-updateMemory :: [(VarName, V)] -> [(VarName, V)] -> [(VarName, V)]
-updateMemory old new = nubBy (on (==) fst) $ new ++ old --yeah performace be damned
-
-type TestVect = [(Int, [(VarName, V)])]
-type VarName = String
-
 evalTestVect
     :: [(D, [E (Op Operand String)])] -- ^network to evaluate
     -> [VarName]                      -- ^watched memory variables
@@ -634,29 +568,8 @@ evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
 
 --------------------------------------------------------------------------------
 
-data LadderTest = T01
-    { testVect :: [(Int, [(String, V)])]
-    , watch :: [String]
-    , expected :: [[V]]
-    } deriving (Show, Read)
-
-getPragma :: [Tok a] -> Maybe a
-getPragma (Pragma p : xs) = Just p
-getPragma (_ : xs)        = getPragma xs
-getPragma _               = Nothing
-
-tokens
-    :: [(p, [((p, p), Tok a)])]
-    -> [Tok a]
-tokens = foldMap (fmap snd . snd)
-
---------------------------------------------------------------------------------
-
 main :: IO ()
 main = do
---     print ((readEither tst01):: Either String LadderTest)
---     print $ T01 [] [] []
---     print ((read tst02):: LadderTest)
 
     [file] <- getArgs
     src <- TIO.readFile file
@@ -665,8 +578,9 @@ main = do
         Right x -> do
 --             print (here, getPragma $ tokens x)
 --             let Just pgma = fmap (filter (/='\\') . T.unpack) $getPragma $ tokens x
-            let pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ tokens x
-            print (here, (pgma>>=readMaybe ) :: Maybe LadderTest)
+
+--             let Just pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ tokens x
+--             print ((read pgma) :: LadderTest)
 
             let zp = mkDgZp $ dropWhitespace x
             forM_ (zpToList zp) (print . (here,))

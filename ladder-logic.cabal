@@ -30,6 +30,7 @@ library
                      , Ladder.DiagramParser
                      , Ladder.Zipper
                      , Ladder.Lexer
+                     , Tooling
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
