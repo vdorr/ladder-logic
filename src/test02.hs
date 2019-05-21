@@ -1,6 +1,6 @@
-{-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    QuasiQuotes, PatternSynonyms,TypeApplications,
-    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns, FlexibleContexts #-}
+{-# OPTIONS_GHC -Wunused-imports #-}
+
+{-# LANGUAGE CPP #-}
 
 -- OverloadedStrings, 
 
@@ -8,21 +8,21 @@
 
 import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
-import Data.Foldable
-import Data.Traversable
+-- import Data.Foldable
+-- import Data.Traversable
 import Data.List
 import Text.Read
-import Data.Maybe
-import Data.Function
-import Data.Bifunctor
+-- import Data.Maybe
+-- import Data.Function
+-- import Data.Bifunctor
 import System.Environment (getArgs)
-import Data.Tuple
-import Control.Monad (replicateM_)
-import Data.Semigroup
+-- import Data.Tuple
+-- import Control.Monad (replicateM_)
+-- import Data.Semigroup
 
-import Control.Monad.Writer.Strict
+-- import Control.Monad.Writer.Strict
 
-import Debug.Trace
+-- import Debug.Trace
 
 import Preprocess
 
@@ -43,14 +43,26 @@ data LadderTest = T01
     , expected :: [[V]]
     } deriving (Show, Read)
 
+
+runTest :: LadderTest -> Cofree (Diagram Dev String) DgExt -> IO ()
+runTest test ast = do
+    print here
+
+    prog <- generateStk ast
+
+    let xxy = evalTestVect'' prog (watch test) (testVect test)
+    print (here, xxy)
+    let Right tr2 = xxy
+    putStrLn $ unlines $ prettyTrace $ zip (watch test) $ transpose tr2
+
+    print (here, expected test == tr2)
+
+    return ()
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
---     print ((readEither tst01):: Either String LadderTest)
---     print $ T01 [] [] []
---     print ((read tst02):: LadderTest)
-
     [file] <- getArgs
     src <- TIO.readFile file
     case stripPos <$> runLexer src of
@@ -61,21 +73,22 @@ main = do
             let pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ tokens x
 --             print ((read pgma) :: LadderTest)
             case pgma >>= readMaybe of
-                 Just test@T01{} -> do
-                     print (here, test)
-                 Nothing -> do
-                     print (here, "no embedded test found")
+                Just test@T01{} -> do
+                    print (here, test)
 
-            let zp = mkDgZp $ dropWhitespace x
+                    let zp = mkDgZp $ dropWhitespace x
 #if 0
-            forM_ (zpToList zp) (print . (here,))
+                    forM_ (zpToList zp) (print . (here,))
 #endif
 
---             print (here, "--------------------------------------------------")
+        --             print (here, "--------------------------------------------------")
 
-            case applyDgp test002' zp of
-                Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
-                    print (here, "--------------------------------------------------")
-                    TIO.putStrLn src
---                     testAst ast
-                Left err -> print (here, err)
+                    case applyDgp test002' zp of
+                        Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
+                            print (here, "--------------------------------------------------")
+                            TIO.putStrLn src
+        --                     testAst ast
+                            runTest test ast
+                        Left err -> print (here, err)
+                Nothing -> do
+                    print (here, "no embedded test found")

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wunused-imports #-}
+
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
     QuasiQuotes, PatternSynonyms,TypeApplications,
     LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns, FlexibleContexts #-}
@@ -7,25 +9,21 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO
-import qualified Data.Text as T
+-- import qualified Data.Text as T
 import Data.Foldable
-import Data.Traversable
+-- import Data.Traversable
 import Data.List
-import Text.Read
-import Data.Maybe
-import Data.Function
-import Data.Bifunctor
+-- import Text.Read
+-- import Data.Maybe
+-- import Data.Function
+-- import Data.Bifunctor
 import System.Environment (getArgs)
-import Data.Tuple
-import Control.Monad (replicateM_)
-import Data.Semigroup
+-- import Data.Tuple
+-- import Control.Monad (replicateM_)
+-- import Data.Semigroup
+-- import Control.Monad.Writer.Strict
 
-import Data.Int
-import Data.Word
-
-import Control.Monad.Writer.Strict
-
-import Debug.Trace
+-- import Debug.Trace
 
 import Preprocess
 
@@ -215,12 +213,6 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
-nodeTable :: [(p, [p])] -> [(p, p)]
-nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
-
-generateStk :: Cofree (Diagram Dev String) DgExt -> IO [Instruction String Int]
-generateStk = do
-    undefined
 
 testAst :: Cofree (Diagram Dev String) DgExt -> IO ()
 testAst ast' = do
@@ -231,44 +223,7 @@ testAst ast' = do
 --                 , ("%QX0", X True), ("%IX0", I 0)
                 ]
 
-    let ast = parseOps ast'
-
-    print (here, "-----------------------")
-
-    --chop
-    let Just x1 = forest ast
-    --collect stubs (per each forest tree)
-    let x1' :: [([DgExt], Cofree (Diagram (Op Operand String) String) DgExt)]
-            = fmap (\x -> (stubs x, x)) x1
-    --merge neighbouring nodes
-    let q = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
-            in ((stbs, nds), tre') --this is result - stubs in subtree, merged nodes and new tree
-                    ) x1'
-
-    let allStubs = foldMap (fst . fst) q --aka sinks
-    let nodesMerged :: [(DgExt, [DgExt])] = foldMap (snd . fst) q
-    let allNodes = nub $ fmap fst nodesMerged ++ foldMap snd nodesMerged
-    let sinksLeadingToNodes = filter (flip elem allNodes) allStubs --aka sinks
-    print (here, "allNodes:", allNodes)
-    print (here, "nodesMerged:", nodesMerged)
-    print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
-    let oldNodeToNewNode = nodeTable nodesMerged
-    let nodeToSink
-            = fmap (\p -> (fromJust $ lookup p oldNodeToNewNode, p)) sinksLeadingToNodes
-    print (here, "nodeToSink:", nodeToSink)
-
-    print (here, "-----------------------")
-    for_ q $ \((stubs, _), tr) -> do
-        print $ filter (flip elem allNodes) stubs
-        print tr
-
-    print (here, "-----------------------")
-    let subTrees = fmap (\((stubs, _), tr) -> (stubs, tr)) q
---     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
---         subTrees
-    xxx <- execWriterT $ generate tell nodeToSink subTrees
-
-
+    xxx <- generateStk ast'
     for_ xxx print
     let watch2 = ["a","b","c","d"]
     let xxy = evalTestVect'' xxx watch2 vect01
@@ -276,14 +231,10 @@ testAst ast' = do
     let Right tr2 = xxy
     putStrLn $ unlines $ prettyTrace $ zip watch2 $ transpose tr2
 
---     let allNodes = nub $ fmap fst nodesMerged' ++ foldMap snd nodesMerged'
---     print (here, "-----------------------")
---     let (nodesMerged, x2) = bimap concat id $ unzip $ fmap merge' x1
---     print (here, "nodesMerged:", nodesMerged)
---     let Just x3' = sequenceA $ fmap (\(stb, fo) -> forest) x2'
---     let Just x3 = sequenceA $ fmap forest x2
---     for_ x3 print
 
+
+
+    let ast = parseOps ast'
     let (st, op, cnt) = fffff ast
 --     print (here, "-----------------------")
 --     for_ st print

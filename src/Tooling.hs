@@ -9,6 +9,7 @@ import Data.List
 import Data.Function
 import Data.Foldable
 import Data.Tuple
+import Data.Maybe
 
 import Data.Int
 import Data.Word
@@ -281,6 +282,17 @@ succs' other          = ([other], [])
 --     -> [([b0], Cofree (Diagram a0 s) b0)]
 --     -> IO ([b0], [([b0], Cofree (Diagram a0 s) b0)])
 --TODO allow ading annotations in 'emit'
+generate ::
+    Monad m0 =>
+    Show b0 =>
+    Show s1 =>
+    Show s0 =>
+    Eq b0 =>
+    ([Instruction String w] -> m0 ())
+                      -> [(b0, b0)]
+                      -> [([b0], Cofree (Diagram (Op Operand s0) s1) b0)]
+                      -> m0 ([b0], [([b0], Cofree (Diagram (Op Operand s0) s1) b0)])
+
 generate emit nodeToSink asts = go ([], asts)
 
     where
@@ -357,6 +369,50 @@ generate emit nodeToSink asts = go ([], asts)
                                 return s
                             other -> error $ show (here, other) --should not happen
         f stk n = error $ show (here, stk, n)
+
+--------------------------------------------------------------------------------
+
+nodeTable :: [(p, [p])] -> [(p, p)]
+nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
+
+generateStk :: Cofree (Diagram Dev String) DgExt -> IO [Instruction String Int]
+generateStk ast' = do
+    let ast = parseOps ast'
+
+    print (here, "-----------------------")
+
+    --chop
+    let Just x1 = forest ast
+    --collect stubs (per each forest tree)
+    let x1' :: [([DgExt], Cofree (Diagram (Op Operand String) String) DgExt)]
+            = fmap (\x -> (stubs x, x)) x1
+    --merge neighbouring nodes
+    let q = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
+            in ((stbs, nds), tre') --this is result - stubs in subtree, merged nodes and new tree
+                    ) x1'
+
+    let allStubs = foldMap (fst . fst) q --aka sinks
+    let nodesMerged :: [(DgExt, [DgExt])] = foldMap (snd . fst) q
+    let allNodes = nub $ fmap fst nodesMerged ++ foldMap snd nodesMerged
+    let sinksLeadingToNodes = filter (flip elem allNodes) allStubs --aka sinks
+    print (here, "allNodes:", allNodes)
+    print (here, "nodesMerged:", nodesMerged)
+    print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
+    let oldNodeToNewNode = nodeTable nodesMerged
+    let nodeToSink
+            = fmap (\p -> (fromJust $ lookup p oldNodeToNewNode, p)) sinksLeadingToNodes
+    print (here, "nodeToSink:", nodeToSink)
+
+    print (here, "-----------------------")
+    for_ q $ \((stubs, _), tr) -> do
+        print $ filter (flip elem allNodes) stubs
+        print tr
+
+    print (here, "-----------------------")
+    let subTrees = fmap (\((stubs, _), tr) -> (stubs, tr)) q
+--     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
+--         subTrees
+    execWriterT $ generate tell nodeToSink subTrees
 
 --------------------------------------------------------------------------------
 
