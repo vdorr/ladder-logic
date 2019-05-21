@@ -40,61 +40,6 @@ import Tooling
 
 --------------------------------------------------------------------------------
 
-stubs
-    :: Cofree (Diagram d s) p
-    -> [p]
-stubs (p :< a) = f a
-    where
-    f (Source a)   = stubs a --ugh what is ungawa for this?
-    f  Sink        = [p]
-    f  End         = []
-    f (Device d a) = stubs a
-    f (Jump s)     = []
-    f (Node a)     = foldMap stubs a
-
---just remove initial Source and tree of Nodes
---quite useless operation, i think
-forest
-    :: Cofree (Diagram d s) p
-    -> Maybe [Cofree (Diagram d s) p]
-forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
-forest _               = Nothing
-
-merge'
-    :: Cofree (Diagram d s) p -- ^input tree
-    -> ([(p, [p])], Cofree (Diagram d s) p)
--- ^pairs of position of 'Node' still in tree and 'Node' positions merged into it and new tree
-merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
--- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
-    where
-    f ns _ []  = ns
-    f ns p nss = (p, nss) : ns
-
-merge
-    :: Cofree (Diagram d s) p
-    -> Cofree (Diagram d s) ([p], p)
-merge = g
-    where
-    g (p :< Node as) = (ns, p) :< Node (fmap merge as')
-            where
-            (as', ns) = foldMap succs' as
-    g (p :< other)   = ([], p) :< fmap merge other
-
--- succs
---     :: Cofree (Diagram d s) p
---     -> [Cofree (Diagram d s) p]
--- succs (_ :< Node xs) = foldMap succs xs
--- succs other          = [other]
-
-succs'
-    :: Cofree (Diagram d s) p
-    -> ([Cofree (Diagram d s) p], [p])
-succs' (p :< Node xs) = fmap (++[p]) $ foldMap succs' xs
--- succs' (p :< Node xs) = foldMap succs' xs
-succs' other          = ([other], [])
-
---------------------------------------------------------------------------------
-
 parseOps
     :: Cofree (Diagram Dev s) p
     -> Cofree (Diagram (Op Operand s) s) p
@@ -179,6 +124,52 @@ ffff (st, op, cnt) r src (p :< x) = f x
 
 --------------------------------------------------------------------------------
 
+evalTestVect
+    :: [(D, [E (Op Operand String)])] -- ^network to evaluate
+    -> [VarName]                      -- ^watched memory variables
+    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
+    -> [[V]]       -- ^resulting trace, elems are same length as watch list
+evalTestVect net = evalTestVect' (network' net)
+
+evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
+evalBlock p st = foldlM eval st p
+
+evalTestVect''
+    :: [Instruction String Int]
+    -> [VarName]
+    -> [(Int, [(VarName, V)])]
+    -> Either (ItpSt, String) [[V]]
+evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
+    where
+
+    vect' = flattenTestVect vect
+
+    step (tr, st@(w, o, mem)) stim = do
+        st'@(_, _, mem'') <- evalBlock prog (w, o, mem')
+        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+        return (tr ++ [tr'], st')
+        where
+        mem' = updateMemory mem stim
+
+--Foldable?
+evalTestVect'
+    :: ([(String, V)] -> [(VarName, V)]) -- ^network to evaluate
+    -> [VarName]                      -- ^watched memory variables
+    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
+    -> [[V]]       -- ^resulting trace, elems are same length as watch list
+evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
+    where
+
+    vect' = flattenTestVect vect
+
+    step (tr, mem) stim = (tr ++ [tr'], mem'')
+        where
+        mem' = updateMemory mem stim
+        mem'' = prog mem'
+        tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+
+--------------------------------------------------------------------------------
+
 --TODO replace lookup by iorefs
 network
     :: [(D, [E (Op Operand String)])]
@@ -251,178 +242,6 @@ tsort ks xs = do
 
     getRegN (R n) = [n]
 --     getRegN _     = []
-
---------------------------------------------------------------------------------
-
--- http://hackage.haskell.org/package/bits
--- http://hackage.haskell.org/package/haskell-modbus
--- https://github.com/yaacov/ArduinoModbusSlave/blob/master/examples/full/full.ino
-
- --wire stack count, wire stack, arg stack, memory???
-type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
-
-eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
-eval2 = undefined
-
-run2
-    :: ItpSt2
-    -> [(String, [ExtendedInstruction String Int Int16])]
-    -> Either (ItpSt2, String) ItpSt2
-run2 = undefined
-
-data ExtendedInstruction ca a w
-    = EIJump ca
-    | Simple (Instruction a w)
-
-data Instruction a w
-    = ITrap --invoke debugger
-    | ISysRq
-    | ILdOn -- push #1 onto wire stack {- w: -- #1 -}
-    | IDup -- coudl be replaced by IPick 0, dup value on top of wire stack {- w: x -- x x -}
-    | IPick  Int -- push wire stack value at index onto wire stack {- w: -- x -}
-    | IDrop --drop value from wire stack {- w: x -- -}
-
-    | ILdBit a -- push bit from address onto wire stack
-    | IStBit a -- dtto for store
-
---     | IJump  String
-    | IAnd -- and two values on wire stack, push result back
-    | IOr -- dtto, or
-    | INot -- negate value on top of wire stack
---     | IXor
-
-    | ILdCnA w {- push int const onto argument stack, a: -- l -}
-    | ILdM {- a: size addr -- <value> -}
-    | IStM
-
---     | IOp Operator --instead of lt,gt,etc
-    | IEq -- compare two value on arg stack and push result onto wire stack
-    | ILt
-    | IGt
-    deriving Show
-
--- data ItSt = ItSt [Bool] [V] [(String, V)]
-type ItpSt = ([Bool], [V], [(String, V)])
-
-eval :: ItpSt -> Instruction String Int -> Either (ItpSt, String) ItpSt
-eval = f
-    where
-    f st                 ITrap      = Left (st, "trap")
-    f    (  ws, os, m)   ILdOn      = pure (True:ws, os, m)
-    f    (w:ws, os, m)   IDup       = pure (w:w:ws, os, m)
-    f st@(  ws, os, m)  (IPick i)
-        | i >= 0 && i < length ws   = pure (ws!!i:ws, os, m)
-        | otherwise                 = Left (st, "stk idx out of range")
-    f    (_:ws, os, m)   IDrop      = pure (ws, os, m)
-    f st@(ws,   os, m)  (ILdBit a)
-        | Just (X v) <- lookup a m  = pure (v:ws, os, m)
-        | otherwise                 = Left (st, "invalid memory access")
-    f st@(w:ws, os, m)  (IStBit a)
-        | (m0,(_,X _):m1) <- break ((==a).fst) m
-                                    = pure (w:ws, os, (m0 ++ (a, X w) : m1))
-        | otherwise                 = Left (st, "invalid memory access")
-    f st@(a:b:ws, os, m) IAnd       = pure ((a&&b):ws, os, m)
-    f st@(a:b:ws, os, m) IOr        = pure ((a||b):ws, os, m)
-    f st@(a:ws,   os, m) INot       = pure (not a:ws,  os, m)
-
---     f _ i = error $ show (here, i)
-
---     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
---     f st@(ItSt ws     (Var n:os) m)  ILdM
---         | Just v <- lookup n m                 = undefined --pure $ ItSt ws os m
---         | otherwise                            = Left (st, "var not found")
-
---------------------------------------------------------------------------------
-
---XXX XXX XXX prob want new base functor, without 'End' (and without 'Source'?)
--- and distinguishing 'Sink' and 'Stub'
-
---only node may have multiple successors
---stub(sink) may have one or zero successors
---i should make newtype for nodeToSink elements
--- emit
---     :: Show a0
---     => Eq b0
---     => [(b0, b0)]
---     -> [([b0], Cofree (Diagram a0 s) b0)]
---     -> IO ([b0], [([b0], Cofree (Diagram a0 s) b0)])
---TODO allow ading annotations in 'emit'
-generate emit nodeToSink asts = go ([], asts)
-
-    where
-
-    sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
-
-    go (stack, []) = do
-        return (stack, [])
---    go stack (p :< a) xs -- get rid of stubs
-    go (stack, (stubs, p :< a) : xs) = f stack a
-
-        where
-
-        f stk (Source b)       = do
-            emit [ILdOn]
-            go (p:stk, (stubs, b) : xs)
-        f (_:stk) Sink         = do
-            case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
-                Just _  -> return (p:stk, xs) --put value back under name with which is referenced
-                Nothing -> do
-                    emit [IDrop]
-                    return (stk, xs)
-        f stk End              = go (stk, xs)
-        f (x:stk) (Device d b) = do
-            case d of
-                 And (Var addr) -> emit [ILdBit addr, IAnd]
-                 St (Var addr)  -> emit [IStBit addr]
-            go (p:stk, (stubs, b):xs)
-        f stk (Jump s)         = error here --later
-        f (_:stk) (Node b)     = do
-            --at least one value on stack
-            --look for stubs coinciding with this node
-            let needToEvalFirst1{-node positions-}
-                    = filter ((p==).fst) nodeToSink
-
-            (stk', xs') <-
-                foldlM
-                    step
-                    (stk, xs)
-                    needToEvalFirst1
-
-            let dups = replicate (length b - 1) p
-            for_ dups $ const $ emit [IDup]
-
-            foldlM
-                (\(stk'', xs'') tr
-                    -> go (stk'', ([{-don't care about stub list here-}], tr) : xs'')
-                    )
-                (dups ++ stk', xs')
-                b
-            where
-            step (stk', xs') (_, stubP) = do
-                case findIndex (stubP==) stk' of
-                     Just i -> do
-                         case i of
-                            0 -> return ()
-                            _ -> emit [IPick i]
-                         emit [IOr]
-                         return (stubP:stk', xs')
-                     Nothing ->
-                        case partition (elem stubP .fst) xs' of
-                          --stub must appear in exactly one subtree
-                            ([tr@(_, _:< _)], rest) -> do
-                                s@(stk'', _) <- go (stk', tr : rest)
-                                --now fetch and or??
-                                case findIndex (stubP==) stk'' of --check latest stack
-                                    Just i ->
-                                        case i of
-                                            0 -> return ()
-                                            _ -> emit [IPick i]
-                                    Nothing
-                                        -> error $ show (here, stubP, stk'') --should not happen
-                                emit [IOr]
-                                return s
-                            other -> error $ show (here, other) --should not happen
-        f stk n = error $ show (here, stk, n)
 
 --------------------------------------------------------------------------------
 
@@ -510,61 +329,6 @@ testAst ast' = do
     let !trace = evalTestVect p01 watch vect01
     print (here, trace)
     putStrLn $ unlines $ prettyTrace $ zip watch $ transpose trace
-
---------------------------------------------------------------------------------
-
-vect01 :: TestVect
-vect01 =
-    [ (2, [("a", X False),("b", X False),("c", X False),("d", X False)])
-    , (1, [("a", X True)])
-    , (1, [("a", X False)])
-    ]
-
---------------------------------------------------------------------------------
-
-evalTestVect
-    :: [(D, [E (Op Operand String)])] -- ^network to evaluate
-    -> [VarName]                      -- ^watched memory variables
-    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
-    -> [[V]]       -- ^resulting trace, elems are same length as watch list
-evalTestVect net = evalTestVect' (network' net)
-
-evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
-evalBlock p st = foldlM eval st p
-
-evalTestVect''
-    :: [Instruction String Int]
-    -> [VarName]
-    -> [(Int, [(VarName, V)])]
-    -> Either (ItpSt, String) [[V]]
-evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
-    where
-
-    vect' = flattenTestVect vect
-
-    step (tr, st@(w, o, mem)) stim = do
-        st'@(_, _, mem'') <- evalBlock prog (w, o, mem')
-        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
-        return (tr ++ [tr'], st')
-        where
-        mem' = updateMemory mem stim
-
---Foldable?
-evalTestVect'
-    :: ([(String, V)] -> [(VarName, V)]) -- ^network to evaluate
-    -> [VarName]                      -- ^watched memory variables
-    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
-    -> [[V]]       -- ^resulting trace, elems are same length as watch list
-evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
-    where
-
-    vect' = flattenTestVect vect
-
-    step (tr, mem) stim = (tr ++ [tr'], mem'')
-        where
-        mem' = updateMemory mem stim
-        mem'' = prog mem'
-        tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
 
 --------------------------------------------------------------------------------
 
