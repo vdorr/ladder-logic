@@ -10,6 +10,7 @@ import Data.Function
 import Data.Foldable
 import Data.Tuple
 import Data.Maybe
+import Data.Bifunctor
 
 import Data.Int
 import Data.Word
@@ -214,6 +215,7 @@ eval = f
 
 --------------------------------------------------------------------------------
 
+-- |Return list of annotations (usually positions) of 'Sink' nodes
 stubs
     :: Cofree (Diagram d s) p
     -> [p]
@@ -250,8 +252,8 @@ merge
 merge = g
     where
     g (p :< Node as) = (ns, p) :< Node (fmap merge as')
-            where
-            (as', ns) = foldMap succs' as
+        where
+        (as', ns) = foldMap succs' as
     g (p :< other)   = ([], p) :< fmap merge other
 
 -- succs
@@ -372,6 +374,32 @@ generate emit nodeToSink asts = go ([], asts)
 
 --------------------------------------------------------------------------------
 
+ldlines'' :: [Cofree (Diagram d s) DgExt] -> [Cofree (Diagram d s) DgExt]
+ldlines'' = sortOn (\(p:<_)->p) . foldMap ldlines'
+
+ldlines' :: Cofree (Diagram d s) DgExt -> [Cofree (Diagram d s) DgExt]
+ldlines' tr = let (a, b) = ldlines tr in a : b
+
+ldlines
+    :: Cofree (Diagram d s) DgExt
+    -> ( Cofree (Diagram d s) DgExt
+       , [Cofree (Diagram d s) DgExt]
+       )
+ldlines = f
+    where
+    f (p@(ln, _) :< Node l) = (p :< Node a', concat as' ++ b' ++ concat bs')
+        where
+        (a, b) = partition (\((ln', _) :< _) -> ln'==ln) l
+        (a', as') = unzip $ fmap (f) a
+        (b', bs') = unzip $ fmap (f) b
+    f (p :< Source a)   = bimap ((p:<) . Source) id $ f a
+    f n@(_ :< Sink)        = (n, [])
+    f n@(_ :< End)        = (n, [])
+    f n@(p :< Device d a) = bimap ((p:<) . Device d) id $ f a
+    f n@(_ :< Jump s)     = (n, [])
+
+--------------------------------------------------------------------------------
+
 nodeTable :: [(p, [p])] -> [(p, p)]
 nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
@@ -382,7 +410,17 @@ generateStk ast' = do
     print (here, "-----------------------")
 
     --chop
-    let Just x1 = forest ast
+    let Just (x1_0::[Cofree (Diagram (Op Operand String) String) DgExt]) = forest ast
+    let x1_x = ldlines'' [ast]
+
+    for_ x1_x print
+    print (here, "-----------------------")
+    let x1 = x1_x
+--     let x1 = x1_0
+
+    for_ x1_0 print
+    print (here, "-----------------------")
+
     --collect stubs (per each forest tree)
     let x1' :: [([DgExt], Cofree (Diagram (Op Operand String) String) DgExt)]
             = fmap (\x -> (stubs x, x)) x1
