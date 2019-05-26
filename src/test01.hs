@@ -44,7 +44,7 @@ import Tooling
 
 fffff
     :: Eq p
-    => Cofree (Diagram (Op Operand s) s) p
+    => Cofree (Diagram () (Op Operand s) s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 
 -- fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
@@ -57,7 +57,7 @@ ffff
     => ([(p, Int)], [(D, E (Op Operand s))], Int)
     -> Int
     -> p
-    -> Cofree (Diagram (Op Operand s) s) p
+    -> Cofree (Diagram () (Op Operand s) s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 ffff (st, op, cnt) r src (p :< x) = f x
     where
@@ -214,7 +214,7 @@ tsort ks xs = do
 --------------------------------------------------------------------------------
 
 
-testAst :: Cofree (Diagram Dev String) DgExt -> IO ()
+testAst :: Cofree (Diagram () Dev String) DgExt -> IO ()
 testAst ast' = do
 
     let watch = ["b", "d"]

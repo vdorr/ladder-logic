@@ -217,7 +217,7 @@ eval = f
 
 -- |Return list of annotations (usually positions) of 'Sink' nodes
 stubs
-    :: Cofree (Diagram d s) p
+    :: Cofree (Diagram c d s) p
     -> [p]
 stubs (p :< a) = f a
     where
@@ -227,18 +227,20 @@ stubs (p :< a) = f a
     f (Device d a) = stubs a
     f (Jump s)     = []
     f (Node a)     = foldMap stubs a
+    f (Conn c    ) = [] --XXX i am not sure !!!
+    f (Cont c   a) = []
 
 --just remove initial Source and tree of Nodes
 --quite useless operation, i think
 forest
-    :: Cofree (Diagram d s) p
-    -> Maybe [Cofree (Diagram d s) p]
+    :: Cofree (Diagram c d s) p
+    -> Maybe [Cofree (Diagram c d s) p]
 forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
 forest _               = Nothing
 
 merge'
-    :: Cofree (Diagram d s) p -- ^input tree
-    -> ([(p, [p])], Cofree (Diagram d s) p)
+    :: Cofree (Diagram c d s) p -- ^input tree
+    -> ([(p, [p])], Cofree (Diagram c d s) p)
 -- ^pairs of position of 'Node' still in tree and 'Node' positions merged into it and new tree
 merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
 -- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
@@ -247,8 +249,8 @@ merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
     f ns p nss = (p, nss) : ns
 
 merge
-    :: Cofree (Diagram d s) p
-    -> Cofree (Diagram d s) ([p], p)
+    :: Cofree (Diagram c d s) p
+    -> Cofree (Diagram c d s) ([p], p)
 merge = g
     where
     g (p :< Node as) = (ns, p) :< Node (fmap merge as')
@@ -263,8 +265,8 @@ merge = g
 -- succs other          = [other]
 
 succs'
-    :: Cofree (Diagram d s) p
-    -> ([Cofree (Diagram d s) p], [p])
+    :: Cofree (Diagram c d s) p
+    -> ([Cofree (Diagram c d s) p], [p])
 succs' (p :< Node xs) = fmap (++[p]) $ foldMap succs' xs
 -- succs' (p :< Node xs) = foldMap succs' xs
 succs' other          = ([other], [])
@@ -277,23 +279,21 @@ succs' other          = ([other], [])
 --only node may have multiple successors
 --stub(sink) may have one or zero successors
 --i should make newtype for nodeToSink elements
--- emit
---     :: Show a0
---     => Eq b0
---     => [(b0, b0)]
---     -> [([b0], Cofree (Diagram a0 s) b0)]
---     -> IO ([b0], [([b0], Cofree (Diagram a0 s) b0)])
+
 --TODO allow ading annotations in 'emit'
+
 generate ::
     Monad m0 =>
     Show b0 =>
     Show s1 =>
     Show s0 =>
     Eq b0 =>
+    Eq c =>
+    Show c =>
     ([Instruction String w] -> m0 ())
                       -> [(b0, b0)]
-                      -> [([b0], Cofree (Diagram (Op Operand s0) s1) b0)]
-                      -> m0 ([b0], [([b0], Cofree (Diagram (Op Operand s0) s1) b0)])
+                      -> [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)]
+                      -> m0 ([b0], [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)])
 
 generate emit nodeToSink asts = go ([], asts)
 
@@ -337,6 +337,7 @@ generate emit nodeToSink asts = go ([], asts)
                     needToEvalFirst1
 
             let dups = replicate (length b - 1) p
+--             liftIO $ print (here, ">>>>>>>>>", length b)
             for_ dups $ const $ emit [IDup]
 
             foldlM
@@ -370,63 +371,87 @@ generate emit nodeToSink asts = go ([], asts)
                                 emit [IOr]
                                 return s
                             other -> error $ show (here, other) --should not happen
+
+--         f (pp:stk) (Conn c) = do
+--             return (c:stk, xs)
+--         f stk (Cont stubP b) = do
+--             case findIndex (stubP==) stk of
+--                 Just i -> do
+--                     case i of
+--                         0 -> return ()
+--                         _ -> emit [IPick i]
+-- --                     return (stubP:stk, xs)
+--                     go (stubP:stk, (stubs, b) : xs)
+-- 
+--                 Nothing -> error here
+-- --             undefined
+
         f stk n = error $ show (here, stk, n)
 
 --------------------------------------------------------------------------------
 
-ldlines'' :: [Cofree (Diagram d s) DgExt] -> [Cofree (Diagram d s) DgExt]
-ldlines'' = sortOn (\(p:<_)->p) . foldMap ldlines'
+ldlines'' :: [Cofree (Diagram () d s) DgExt] -> [Cofree (Diagram DgExt d s) DgExt]
+-- ldlines'' = sortOn (\(p:<_)->p) . foldMap ldlines'
+ldlines'' = foldMap ldlines'
 
-ldlines' :: Cofree (Diagram d s) DgExt -> [Cofree (Diagram d s) DgExt]
+ldlines' :: Cofree (Diagram () d s) DgExt -> [Cofree (Diagram DgExt d s) DgExt]
 ldlines' tr = let (a, b) = ldlines tr in a : b
 
 ldlines
-    :: Cofree (Diagram d s) DgExt
-    -> ( Cofree (Diagram d s) DgExt
-       , [Cofree (Diagram d s) DgExt]
+    :: Cofree (Diagram () d s) DgExt
+    -> ( Cofree (Diagram DgExt d s) DgExt
+       , [Cofree (Diagram DgExt d s) DgExt]
        )
 ldlines = f
     where
-    f (p@(ln, _) :< Node l) = (p :< Node a', concat as' ++ b' ++ concat bs')
+
+    f (p@(ln, _) :< Node l) = (p :< Node (a' ++ fmap (const (p :< Conn p)) b) , as'')
         where
+
+        as'' = concat as' ++ fmap (\nn@(pp:<_) -> pp :< Cont p nn) b' ++ concat bs'
+
         (a, b) = partition (\((ln', _) :< _) -> ln'==ln) l
         (a', as') = unzip $ fmap (f) a
         (b', bs') = unzip $ fmap (f) b
     f (p :< Source a)   = bimap ((p:<) . Source) id $ f a
-    f n@(_ :< Sink)        = (n, [])
-    f n@(_ :< End)        = (n, [])
-    f n@(p :< Device d a) = bimap ((p:<) . Device d) id $ f a
-    f n@(_ :< Jump s)     = (n, [])
+    f (p :< Sink)        = (p :< Sink, [])
+    f (p :< End)        = (p :< End, [])
+    f (p :< Device d a) = bimap ((p:<) . Device d) id $ f a
+    f (p :< Jump s)     = (p :< Jump s, [])
 
 --------------------------------------------------------------------------------
 
 nodeTable :: [(p, [p])] -> [(p, p)]
 nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
-generateStk :: Cofree (Diagram Dev String) DgExt -> IO [Instruction String Int]
+generateStk :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String Int]
 generateStk ast' = do
     let ast = parseOps ast'
 
     print (here, "-----------------------")
 
     --chop
-    let Just (x1_0::[Cofree (Diagram (Op Operand String) String) DgExt]) = forest ast
-    let x1_x = ldlines'' [ast]
+    let Just (x1_0 ::[Cofree (Diagram () (Op Operand String) String) DgExt])
+            = forest ast
+--     let x1_x = ldlines'' [ast]
+--     let x1_xxx = ldlines'' x1_0
+-- 
+--     for_ x1_x print
+--     print (here, "-----------------------")
+--     let x1 = x1_x
+    let x1 = x1_0
 
-    for_ x1_x print
-    print (here, "-----------------------")
-    let x1 = x1_x
---     let x1 = x1_0
-
-    for_ x1_0 print
-    print (here, "-----------------------")
+--     for_ x1_0 print
+--     print (here, "-----------------------")
 
     --collect stubs (per each forest tree)
-    let x1' :: [([DgExt], Cofree (Diagram (Op Operand String) String) DgExt)]
+    let x1' -- :: [([DgExt], Cofree (Diagram c (Op Operand String) String) DgExt)]
             = fmap (\x -> (stubs x, x)) x1
     --merge neighbouring nodes
-    let q = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
-            in ((stbs, nds), tre') --this is result - stubs in subtree, merged nodes and new tree
+    let q -- :: [(([DgExt], [(DgExt, [DgExt])]), Cofree (Diagram DgExt (Op Operand String) String) DgExt)]
+            = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
+                in ((stbs, nds), tre')
+                    --this is result - stubs in subtree, merged nodes and new tree
                     ) x1'
 
     let allStubs = foldMap (fst . fst) q --aka sinks
@@ -477,9 +502,9 @@ evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
 --------------------------------------------------------------------------------
 
 parseOps
-    :: Cofree (Diagram Dev s) p
-    -> Cofree (Diagram (Op Operand s) s) p
-parseOps (a :< n) = a :< fmap parseOps (mapDg f id n)
+    :: Cofree (Diagram c Dev s) p
+    -> Cofree (Diagram c (Op Operand s) s) p
+parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
     where
     f (Dev "[ ]" [n]   ) = And  n
     f (Dev "[>]" [a, b]) = Cmp Gt a b

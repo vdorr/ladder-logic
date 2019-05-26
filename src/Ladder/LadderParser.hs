@@ -23,30 +23,31 @@ import Ladder.DiagramParser
 
 --------------------------------------------------------------------------------
 
-data Diagram d s a
+data Diagram c d s a
     = Source a   -- ^start of power rail
     | Sink       -- ^where wire connects to (implied) right rail
     | End        -- ^where vertical left rail ends at the bottom
---     | Stub -- maybe better 
+    | Stub       -- ^intersection of hline and node
     | Device d a --
     | Jump   s
     | Node   [a] --order matters here
 --     | Label s --i dislike it, but would need it if vline can cross line with label
---     | Cont c a
---     | Conn c
+    | Cont c a
+    | Conn c
     deriving (Show, Functor, Eq, Foldable, Traversable)
 
-mapDg :: (d -> d') -> (s -> s') -> Diagram d s a -> Diagram d' s' a
-mapDg x y = f
+mapDg :: (c -> c') -> (d -> d') -> (s -> s') -> Diagram c d s a -> Diagram c' d' s' a
+mapDg z x y = f
     where
-    f (Source   a) = Source a
+    f (Source   a) = Source       a
     f  Sink        = Sink
     f  End         = End
     f (Device d a) = Device (x d) a
-    f (Jump s    ) = Jump (y s)
-    f (Node     a) = Node a
---     f (Conn     a) = Conn a
---     f (Cont c   a) = Cont c a
+    f (Jump s    ) = Jump   (y s)
+    f (Node     a) = Node         a
+    f (Conn c    ) = Conn   (z c)
+    f (Cont c   a) = Cont   (z c) a
+    f  Stub        = Stub
 
 --------------------------------------------------------------------------------
 
@@ -196,16 +197,16 @@ coilType    : ...
 
 -}
 
-test002' :: DgP (Cofree (Diagram Dev String) DgExt)
+test002' :: DgP (Cofree (Diagram () Dev String) DgExt)
 test002'
     = setDir goDown
     *> ((:<) <$> currentPos <*> fmap Source vline'2)
     <* dgIsEmpty
 
-node2 :: DgP (Cofree (Diagram Dev String) DgExt)
+node2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 node2 = (:<) <$> currentPos <*> (Ladder.LadderParser.Node <$> node2')
 
-node2' :: DgP [Cofree (Diagram Dev String) DgExt]
+node2' :: DgP [Cofree (Diagram c Dev String) DgExt]
 node2'
     = branch
         (==Cross)
@@ -214,16 +215,16 @@ node2'
         ]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
-vline'2 :: DgP (Cofree (Diagram Dev String) DgExt)
+vline'2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 vline'2 = many vline2 *> (end2 <|> node2)
 
-end2 :: DgP (Cofree (Diagram Dev String) DgExt)
+end2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 
-eol2 :: DgP (Cofree (Diagram Dev String) DgExt)
+eol2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
-hline'2 :: DgP (Cofree (Diagram Dev String) DgExt)
+hline'2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 hline'2 = some hline2 *> (coil2 <|> contact2 <|> node2 <|> eol2) --TODO vline crossing
 
 vline2 :: DgP ()
@@ -236,18 +237,18 @@ hline2 = do
     HLine _ <- eat
     return ()
 
-device :: DgP (Bool, String) -> DgP (Cofree (Diagram Dev String) DgExt)
+device :: DgP (Bool, String) -> DgP (Cofree (Diagram c Dev String) DgExt)
 device p = do
     pos <- currentPos
     (op, op2, f) <- withOperands p
     (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline'2)
 
-coil2 :: DgP (Cofree (Diagram Dev String) DgExt)
+coil2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 coil2 = device $ do
     Coil f <- eat
     return (False, "(" <> unpack f <> ")")
 
--- contact2 :: DgP (Bool, Cofree (Diagram Dev String) DgExt)
+-- contact2 :: DgP (Bool, Cofree (Diagram c Dev String) DgExt)
 contact2 = device $ do
     Contact f <- eat
     return (elem f cmp, "[" <> unpack f <> "]")
