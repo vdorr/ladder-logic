@@ -32,19 +32,21 @@ data Diagram d s a
     | Jump   s
     | Node   [a] --order matters here
 --     | Label s --i dislike it, but would need it if vline can cross line with label
---     | Cont a
+--     | Cont c a
+--     | Conn c
     deriving (Show, Functor, Eq, Foldable, Traversable)
 
 mapDg :: (d -> d') -> (s -> s') -> Diagram d s a -> Diagram d' s' a
 mapDg x y = f
     where
-    f (Source a)   = Source a
+    f (Source   a) = Source a
     f  Sink        = Sink
     f  End         = End
     f (Device d a) = Device (x d) a
-    f (Jump s)     = Jump (y s)
-    f (Node a)     = Node a
---     f (Cont a)     = Cont a
+    f (Jump s    ) = Jump (y s)
+    f (Node     a) = Node a
+--     f (Conn     a) = Conn a
+--     f (Cont c   a) = Cont c a
 
 --------------------------------------------------------------------------------
 
