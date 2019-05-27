@@ -242,10 +242,10 @@ testAst ast' = do
 dropEnd
     :: Cofree (Diagram c d s) p
     -> Cofree (Diagram c d s) p
-dropEnd (p :< a) = p :< f a
+dropEnd (p :< a) = p :< go a
     where
-    f (Node ns) = Node (fmap dropEnd (filter notEnd ns))
-    f n         = fmap dropEnd n
+    go (Node ns) = Node (fmap dropEnd (filter notEnd ns))
+    go n         = fmap dropEnd n
     notEnd (_ :< End) = False
     notEnd _          = True
 

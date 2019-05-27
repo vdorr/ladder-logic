@@ -27,7 +27,7 @@ data Diagram c d s a
     = Source a   -- ^start of power rail
     | Sink       -- ^where wire connects to (implied) right rail
     | End        -- ^where vertical left rail ends at the bottom
-    | Stub       -- ^intersection of hline and node
+--     | Stub       -- ^intersection of hline and node
     | Device d a --
     | Jump   s
     | Node   [a] --order matters here
@@ -47,7 +47,7 @@ mapDg z x y = f
     f (Node     a) = Node         a
     f (Conn c    ) = Conn   (z c)
     f (Cont c   a) = Cont   (z c) a
-    f  Stub        = Stub
+--     f  Stub        = Stub
 
 --------------------------------------------------------------------------------
 
