@@ -39,7 +39,7 @@ data V
 
 data Op n s
     = And n -- wire out <- wire in and memory cell
---     | AndN
+    | AndN n
     | Ld    -- ^ set wire state same as argument
     | On    -- ^ set wire state to #on
     | St n
@@ -235,7 +235,8 @@ stubs (p :< a) = f a
 forest
     :: Cofree (Diagram c d s) p
     -> Maybe [Cofree (Diagram c d s) p]
-forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
+-- forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
+forest (_ :< Source a) = Just $ fmap (\n@(p :< _) -> p :< Source n) $ fst $ succs' a
 forest _               = Nothing
 
 merge'
@@ -507,6 +508,7 @@ parseOps
 parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
     where
     f (Dev "[ ]" [n]   ) = And  n
+    f (Dev "[/]" [n]   ) = AndN  n
     f (Dev "[>]" [a, b]) = Cmp Gt a b
     f (Dev "( )" [n]   ) = St n
     f _                  = error here

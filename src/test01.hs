@@ -14,14 +14,15 @@ import Data.Foldable
 -- import Data.Traversable
 import Data.List
 -- import Text.Read
--- import Data.Maybe
 -- import Data.Function
 -- import Data.Bifunctor
 import System.Environment (getArgs)
 -- import Data.Tuple
 -- import Control.Monad (replicateM_)
 -- import Data.Semigroup
--- import Control.Monad.Writer.Strict
+
+import Data.Maybe
+import Control.Monad.Writer.Strict
 
 -- import Debug.Trace
 
@@ -196,7 +197,7 @@ testAst ast' = do
                 [ ("a", X True),("b", X False),("c", X False),("d", X False)
 --                 , ("%QX0", X True), ("%IX0", I 0)
                 ]
-
+#if 0
     xxx <- generateStk ast'
     for_ xxx print
     let watch2 = ["a","b","c","d"]
@@ -204,9 +205,13 @@ testAst ast' = do
     print (here, xxy)
     let Right tr2 = xxy
     putStrLn $ unlines $ prettyTrace $ zip watch2 $ transpose tr2
+#endif
 
 
+    generateStk2 ast'
+    return ()
 
+#if 0
 
     let ast = parseOps ast'
     let (st, op, cnt) = fffff ast
@@ -230,6 +235,87 @@ testAst ast' = do
     let !trace = evalTestVect p01 watch vect01
     print (here, trace)
     putStrLn $ unlines $ prettyTrace $ zip watch $ transpose trace
+#endif
+
+--------------------------------------------------------------------------------
+
+dropEnd
+    :: Cofree (Diagram c d s) p
+    -> Cofree (Diagram c d s) p
+dropEnd (p :< a) = p :< f a
+    where
+    f (Node ns) = Node (fmap dropEnd (filter notEnd ns))
+    f n         = fmap dropEnd n
+    notEnd (_ :< End) = False
+    notEnd _          = True
+
+generateStk2 :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String Int]
+generateStk2 ast' = do
+    let ast = parseOps $ dropEnd ast'
+
+    print (here, "-----------------------")
+    print (here, "-----------------------")
+    print (here, "-----------------------")
+
+    --collapse nodes
+    let (nodes, a0) = merge' ast
+
+    --chop
+    let Just (a1 ::[Cofree (Diagram () (Op Operand String) String) DgExt])
+            = forest a0
+--     let x1_x = ldlines'' [ast]
+--     let x1_xxx = ldlines'' x1_0
+
+    for_ a1 print
+    print (here, "-----------------------")
+
+    let a2 = ldlines'' a1
+    let a3 = sortOn (\(p:<_) -> p) a2
+
+    for_ a3 print
+    print (here, "-----------------------")
+
+--     let x1 = x1_x
+#if 0
+    let x1 = x1_0
+--     for_ x1_0 print
+--     print (here, "-----------------------")
+
+    --collect stubs (per each forest tree)
+    let x1' -- :: [([DgExt], Cofree (Diagram c (Op Operand String) String) DgExt)]
+            = fmap (\x -> (stubs x, x)) x1
+    --merge neighbouring nodes
+    let q -- :: [(([DgExt], [(DgExt, [DgExt])]), Cofree (Diagram DgExt (Op Operand String) String) DgExt)]
+            = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
+                in ((stbs, nds), tre')
+                    --this is result - stubs in subtree, merged nodes and new tree
+                    ) x1'
+
+    let allStubs = foldMap (fst . fst) q --aka sinks
+    let nodesMerged :: [(DgExt, [DgExt])] = foldMap (snd . fst) q
+    let allNodes = nub $ fmap fst nodesMerged ++ foldMap snd nodesMerged
+    let sinksLeadingToNodes = filter (flip elem allNodes) allStubs --aka sinks
+    print (here, "allNodes:", allNodes)
+    print (here, "nodesMerged:", nodesMerged)
+    print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
+    let oldNodeToNewNode = nodeTable nodesMerged
+    let nodeToSink
+            = fmap (\p -> (fromJust $ lookup p oldNodeToNewNode, p)) sinksLeadingToNodes
+    print (here, "nodeToSink:", nodeToSink)
+
+    print (here, "-----------------------")
+    for_ q $ \((stubs, _), tr) -> do
+        print $ filter (flip elem allNodes) stubs
+        print tr
+
+    print (here, "-----------------------")
+    let subTrees = fmap (\((stubs, _), tr) -> (stubs, tr)) q
+--     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
+--         subTrees
+    execWriterT $ generate tell nodeToSink subTrees
+#else
+    return []
+#endif
 
 --------------------------------------------------------------------------------
 
