@@ -46,10 +46,6 @@ fffff
     :: Eq p
     => Cofree (Diagram () (Op Operand s) s) p
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
-
--- fffff (p :< Source a) =  ffff ([], [(R 0, Op On [])], 1) 0 p a
--- fffff _               = error here --should not happen
-
 fffff w@(p :< _a) =  ffff ([], [], 0) 0 p w
 
 ffff
@@ -61,14 +57,11 @@ ffff
     -> ([(p, Int)], [(D, E (Op Operand s))], Int)
 ffff (st, op, cnt) r src (p :< x) = f x
     where
---     f (Label s a) = undefined --should not happen
---     f (Source a) = error here --should not happen
     f (Source a) = 
         ffff
             (st
             , op <> [(R cnt, Op On [])] --getop r cnt s n
             , cnt + 1) cnt p a
-    
     f  Sink = --end of hline, may lead to 'Node'
         ( st
         , op <> case lookup p st of
@@ -80,11 +73,6 @@ ffff (st, op, cnt) r src (p :< x) = f x
 --should really appear only once at end of left power rail
 --should test this (exactly one End in rung)
         (st, op, cnt)
---     f (Device (Dev s n) a) =
---         ffff
---             (st
---             , op <> getop r cnt s n
---             , cnt + 1) cnt p a
     f (Device (dev) a) =
         ffff
             (st
@@ -92,23 +80,9 @@ ffff (st, op, cnt) r src (p :< x) = f x
             , cnt + 1) cnt p a
 --TODO at this point Jump should be handled separately, only basic blocks here
     f (Jump s) =
---         (st, op <> [(DD, Op (Jmp s) [R r])], cnt) --XXX XXX beware wires crossing jump point
         (st, op <> [(R cnt, Op (Jmp s) [R r])], cnt + 1) --XXX XXX beware wires crossing jump point
     f (Node la) =
---         doNode (st <> [(p, r)], op, cnt) la
         foldl (\st' x' -> ffff st' r p x') (st <> [(p, r)], op, cnt) la
-
---     doNode st' []        = st'
---     doNode st' (x' : xs) =
---         let st'' = ffff st' r p x'
---             in doNode st'' xs
-
---     getop rr rrr "[ ]" [n]    = [(R rrr, Op (And n) [ R rr ])]
---     getop rr rrr "[>]" [a, b] = [(R rrr, Op (Cmp Gt a b) [ R rr ])]
---     getop rr rrr "( )" [n]
--- --         = [(DD, Op (St n) [R rr]), (R rrr, Op Ld [R rr])]
---         = [(R rrr, Op (St n) [R rr])]
---     getop rr _ s n = error $ show (here, s, n)
 
 --------------------------------------------------------------------------------
 
@@ -267,11 +241,6 @@ main = do
     case stripPos <$> runLexer src of
         Left err -> TIO.putStrLn err
         Right x -> do
---             print (here, getPragma $ tokens x)
---             let Just pgma = fmap (filter (/='\\') . T.unpack) $getPragma $ tokens x
-
---             let Just pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ tokens x
---             print ((read pgma) :: LadderTest)
 
             let zp = mkDgZp $ dropWhitespace x
             forM_ (zpToList zp) (print . (here,))
