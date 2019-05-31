@@ -412,10 +412,10 @@ ldlines = f
         as'' = concat as' ++ fmap (\nn@(pp:<_) -> pp :< Cont p nn) b' ++ concat bs'
 
         (a, b) = partition (\((ln', _) :< _) -> ln'==ln) l
-        (a', as') = unzip $ fmap (f) a
-        (b', bs') = unzip $ fmap (f) b
+        (a', as') = unzip $ fmap f a
+        (b', bs') = unzip $ fmap f b
     f (p :< Source a)   = bimap ((p:<) . Source) id $ f a
-    f (p :< Sink)        = (p :< Sink, [])
+    f (p :< Sink)       = (p :< Sink, [])
     f (p :< End)        = (p :< End, [])
     f (p :< Device d a) = bimap ((p:<) . Device d) id $ f a
     f (p :< Jump s)     = (p :< Jump s, [])

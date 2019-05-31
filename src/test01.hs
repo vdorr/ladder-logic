@@ -15,7 +15,7 @@ import Data.Foldable
 import Data.List
 -- import Text.Read
 -- import Data.Function
--- import Data.Bifunctor
+import Data.Bifunctor
 import System.Environment (getArgs)
 -- import Data.Tuple
 -- import Control.Monad (replicateM_)
@@ -249,6 +249,55 @@ dropEnd (p :< a) = p :< go a
     notEnd (_ :< End) = False
     notEnd _          = True
 
+--assuming spatially sorted input (by lines then by columns)
+tsort2
+    :: [(DgExt, [DgExt])]
+    -> [Cofree (Diagram DgExt d s) DgExt]
+    -> [Cofree (Diagram DgExt d s) DgExt]
+tsort2 = undefined
+
+data Deps p = Deps { nodes, sinks, conts, conns :: [p] }
+    deriving Show
+
+annotateWithDeps
+    :: Eq p
+    => Cofree (Diagram DgExt d s) p
+    -> Cofree (Diagram DgExt d s) (Deps p, p)
+annotateWithDeps = undefined
+
+
+cut'
+    :: [Cofree (Diagram DgExt d s) DgExt]
+    -> [Cofree (Diagram DgExt d s) DgExt]
+cut' = foldMap cut''
+
+cut''
+    :: Cofree (Diagram DgExt d s) DgExt
+    -> [Cofree (Diagram DgExt d s) DgExt]
+cut'' t = let (a, b) = cut t in a : b
+
+cut
+    :: Cofree (Diagram DgExt d s) DgExt
+    -> ( Cofree (Diagram DgExt d s) DgExt
+       , [Cofree (Diagram DgExt d s) DgExt])
+cut (p :< a) = f a
+    where
+    f (Source   a) = h Source (cut a)
+    f  Sink        = (p :< Sink, [])
+    f  End         = (p :< End, [])
+    f (Device d a) = h (Device d) (cut a)
+    f (Jump s    ) = (p :< Jump s, [])
+
+    f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
+        where
+        (x, y) = unzip $ fmap cut a
+        x' = (fmap (\n@(pp:<_) -> pp:<Cont p n) x)
+
+    f (Conn c    ) = (p :< Conn c, [])
+    f (Cont c   a) = h (Cont c) (cut a)
+
+    h g w = bimap ((p :<) . g) id w
+
 generateStk2 :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String Int]
 generateStk2 ast' = do
     let ast = parseOps $ dropEnd ast'
@@ -269,10 +318,16 @@ generateStk2 ast' = do
     for_ a1 print
     print (here, "-----------------------")
 
+--     let a2 = ldlines'' a1
+--     let a3 = cut' a2
     let a2 = ldlines'' a1
-    let a3 = sortOn (\(p:<_) -> p) a2
+    let a3 = cut' a2
 
-    for_ a3 print
+    let a4 = sortOn (\(p:<_) -> p) a3
+
+    let a5 = tsort2 nodes a4
+
+    for_ a5 print
     print (here, "-----------------------")
 
 --     let x1 = x1_x
