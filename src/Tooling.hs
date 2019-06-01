@@ -6,6 +6,8 @@ module Tooling where
 
 import Data.Semigroup
 import Data.List
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Function
 import Data.Foldable
 import Data.Tuple
@@ -396,14 +398,17 @@ ldlines'' :: [Cofree (Diagram () d s) DgExt] -> [Cofree (Diagram DgExt d s) DgEx
 ldlines'' = foldMap ldlines'
 
 ldlines' :: Cofree (Diagram () d s) DgExt -> [Cofree (Diagram DgExt d s) DgExt]
-ldlines' tr = let (a, b) = ldlines tr in a : b
+-- ldlines' tr = let (a, b) = ldlines tr in a : b
+ldlines' = toList . ldlines
 
 ldlines
     :: Cofree (Diagram () d s) DgExt
-    -> ( Cofree (Diagram DgExt d s) DgExt
-       , [Cofree (Diagram DgExt d s) DgExt]
-       )
-ldlines = f
+--NonEMpty seem like better option here, foldabale etc
+--     -> ( Cofree (Diagram DgExt d s) DgExt
+--        , [Cofree (Diagram DgExt d s) DgExt]
+--        )
+    -> NonEmpty (Cofree (Diagram DgExt d s) DgExt)
+ldlines tr = let (a, b) = f tr in a :| b
     where
 
     f (p@(ln, _) :< Node l) = (p :< Node (a' ++ fmap (const (p :< Conn p)) b) , as'')

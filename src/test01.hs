@@ -17,7 +17,7 @@ import Data.List
 -- import Data.Function
 import Data.Bifunctor
 import System.Environment (getArgs)
--- import Data.Tuple
+import Data.Tuple
 -- import Control.Monad (replicateM_)
 -- import Data.Semigroup
 
@@ -36,6 +36,9 @@ import Ladder.LadderParser
 -- import NeatInterpolation
 
 import Tooling
+
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
 
 --------------------------------------------------------------------------------
 
@@ -274,7 +277,9 @@ cut' = foldMap cut''
 cut''
     :: Cofree (Diagram DgExt d s) DgExt
     -> [Cofree (Diagram DgExt d s) DgExt]
-cut'' t = let (a, b) = cut t in a : b
+cut'' = uncurry (:) . cut
+
+--------------------------------------------------------------------------------
 
 cut
     :: Cofree (Diagram DgExt d s) DgExt
@@ -298,6 +303,171 @@ cut (p :< a) = f a
 
     h g w = bimap ((p :<) . g) id w
 
+
+--TODO TEST every list elemen has all nodes on same line
+cut1' = foldMap (uncurry (:) . cut1)
+
+cut1
+    :: Cofree (Diagram () d s) DgExt
+    -> ( Cofree (Diagram DgExt d s) DgExt
+       , [Cofree (Diagram DgExt d s) DgExt])
+cut1 (p :< a) = f a
+    where
+--     f :: Diagram () d1 s1 (Cofree (Diagram () d1 s1) DgExt)
+--                       -> (Cofree (Diagram DgExt d1 s1) DgExt,
+--                           [Cofree (Diagram DgExt d1 s1) DgExt])
+    f (Source   a) = h Source (cut1 a)
+    f  Sink        = (p :< Sink, [])
+    f  End         = (p :< End, [])
+    f (Device d a) = h (Device d) (cut1 a)
+    f (Jump s    ) = (p :< Jump s, [])
+
+    f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
+        where
+        (x, y) = unzip $ fmap cut1 a
+        x' = (fmap (\n@(pp:<_) -> pp :< Cont p n) x)
+
+    f (Conn _    ) = error here
+    f (Cont _   _) = error here
+
+    h g w = bimap ((p :<) . g) id w
+
+--------------------------------------------------------------------------------
+
+-- cutcut
+--     :: Cofree (Diagram () d s) DgExt
+--     -> NonEmpty (Cofree (Diagram DgExt d s) DgExt)
+-- cutcut tr = let (a, b) = f tr in a :| b
+--     where
+-- 
+--     f (p@(ln, _) :< Node l) = (p :< Node (a' ++ fmap (const (p :< Conn p)) b) , as'')
+--         where
+-- 
+--         as'' = concat as' ++ fmap (\nn@(pp:<_) -> pp :< Cont p nn) b' ++ concat bs'
+-- 
+--         (a, b) = partition (lineNumberIs ln) l
+--         (a', as') = unzip $ fmap f a
+--         (b', bs') = unzip $ fmap f b
+--     f (p :< Source a)   = bimap ((p:<) . Source) id $ f a
+--     f (p :< Sink)       = (p :< Sink, [])
+--     f (p :< End)        = (p :< End, [])
+--     f (p :< Device d a) = bimap ((p:<) . Device d) id $ f a
+--     f (p :< Jump s)     = (p :< Jump s, [])
+-- 
+--     lineNumberIs ln'' = \((ln', _) :< _) -> ln'==ln''
+
+lineNumber = (\(p:<_) -> p)
+
+--------------------------------------------------------------------------------
+
+generate2 ::
+    Monad m0 =>
+    Show b0 =>
+    Show s1 =>
+    Show s0 =>
+    Eq b0 =>
+    Eq c =>
+    Show c =>
+    ([Instruction String w] -> m0 ())
+                      -> [(b0, b0)]
+                      -> [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)]
+                      -> m0 ([b0], [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)])
+
+generate2 emit nodeToSink asts = go ([], asts)
+
+    where
+
+    sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
+
+    go (stack, []) = do
+        return (stack, [])
+--    go stack (p :< a) xs -- get rid of stubs
+    go (stack, (stubs, p :< a) : xs) = f stack a
+
+        where
+
+        f stk (Source b)       = do
+            emit [ILdOn]
+            go (p:stk, (stubs, b) : xs)
+        f (_:stk) Sink         = do
+            case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
+                Just _  -> return (p:stk, xs) --put value back under name with which is referenced
+                Nothing -> do
+                    emit [IDrop]
+                    return (stk, xs)
+        f stk End              = go (stk, xs)
+        f (x:stk) (Device d b) = do
+            case d of
+                 And (Var addr) -> emit [ILdBit addr, IAnd]
+                 St (Var addr)  -> emit [IStBit addr]
+            go (p:stk, (stubs, b):xs)
+        f stk (Jump s)         = error here --later
+        f (_:stk) (Node b)     = do
+            --at least one value on stack
+            --look for stubs coinciding with this node
+            let needToEvalFirst1{-node positions-}
+                    = filter ((p==).fst) nodeToSink
+
+            (stk', xs') <-
+                foldlM
+                    step
+                    (stk, xs)
+                    needToEvalFirst1
+
+            let dups = replicate (length b - 1) p
+--             liftIO $ print (here, ">>>>>>>>>", length b)
+            for_ dups $ const $ emit [IDup]
+
+            foldlM
+                (\(stk'', xs'') tr
+                    -> go (stk'', ([{-don't care about stub list here-}], tr) : xs'')
+                    )
+                (dups ++ stk', xs')
+                b
+            where
+            step (stk', xs') (_, stubP) = do
+                case findIndex (stubP==) stk' of
+                     Just i -> do
+                         case i of
+                            0 -> return ()
+                            _ -> emit [IPick i]
+                         emit [IOr]
+                         return (stubP:stk', xs')
+                     Nothing ->
+                        case partition (elem stubP .fst) xs' of
+                          --stub must appear in exactly one subtree
+                            ([tr@(_, _:< _)], rest) -> do
+                                s@(stk'', _) <- go (stk', tr : rest)
+                                --now fetch and or??
+                                case findIndex (stubP==) stk'' of --check latest stack
+                                    Just i ->
+                                        case i of
+                                            0 -> return ()
+                                            _ -> emit [IPick i]
+                                    Nothing
+                                        -> error $ show (here, stubP, stk'') --should not happen
+                                emit [IOr]
+                                return s
+                            other -> error $ show (here, other) --should not happen
+
+--         f (pp:stk) (Conn c) = do
+--             return (c:stk, xs)
+--         f stk (Cont stubP b) = do
+--             case findIndex (stubP==) stk of
+--                 Just i -> do
+--                     case i of
+--                         0 -> return ()
+--                         _ -> emit [IPick i]
+-- --                     return (stubP:stk, xs)
+--                     go (stubP:stk, (stubs, b) : xs)
+-- 
+--                 Nothing -> error here
+-- --             undefined
+
+        f stk n = error $ show (here, stk, n)
+
+--------------------------------------------------------------------------------
+
 generateStk2 :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String Int]
 generateStk2 ast' = do
     let ast = parseOps $ dropEnd ast'
@@ -320,14 +490,15 @@ generateStk2 ast' = do
 
 --     let a2 = ldlines'' a1
 --     let a3 = cut' a2
+
     let a2 = ldlines'' a1
     let a3 = cut' a2
-
     let a4 = sortOn (\(p:<_) -> p) a3
 
-    let a5 = tsort2 nodes a4
+    let a5 = cut1' a1
+    let a6 = sortOn lineNumber a5
 
-    for_ a5 print
+    for_ a6 print
     print (here, "-----------------------")
 
 --     let x1 = x1_x
