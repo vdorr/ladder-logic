@@ -373,46 +373,45 @@ generate2 ::
                       -> Cofree (Diagram c (Op Operand s0) s1) b0
                       -> m0 ()
 
-generate2 emit nodeToSink asts = do
-    go ([], asts)
-    return ()
+generate2 emit nodeToSink asts = () <$ go ([], asts)
 
     where
 
     sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
 
-
---    go stack (p :< a) xs -- get rid of stubs
-    go (stack, p :< a) = f stack a
-
+    go (stack, nd@(p :< a)) = f stack a
         where
 
         f stk (Source b)       = do
             emit [ILdOn]
-            go (p:stk, b)
+            go (nd:stk, b)
         f (_:stk) Sink         = do
             case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
-                Just _  -> return (p:stk, ()) --put value back under name with which is referenced
+                Just _  -> return (nd:stk) --put value back under name with which is referenced
                 Nothing -> do
                     emit [IDrop]
-                    return (stk, ())
-        f stk End              = return (stk, ())
+                    return (stk)
+        f stk End              = return (stk)
         f (x:stk) (Device d b) = do
             case d of
                  And (Var addr) -> emit [ILdBit addr, IAnd]
                  St (Var addr)  -> emit [IStBit addr]
-            go (p:stk, b)
+            go (nd:stk, b)
         f stk (Jump s)         = error here --later
         f (_:stk) (Node b)     = do
 
-            let dups = replicate (length b - 1) p
+--i think dups should be emitted only AFTER node value is computed
+            let dups = replicate (length b - 1) nd
             for_ dups $ const $ emit [IDup]
 
+    --fold over stack, picking sinks(aka stubs), emitting Or's
+
+
             foldlM
-                (\(stk'', ()) tr
-                    -> go (stk'', tr)
-                    )
-                (dups ++ stk, ())
+                (curry go
+    --emit Dup's here?
+                )
+                (dups ++ stk)
                 b
 #if 0
             where
