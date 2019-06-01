@@ -379,6 +379,7 @@ generate2 emit nodeToSink asts = go ([], asts)
 
     sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
 
+    go :: _
     go (stack, []) = do
         return (stack, [])
 --    go stack (p :< a) xs -- get rid of stubs
