@@ -370,61 +370,51 @@ generate2 ::
     Show c =>
     ([Instruction String w] -> m0 ())
                       -> [(b0, b0)]
-                      -> [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)]
-                      -> m0 ([b0], [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)])
+                      -> Cofree (Diagram c (Op Operand s0) s1) b0
+                      -> m0 ()
 
-generate2 emit nodeToSink asts = go ([], asts)
+generate2 emit nodeToSink asts = do
+    go ([], asts)
+    return ()
 
     where
 
     sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
 
-    go :: _
-    go (stack, []) = do
-        return (stack, [])
+
 --    go stack (p :< a) xs -- get rid of stubs
-    go (stack, (stubs, p :< a) : xs) = f stack a
+    go (stack, p :< a) = f stack a
 
         where
 
         f stk (Source b)       = do
             emit [ILdOn]
-            go (p:stk, (stubs, b) : xs)
+            go (p:stk, b)
         f (_:stk) Sink         = do
             case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
-                Just _  -> return (p:stk, xs) --put value back under name with which is referenced
+                Just _  -> return (p:stk, ()) --put value back under name with which is referenced
                 Nothing -> do
                     emit [IDrop]
-                    return (stk, xs)
-        f stk End              = go (stk, xs)
+                    return (stk, ())
+        f stk End              = return (stk, ())
         f (x:stk) (Device d b) = do
             case d of
                  And (Var addr) -> emit [ILdBit addr, IAnd]
                  St (Var addr)  -> emit [IStBit addr]
-            go (p:stk, (stubs, b):xs)
+            go (p:stk, b)
         f stk (Jump s)         = error here --later
         f (_:stk) (Node b)     = do
-            --at least one value on stack
-            --look for stubs coinciding with this node
-            let needToEvalFirst1{-node positions-}
-                    = filter ((p==).fst) nodeToSink
-
-            (stk', xs') <-
-                foldlM
-                    step
-                    (stk, xs)
-                    needToEvalFirst1
 
             let dups = replicate (length b - 1) p
---             liftIO $ print (here, ">>>>>>>>>", length b)
             for_ dups $ const $ emit [IDup]
 
             foldlM
-                (\(stk'', xs'') tr
-                    -> go (stk'', ([{-don't care about stub list here-}], tr) : xs'')
+                (\(stk'', ()) tr
+                    -> go (stk'', tr)
                     )
-                (dups ++ stk', xs')
+                (dups ++ stk, ())
                 b
+#if 0
             where
             step (stk', xs') (_, stubP) = do
                 case findIndex (stubP==) stk' of
@@ -450,7 +440,7 @@ generate2 emit nodeToSink asts = go ([], asts)
                                 emit [IOr]
                                 return s
                             other -> error $ show (here, other) --should not happen
-
+#endif
 --         f (pp:stk) (Conn c) = do
 --             return (c:stk, xs)
 --         f stk (Cont stubP b) = do
