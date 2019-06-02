@@ -373,18 +373,18 @@ lineNumber = (\(p:<_) -> p)
 --                       -> Cofree (Diagram c (Op Operand s0) s1) b0
 --                       -> m0 [Cofree (Diagram c (Op Operand s0) s1) b0]
 
-generate2 emit stk0 asts = go (stk0, asts)
+generate2 emit stk0 asts = go stk0 asts
 
     where
 
 --     sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
 
-    go (stack, nd@(p :< a)) = f stack a
+    go stack nd@(p :< a) = f stack a
         where
 
         f stk (Source b)       = do
             emit [ILdOn]
-            go (nd:stk, b)
+            go (nd:stk) b
         f (_:stk) Sink         = do
             return (nd:stk)
 --             case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
@@ -395,11 +395,11 @@ generate2 emit stk0 asts = go (stk0, asts)
         f stk End              = return (stk)
         f (x:stk) (Device d b) = do
             case d of
-                 And (Var addr) -> emit [ILdBit addr, IAnd]
+                 And  (Var addr) -> emit [ILdBit addr, IAnd]
                  AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
-                 St (Var addr)  -> emit [IStBit addr]
-                 _ -> error $ show (here, d)
-            go (nd:stk, b)
+                 St   (Var addr) -> emit [IStBit addr]
+                 _               -> error $ show (here, d)
+            go (nd:stk) b
         f stk (Jump s)         = error here --later
         f (_:stk) (Node b)     = do
 
@@ -420,22 +420,22 @@ generate2 emit stk0 asts = go (stk0, asts)
             let dups = replicate (length b - 1) nd
             for_ dups $ const $ emit [IDup]
 
-            liftIO $ print (here)
+--             liftIO $ print (here)
             foldlM
-                (curry go
+                (go
     --emit Dup's here? --so that stack level is kept low
                 )
                 ([nd] ++ dups ++ stk)
                 b
         f (pp:stk) (Conn c) = do
-            liftIO $ print here
+--             liftIO $ print here
             return (nd:stk)
         f stk (Cont stubP b) = do
-            liftIO $ print here
+--             liftIO $ print here
             case findIndex (isConn stubP) stk of
                 Just i -> bringToTop i
                 Nothing -> error here
-            go (nd:stk, b) --XXX not sure about nd on stack here
+            go (nd:stk) b --XXX not sure about nd on stack here
 
         f stk n = error $ show (here, stk, n)
 
@@ -481,7 +481,8 @@ generateStk2 ast' = do
     print (here, "-----------------------")
 
     q :: [Instruction String Int] <- execWriterT $ foldlM (generate2 tell) [] a6
-    print (here, q)
+    for_ q print
+    print (here, "-----------------------")
 
 --     let x1 = x1_x
 #if 0
