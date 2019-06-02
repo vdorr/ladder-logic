@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wunused-imports #-}
 
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    QuasiQuotes, PatternSynonyms,TypeApplications,
+    QuasiQuotes, PatternSynonyms,TypeApplications,DeriveAnyClass,
     LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns, FlexibleContexts #-}
 
 -- OverloadedStrings, 
@@ -257,56 +257,94 @@ tsort2
     :: [(DgExt, [DgExt])]
     -> [Cofree (Diagram DgExt d s) DgExt]
     -> [Cofree (Diagram DgExt d s) DgExt]
-tsort2 = undefined
+tsort2 mergedNodes asts = f asts'
+    where
+    asts' = fmap (\n -> (dependencies' n, n)) asts
+
+    dependencies' n = deps { nodes = nodes'}
+        where
+        deps = dependencies n
+        nodes' = foldMap allNodeLocs (nodes deps)
+
+    --assuming p is in list in mergedNodes
+    allNodeLocs p = fromMaybe [p] $ lookup p mergedNodes
+
+    f ((d, x) : xs) = fmap snd a ++ [x] ++ f b
+        where
+        (a, b) = partition (dependsOn d . fst) xs
+    f [] = []
+
+dependsOn :: Deps DgExt -> Deps DgExt -> Bool
+a `dependsOn` b = sinks b `someIsIn` nodes a
+                    || conns b `someIsIn` conts a
+    where
+    someIsIn x y = any (flip elem y) x
 
 data Deps p = Deps { nodes, sinks, conts, conns :: [p] }
-    deriving Show
+    deriving (Show, Semigroup, Monoid)
 
-annotateWithDeps
-    :: Eq p
-    => Cofree (Diagram DgExt d s) p
-    -> Cofree (Diagram DgExt d s) (Deps p, p)
-annotateWithDeps = undefined
+dependencies :: Cofree (Diagram DgExt d s) DgExt -> Deps DgExt
+dependencies = cata' go
+    where
+    go (p, n) = f n
+        where
+        f (Source   a ) = a
+        f  Sink         = Deps [] [p] [] []
+        f  End          = mempty
+        f (Device _ a ) = a
+        f (Jump _     ) = mempty
+        f (Node     as) = Deps [p] [] [] [] <> mconcat as
+        f (Conn c     ) = Deps [] [] [] [p]
+        f (Cont c   a ) = Deps [] [] [p] [] <> a
 
+unFix' :: Cofree f a -> (a, f (Cofree f a))
+unFix' (a :< f) = (a, f)
 
-cut'
-    :: [Cofree (Diagram DgExt d s) DgExt]
-    -> [Cofree (Diagram DgExt d s) DgExt]
-cut' = foldMap cut''
+cata' :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
+cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 
-cut''
-    :: Cofree (Diagram DgExt d s) DgExt
-    -> [Cofree (Diagram DgExt d s) DgExt]
-cut'' = uncurry (:) . cut
+-- cut'
+--     :: [Cofree (Diagram DgExt d s) DgExt]
+--     -> [Cofree (Diagram DgExt d s) DgExt]
+-- cut' = foldMap cut''
+-- 
+-- cut''
+--     :: Cofree (Diagram DgExt d s) DgExt
+--     -> [Cofree (Diagram DgExt d s) DgExt]
+-- cut'' = uncurry (:) . cut
 
 --------------------------------------------------------------------------------
 
-cut
-    :: Cofree (Diagram DgExt d s) DgExt
-    -> ( Cofree (Diagram DgExt d s) DgExt
-       , [Cofree (Diagram DgExt d s) DgExt])
-cut (p :< a) = f a
-    where
-    f (Source   a) = h Source (cut a)
-    f  Sink        = (p :< Sink, [])
-    f  End         = (p :< End, [])
-    f (Device d a) = h (Device d) (cut a)
-    f (Jump s    ) = (p :< Jump s, [])
-
-    f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
-        where
-        (x, y) = unzip $ fmap cut a
-        x' = (fmap (\n@(pp:<_) -> pp:<Cont p n) x)
-
-    f (Conn c    ) = (p :< Conn c, [])
-    f (Cont c   a) = h (Cont c) (cut a)
-
-    h g w = bimap ((p :<) . g) id w
+-- cut
+--     :: Cofree (Diagram DgExt d s) DgExt
+--     -> ( Cofree (Diagram DgExt d s) DgExt
+--        , [Cofree (Diagram DgExt d s) DgExt])
+-- cut (p :< a) = f a
+--     where
+--     f (Source   a) = h Source (cut a)
+--     f  Sink        = (p :< Sink, [])
+--     f  End         = (p :< End, [])
+--     f (Device d a) = h (Device d) (cut a)
+--     f (Jump s    ) = (p :< Jump s, [])
+-- 
+--     f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
+--         where
+--         (x, y) = unzip $ fmap cut a
+--         x' = (fmap (\n@(pp:<_) -> pp:<Cont p n) x)
+-- 
+--     f (Conn c    ) = (p :< Conn c, [])
+--     f (Cont c   a) = h (Cont c) (cut a)
+-- 
+--     h g w = bimap ((p :<) . g) id w
 
 
 --TODO TEST every list elemen has all nodes on same line
 cut1' = foldMap (uncurry (:) . cut1)
 
+sameLine :: Cofree (Diagram c d s) DgExt -> Bool
+sameLine n@((ln, _) :< _) = getAll $ foldMap (All.(ln==).fst) n
+
+--TODO ensure cut when line number changes
 cut1
     :: Cofree (Diagram () d s) DgExt
     -> ( Cofree (Diagram DgExt d s) DgExt
@@ -356,28 +394,26 @@ cut1 (p :< a) = f a
 -- 
 --     lineNumberIs ln'' = \((ln', _) :< _) -> ln'==ln''
 
-lineNumber = (\(p:<_) -> p)
+position (p :< _) = p
 
 --------------------------------------------------------------------------------
 
--- generate2 ::
---     Monad m0 =>
---     Show b0 =>
---     Show s1 =>
---     Show s0 =>
---     Eq b0 =>
---     Eq c =>
---     Show c
---     => ([Instruction String w] -> m0 ())
---     -> [Cofree (Diagram c (Op Operand s0) s1) b0]
---                       -> Cofree (Diagram c (Op Operand s0) s1) b0
---                       -> m0 [Cofree (Diagram c (Op Operand s0) s1) b0]
+generate2 ::
+    Monad m0 =>
+    Show b0 =>
+    Show s1 =>
+    Show s0 =>
+    Eq b0 =>
+    Eq c =>
+    Show c
+    => ([Instruction String w] -> m0 ())
+    -> [Cofree (Diagram c (Op Operand s0) s1) b0]
+                      -> Cofree (Diagram c (Op Operand s0) s1) b0
+                      -> m0 [Cofree (Diagram c (Op Operand s0) s1) b0]
 
 generate2 emit stk0 asts = go stk0 asts
 
     where
-
---     sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
 
     go stack nd@(p :< a) = f stack a
         where
@@ -392,13 +428,9 @@ generate2 emit stk0 asts = go stk0 asts
 --                 Nothing -> do
 --                     emit [IDrop]
 --                     return (stk)
-        f stk End              = return (stk)
+        f stk End              = return (stk) --XXX emit Drop?
         f (x:stk) (Device d b) = do
-            case d of
-                 And  (Var addr) -> emit [ILdBit addr, IAnd]
-                 AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
-                 St   (Var addr) -> emit [IStBit addr]
-                 _               -> error $ show (here, d)
+            emitDevice d
             go (nd:stk) b
         f stk (Jump s)         = error here --later
         f (_:stk) (Node b)     = do
@@ -406,9 +438,6 @@ generate2 emit stk0 asts = go stk0 asts
 --i think dups should be emitted only AFTER node value is computed
 
     --fold over stack, picking sinks(aka stubs), emitting Or's
---             foldM
---                 (nodePredStep)
---                 (stk)
             --depth of stack stays the same during evaluation of preds
             for_ (zip stk [0..]) $ \(x, i) -> do
                 case x of
@@ -417,15 +446,18 @@ generate2 emit stk0 asts = go stk0 asts
                          emit [IOr]
                      _ -> return ()
 
-            let dups = replicate (length b - 1) nd
-            for_ dups $ const $ emit [IDup]
+--             let dups = replicate (length b - 1) nd
+--             for_ dups $ const $ emit [IDup]
+            let copiesOnStack = fmap (const nd) b
+            replicateM (length b - 1) $ emit [IDup]
 
 --             liftIO $ print (here)
             foldlM
                 (go
     --emit Dup's here? --so that stack level is kept low
                 )
-                ([nd] ++ dups ++ stk)
+--                 ([nd] ++ dups ++ stk)
+                (copiesOnStack ++ stk)
                 b
         f (pp:stk) (Conn c) = do
 --             liftIO $ print here
@@ -434,16 +466,23 @@ generate2 emit stk0 asts = go stk0 asts
 --             liftIO $ print here
             case findIndex (isConn stubP) stk of
                 Just i -> bringToTop i
-                Nothing -> error here
+                Nothing -> error here --should not happen
             go (nd:stk) b --XXX not sure about nd on stack here
 
         f stk n = error $ show (here, stk, n)
 
-        isConn p0 (_ :< Conn p1) = p0 == p1
-        isConn _ _ = False
+    isConn p0 (_ :< Conn p1) = p0 == p1
+    isConn _ _ = False
 
-        bringToTop 0 = return ()
-        bringToTop i = emit [IPick i]
+    bringToTop 0 = return ()
+    bringToTop i = emit [IPick i]
+
+    emitDevice d =
+        case d of
+                And  (Var addr) -> emit [ILdBit addr, IAnd]
+                AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
+                St   (Var addr) -> emit [IStBit addr]
+                _               -> error $ show (here, d)
 
 --------------------------------------------------------------------------------
 
@@ -470,12 +509,12 @@ generateStk2 ast' = do
 --     let a2 = ldlines'' a1
 --     let a3 = cut' a2
 
-    let a2 = ldlines'' a1
-    let a3 = cut' a2
-    let a4 = sortOn (\(p:<_) -> p) a3
+--     let a2 = ldlines'' a1
+--     let a3 = cut' a2
+--     let a4 = sortOn (\(p:<_) -> p) a3
 
     let a5 = cut1' a1
-    let a6 = sortOn lineNumber a5
+    let a6 = sortOn position a5
 
     for_ a6 print
     print (here, "-----------------------")
