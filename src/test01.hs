@@ -269,6 +269,7 @@ tsort2 mergedNodes asts = f asts'
     --assuming p is in list in mergedNodes
     allNodeLocs p = fromMaybe [p] $ lookup p mergedNodes
 
+    --XXX wrong!!!!!
     f ((d, x) : xs) = fmap snd a ++ [x] ++ f b
         where
         (a, b) = partition (dependsOn d . fst) xs
