@@ -360,24 +360,24 @@ lineNumber = (\(p:<_) -> p)
 
 --------------------------------------------------------------------------------
 
-generate2 ::
-    Monad m0 =>
-    Show b0 =>
-    Show s1 =>
-    Show s0 =>
-    Eq b0 =>
-    Eq c =>
-    Show c =>
-    ([Instruction String w] -> m0 ())
-                      -> [(b0, b0)]
-                      -> Cofree (Diagram c (Op Operand s0) s1) b0
-                      -> m0 ()
+-- generate2 ::
+--     Monad m0 =>
+--     Show b0 =>
+--     Show s1 =>
+--     Show s0 =>
+--     Eq b0 =>
+--     Eq c =>
+--     Show c
+--     => ([Instruction String w] -> m0 ())
+--     -> [Cofree (Diagram c (Op Operand s0) s1) b0]
+--                       -> Cofree (Diagram c (Op Operand s0) s1) b0
+--                       -> m0 [Cofree (Diagram c (Op Operand s0) s1) b0]
 
-generate2 emit nodeToSink asts = () <$ go ([], asts)
+generate2 emit stk0 asts = go (stk0, asts)
 
     where
 
-    sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
+--     sinkToNode = nub $ fmap swap nodeToSink --do i need nub? i think yes
 
     go (stack, nd@(p :< a)) = f stack a
         where
@@ -386,75 +386,64 @@ generate2 emit nodeToSink asts = () <$ go ([], asts)
             emit [ILdOn]
             go (nd:stk, b)
         f (_:stk) Sink         = do
-            case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
-                Just _  -> return (nd:stk) --put value back under name with which is referenced
-                Nothing -> do
-                    emit [IDrop]
-                    return (stk)
+            return (nd:stk)
+--             case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
+--                 Just _  -> return (nd:stk) --put value back under name with which is referenced
+--                 Nothing -> do
+--                     emit [IDrop]
+--                     return (stk)
         f stk End              = return (stk)
         f (x:stk) (Device d b) = do
             case d of
                  And (Var addr) -> emit [ILdBit addr, IAnd]
+                 AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
                  St (Var addr)  -> emit [IStBit addr]
+                 _ -> error $ show (here, d)
             go (nd:stk, b)
         f stk (Jump s)         = error here --later
         f (_:stk) (Node b)     = do
 
 --i think dups should be emitted only AFTER node value is computed
+
+    --fold over stack, picking sinks(aka stubs), emitting Or's
+--             foldM
+--                 (nodePredStep)
+--                 (stk)
+            --depth of stack stays the same during evaluation of preds
+            for_ (zip stk [0..]) $ \(x, i) -> do
+                case x of
+                     pp :< Sink | pp == p -> do
+                         bringToTop i
+                         emit [IOr]
+                     _ -> return ()
+
             let dups = replicate (length b - 1) nd
             for_ dups $ const $ emit [IDup]
 
-    --fold over stack, picking sinks(aka stubs), emitting Or's
-
-
+            liftIO $ print (here)
             foldlM
                 (curry go
-    --emit Dup's here?
+    --emit Dup's here? --so that stack level is kept low
                 )
-                (dups ++ stk)
+                ([nd] ++ dups ++ stk)
                 b
-#if 0
-            where
-            step (stk', xs') (_, stubP) = do
-                case findIndex (stubP==) stk' of
-                     Just i -> do
-                         case i of
-                            0 -> return ()
-                            _ -> emit [IPick i]
-                         emit [IOr]
-                         return (stubP:stk', xs')
-                     Nothing ->
-                        case partition (elem stubP .fst) xs' of
-                          --stub must appear in exactly one subtree
-                            ([tr@(_, _:< _)], rest) -> do
-                                s@(stk'', _) <- go (stk', tr : rest)
-                                --now fetch and or??
-                                case findIndex (stubP==) stk'' of --check latest stack
-                                    Just i ->
-                                        case i of
-                                            0 -> return ()
-                                            _ -> emit [IPick i]
-                                    Nothing
-                                        -> error $ show (here, stubP, stk'') --should not happen
-                                emit [IOr]
-                                return s
-                            other -> error $ show (here, other) --should not happen
-#endif
---         f (pp:stk) (Conn c) = do
---             return (c:stk, xs)
---         f stk (Cont stubP b) = do
---             case findIndex (stubP==) stk of
---                 Just i -> do
---                     case i of
---                         0 -> return ()
---                         _ -> emit [IPick i]
--- --                     return (stubP:stk, xs)
---                     go (stubP:stk, (stubs, b) : xs)
--- 
---                 Nothing -> error here
--- --             undefined
+        f (pp:stk) (Conn c) = do
+            liftIO $ print here
+            return (nd:stk)
+        f stk (Cont stubP b) = do
+            liftIO $ print here
+            case findIndex (isConn stubP) stk of
+                Just i -> bringToTop i
+                Nothing -> error here
+            go (nd:stk, b) --XXX not sure about nd on stack here
 
         f stk n = error $ show (here, stk, n)
+
+        isConn p0 (_ :< Conn p1) = p0 == p1
+        isConn _ _ = False
+
+        bringToTop 0 = return ()
+        bringToTop i = emit [IPick i]
 
 --------------------------------------------------------------------------------
 
@@ -490,6 +479,9 @@ generateStk2 ast' = do
 
     for_ a6 print
     print (here, "-----------------------")
+
+    q :: [Instruction String Int] <- execWriterT $ foldlM (generate2 tell) [] a6
+    print (here, q)
 
 --     let x1 = x1_x
 #if 0
