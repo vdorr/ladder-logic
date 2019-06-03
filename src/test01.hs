@@ -24,7 +24,7 @@ import Data.Tuple
 import Data.Maybe
 import Control.Monad.Writer.Strict
 
--- import Debug.Trace
+import Debug.Trace
 
 import Preprocess
 
@@ -275,8 +275,42 @@ tsort2 mergedNodes asts = f asts'
         (a, b) = partition (dependsOn d . fst) xs
     f [] = []
 
+pickFirst :: (a -> Bool) -> [a] -> (Maybe a, [a])
+pickFirst p s
+    = case break p s of
+        (a, b:bs) -> (Just b , a ++ bs)
+        _         -> (Nothing, s)
+
+--TODO tests
+-- stability - without dependencies order is unchanged
+-- topology - either topo order is satisfied or it is cycle (or no dependency)
+tststs :: (a -> a -> Bool) -> [a] -> [a]
+tststs depOn = f
+    where
+    f (x : xs) = dep ++ [x] ++ f indep
+        where
+        (dep, indep) = g x xs
+    f [] = []
+
+    g x xs
+        = case pickFirst (depOn x) xs of
+            (Just x1, x1s) ->
+                let
+                    (dep1, indep1) = g x1 x1s
+                    (dep, indep) = g x indep1
+                in
+                    (dep1++[x1]++dep , indep )
+            (Nothing, xs1) -> ([], xs1)
+
+
 dependsOn :: Deps DgExt -> Deps DgExt -> Bool
 a `dependsOn` b = sinks b `someIsIn` nodes a
+                    || conns b `someIsIn` conts a
+    where
+    someIsIn x y = any (flip elem y) x
+
+comesBefore :: Deps DgExt -> Deps DgExt -> Bool
+b `comesBefore` a = sinks b `someIsIn` nodes a
                     || conns b `someIsIn` conts a
     where
     someIsIn x y = any (flip elem y) x
@@ -304,40 +338,7 @@ unFix' (a :< f) = (a, f)
 cata' :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
 cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 
--- cut'
---     :: [Cofree (Diagram DgExt d s) DgExt]
---     -> [Cofree (Diagram DgExt d s) DgExt]
--- cut' = foldMap cut''
--- 
--- cut''
---     :: Cofree (Diagram DgExt d s) DgExt
---     -> [Cofree (Diagram DgExt d s) DgExt]
--- cut'' = uncurry (:) . cut
-
 --------------------------------------------------------------------------------
-
--- cut
---     :: Cofree (Diagram DgExt d s) DgExt
---     -> ( Cofree (Diagram DgExt d s) DgExt
---        , [Cofree (Diagram DgExt d s) DgExt])
--- cut (p :< a) = f a
---     where
---     f (Source   a) = h Source (cut a)
---     f  Sink        = (p :< Sink, [])
---     f  End         = (p :< End, [])
---     f (Device d a) = h (Device d) (cut a)
---     f (Jump s    ) = (p :< Jump s, [])
--- 
---     f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
---         where
---         (x, y) = unzip $ fmap cut a
---         x' = (fmap (\n@(pp:<_) -> pp:<Cont p n) x)
--- 
---     f (Conn c    ) = (p :< Conn c, [])
---     f (Cont c   a) = h (Cont c) (cut a)
--- 
---     h g w = bimap ((p :<) . g) id w
-
 
 --TODO TEST every list elemen has all nodes on same line
 cut1' = foldMap (uncurry (:) . cut1)
@@ -352,9 +353,7 @@ cut1
        , [Cofree (Diagram DgExt d s) DgExt])
 cut1 (p :< a) = f a
     where
---     f :: Diagram () d1 s1 (Cofree (Diagram () d1 s1) DgExt)
---                       -> (Cofree (Diagram DgExt d1 s1) DgExt,
---                           [Cofree (Diagram DgExt d1 s1) DgExt])
+
     f (Source   a) = h Source (cut1 a)
     f  Sink        = (p :< Sink, [])
     f  End         = (p :< End, [])
@@ -370,30 +369,6 @@ cut1 (p :< a) = f a
     f (Cont _   _) = error here
 
     h g w = bimap ((p :<) . g) id w
-
---------------------------------------------------------------------------------
-
--- cutcut
---     :: Cofree (Diagram () d s) DgExt
---     -> NonEmpty (Cofree (Diagram DgExt d s) DgExt)
--- cutcut tr = let (a, b) = f tr in a :| b
---     where
--- 
---     f (p@(ln, _) :< Node l) = (p :< Node (a' ++ fmap (const (p :< Conn p)) b) , as'')
---         where
--- 
---         as'' = concat as' ++ fmap (\nn@(pp:<_) -> pp :< Cont p nn) b' ++ concat bs'
--- 
---         (a, b) = partition (lineNumberIs ln) l
---         (a', as') = unzip $ fmap f a
---         (b', bs') = unzip $ fmap f b
---     f (p :< Source a)   = bimap ((p:<) . Source) id $ f a
---     f (p :< Sink)       = (p :< Sink, [])
---     f (p :< End)        = (p :< End, [])
---     f (p :< Device d a) = bimap ((p:<) . Device d) id $ f a
---     f (p :< Jump s)     = (p :< Jump s, [])
--- 
---     lineNumberIs ln'' = \((ln', _) :< _) -> ln'==ln''
 
 position (p :< _) = p
 
@@ -570,7 +545,7 @@ generateStk2 ast' = do
 
 main :: IO ()
 main = do
-
+#if 0
     [file] <- getArgs
     src <- TIO.readFile file
     case stripPos <$> runLexer src of
@@ -600,8 +575,30 @@ main = do
 
 
                 Left err -> print (here, err)
-#if 0
-            forM_ x $ \(l,c) -> do
-                print l
-                print c
+#else
+    let ts = tststs (\(as, a) (bs, b) -> elem b as)
+    print (here, ts [([2], 1)])
+    print (here, ts
+            [ ([],  1)
+            , ([1], 2)
+            , ([],  3)
+            , ([1], 4)
+            ])
+    print (here, ts
+            [ ([],  1)
+            , ([3], 2)
+            , ([] , 3)
+            , ([1], 4)
+            ])
+    print (here, ts
+            [ ([2], 1)
+            , ([1], 2)
+            , ([], 3)
+            ])
+    print (here, ts
+            [ ([2,3], 1)
+            , ([], 2)
+            , ([2], 3)
+            , ([], 4)
+            ])
 #endif
