@@ -2,7 +2,8 @@
 
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
     QuasiQuotes, PatternSynonyms,TypeApplications,DeriveAnyClass,
-    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns, FlexibleContexts #-}
+    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns
+    , FlexibleContexts #-}
 
 -- OverloadedStrings, 
 
@@ -11,15 +12,16 @@
 import qualified Data.Text.IO as TIO
 -- import qualified Data.Text as T
 import Data.Foldable
--- import Data.Traversable
+import Data.Traversable
 import Data.List
 -- import Text.Read
--- import Data.Function
+import Data.Function
 import Data.Bifunctor
 import System.Environment (getArgs)
 import Data.Tuple
 -- import Control.Monad (replicateM_)
 -- import Data.Semigroup
+import Control.Applicative
 
 import Data.Maybe
 import Control.Monad.Writer.Strict
@@ -37,8 +39,11 @@ import Ladder.LadderParser
 
 import Tooling
 
-import qualified Data.List.NonEmpty as NE
-import Data.List.NonEmpty (NonEmpty(..))
+-- import qualified Data.List.NonEmpty as NE
+-- import Data.List.NonEmpty (NonEmpty(..))
+
+import qualified Hedgehog.Gen as Gen
+import Hedgehog.Range
 
 --------------------------------------------------------------------------------
 
@@ -257,7 +262,7 @@ tsort2
     :: [(DgExt, [DgExt])]
     -> [Cofree (Diagram DgExt d s) DgExt]
     -> [Cofree (Diagram DgExt d s) DgExt]
-tsort2 mergedNodes asts = f asts'
+tsort2 mergedNodes asts = fmap snd $ f asts'
     where
     asts' = fmap (\n -> (dependencies' n, n)) asts
 
@@ -269,17 +274,38 @@ tsort2 mergedNodes asts = f asts'
     --assuming p is in list in mergedNodes
     allNodeLocs p = fromMaybe [p] $ lookup p mergedNodes
 
-    --XXX wrong!!!!!
-    f ((d, x) : xs) = fmap snd a ++ [x] ++ f b
-        where
-        (a, b) = partition (dependsOn d . fst) xs
-    f [] = []
+    f = tststs (dependsOn `on` fst)
+
 
 pickFirst :: (a -> Bool) -> [a] -> (Maybe a, [a])
 pickFirst p s
     = case break p s of
         (a, b:bs) -> (Just b , a ++ bs)
         _         -> (Nothing, s)
+
+
+istopo :: (a -> a -> Bool) -> [a] -> Bool
+istopo dep (x : xs) = all (\y -> not $ dep x y) xs && istopo dep xs
+istopo _ [] = True
+
+istopoM :: (a -> a -> Bool) -> [a] -> Maybe a
+istopoM dep (x : xs)
+--     = case filter (dep x) xs of
+--                             [] -> istopoM dep xs
+--                             offender : _ -> Just offender
+    = fst (pickFirst (dep x) xs) <|> istopoM dep xs
+istopoM _ [] = Nothing
+
+
+iscycle :: (a -> a -> Bool) -> (a -> a -> Bool) -> a -> [a] -> Bool
+iscycle eq dep x = go x
+    where
+    go a as = case depend of
+                   [] -> False
+                   d | any (dep x) depend -> True --flip dep?
+                   _ -> any (flip go indep) depend
+        where
+        (depend, indep) = partition (flip dep a) as
 
 --TODO tests
 -- stability - without dependencies order is unchanged
@@ -316,7 +342,13 @@ b `comesBefore` a = sinks b `someIsIn` nodes a
     someIsIn x y = any (flip elem y) x
 
 data Deps p = Deps { nodes, sinks, conts, conns :: [p] }
-    deriving (Show, Semigroup, Monoid)
+    deriving (Show)
+
+instance Semigroup (Deps p) where
+    Deps a b c d <> Deps t u v w = Deps (a <> t) (b <> u) (c <> v) (d <> w)
+
+instance Monoid (Deps p) where
+    mempty = Deps [] [] [] []
 
 dependencies :: Cofree (Diagram DgExt d s) DgExt -> Deps DgExt
 dependencies = cata' go
@@ -332,6 +364,8 @@ dependencies = cata' go
         f (Conn c     ) = Deps [] [] [] [p]
         f (Cont c   a ) = Deps [] [] [p] [] <> a
 
+--------------------------------------------------------------------------------
+
 unFix' :: Cofree f a -> (a, f (Cofree f a))
 unFix' (a :< f) = (a, f)
 
@@ -340,7 +374,7 @@ cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 
 --------------------------------------------------------------------------------
 
---TODO TEST every list elemen has all nodes on same line
+--TODO TEST every list elemen has all nodes on same line, 'sameLine'
 cut1' = foldMap (uncurry (:) . cut1)
 
 sameLine :: Cofree (Diagram c d s) DgExt -> Bool
@@ -476,70 +510,22 @@ generateStk2 ast' = do
     --chop
     let Just (a1 ::[Cofree (Diagram () (Op Operand String) String) DgExt])
             = forest a0
---     let x1_x = ldlines'' [ast]
---     let x1_xxx = ldlines'' x1_0
 
     for_ a1 print
     print (here, "-----------------------")
 
---     let a2 = ldlines'' a1
---     let a3 = cut' a2
-
---     let a2 = ldlines'' a1
---     let a3 = cut' a2
---     let a4 = sortOn (\(p:<_) -> p) a3
-
     let a5 = cut1' a1
     let a6 = sortOn position a5
+    let a7 = tsort2 nodes a6
 
-    for_ a6 print
+    for_ a7 print
     print (here, "-----------------------")
 
-    q :: [Instruction String Int] <- execWriterT $ foldlM (generate2 tell) [] a6
-    for_ q print
+    code <- execWriterT $ foldlM (generate2 tell) [] a7
+    for_ code print
     print (here, "-----------------------")
 
---     let x1 = x1_x
-#if 0
-    let x1 = x1_0
---     for_ x1_0 print
---     print (here, "-----------------------")
-
-    --collect stubs (per each forest tree)
-    let x1' -- :: [([DgExt], Cofree (Diagram c (Op Operand String) String) DgExt)]
-            = fmap (\x -> (stubs x, x)) x1
-    --merge neighbouring nodes
-    let q -- :: [(([DgExt], [(DgExt, [DgExt])]), Cofree (Diagram DgExt (Op Operand String) String) DgExt)]
-            = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
-                in ((stbs, nds), tre')
-                    --this is result - stubs in subtree, merged nodes and new tree
-                    ) x1'
-
-    let allStubs = foldMap (fst . fst) q --aka sinks
-    let nodesMerged :: [(DgExt, [DgExt])] = foldMap (snd . fst) q
-    let allNodes = nub $ fmap fst nodesMerged ++ foldMap snd nodesMerged
-    let sinksLeadingToNodes = filter (flip elem allNodes) allStubs --aka sinks
-    print (here, "allNodes:", allNodes)
-    print (here, "nodesMerged:", nodesMerged)
-    print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
-    let oldNodeToNewNode = nodeTable nodesMerged
-    let nodeToSink
-            = fmap (\p -> (fromJust $ lookup p oldNodeToNewNode, p)) sinksLeadingToNodes
-    print (here, "nodeToSink:", nodeToSink)
-
-    print (here, "-----------------------")
-    for_ q $ \((stubs, _), tr) -> do
-        print $ filter (flip elem allNodes) stubs
-        print tr
-
-    print (here, "-----------------------")
-    let subTrees = fmap (\((stubs, _), tr) -> (stubs, tr)) q
---     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
---         subTrees
-    execWriterT $ generate tell nodeToSink subTrees
-#else
-    return []
-#endif
+    return code
 
 --------------------------------------------------------------------------------
 
@@ -576,29 +562,51 @@ main = do
 
                 Left err -> print (here, err)
 #else
-    let ts = tststs (\(as, a) (bs, b) -> elem b as)
-    print (here, ts [([2], 1)])
-    print (here, ts
-            [ ([],  1)
-            , ([1], 2)
-            , ([],  3)
-            , ([1], 4)
-            ])
-    print (here, ts
-            [ ([],  1)
-            , ([3], 2)
-            , ([] , 3)
-            , ([1], 4)
-            ])
-    print (here, ts
-            [ ([2], 1)
-            , ([1], 2)
-            , ([], 3)
-            ])
-    print (here, ts
-            [ ([2,3], 1)
-            , ([], 2)
-            , ([2], 3)
-            , ([], 4)
-            ])
+    let dep01 = (\(as, a) (bs, b) -> elem b as)
+    let ts = tststs dep01
+    let testts lbl s =
+            let s2 = ts s
+            in print
+                ( lbl
+                , istopo dep01 s
+                , istopo dep01 s2
+                , istopoM dep01 s2
+                , fmap
+                    (\p -> iscycle (on (==) snd) dep01 p s2)
+                    $ istopoM dep01 s2
+                , s2)
+    testts here
+        [([2], 1)]
+    testts here
+        [ ([],  1)
+        , ([1], 2)
+        , ([],  3)
+        , ([1], 4)
+        ]
+    testts here
+        [ ([],  1)
+        , ([3], 2)
+        , ([] , 3)
+        , ([1], 4)
+        ]
+    testts here
+        [ ([2], 1)
+        , ([1], 2)
+        , ([], 3)
+        ]
+    testts here
+        [ ([2,3], 1)
+        , ([], 2)
+        , ([2], 3)
+        , ([], 4)
+        ]
+    x <- Gen.sample $ do
+        let k = 10
+        n <- Gen.int $ constant 0 k
+        let l = [0..n]
+        ll <- for [0..n] $ \v -> do
+            deps <- Gen.list (linear 0 k) (Gen.int $ constant 0 k)
+            return (deps, v)
+        return ll
+    print (here, x)
 #endif
