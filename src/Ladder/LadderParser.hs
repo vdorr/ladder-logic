@@ -1,8 +1,4 @@
-{-# LANGUAGE FlexibleContexts, DeriveFunctor, QuantifiedConstraints
-  , DeriveFoldable, DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
-
-{-# LANGUAGE UndecidableInstances #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 

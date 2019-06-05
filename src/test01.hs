@@ -224,14 +224,7 @@ testAst ast' = do
 
     let ast = parseOps ast'
     let (st, op, cnt) = fffff ast
---     print (here, "-----------------------")
---     for_ st print
---     print (here, "-----------------------")
---     for_ op print
     print (here, "-----------------------")
---     Just w <- return $ tsort [] $ or'd [] op
---     for_ (w) print
---     print (here, "-----------------------")
     let Just p01 = tsort [] $ or'd [] op
     print (here, "memory after single eval:", network' p01 memory)
 
@@ -277,66 +270,7 @@ tsort2 mergedNodes asts = fmap snd $ f asts'
 
     f = sttsort (dependsOn `on` fst)
 
-
-pickFirst :: (a -> Bool) -> [a] -> (Maybe a, [a])
-pickFirst p s
-    = case break p s of
-        (a, b:bs) -> (Just b , a ++ bs)
-        _         -> (Nothing, s)
-
-
-istopo :: (a -> a -> Bool) -> [a] -> Bool
-istopo dep (x : xs) = all (\y -> not $ dep x y) xs && istopo dep xs
-istopo _ [] = True
-
-istopoM :: (a -> a -> Bool) -> [a] -> Maybe a
-istopoM dep (x : xs)
---     = case filter (dep x) xs of
---                             [] -> istopoM dep xs
---                             offender : _ -> Just offender
-    = fst (pickFirst (dep x) xs) <|> istopoM dep xs
-istopoM _ [] = Nothing
-
---i think i don't need to check for cycles here
-isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
-isSpatialOrTopo dep spa = go
-    where
-    go (x : xs : xss)
-        | spa x xs == LT || dep xs x = go (xs : xss)
-        | otherwise = Just x
-    go _ = Nothing
-
-iscycle :: (a -> a -> Bool) -> (a -> a -> Bool) -> a -> [a] -> Bool
-iscycle eq dep x = go x
-    where
-    go a as = case depend of
-                   [] -> False
-                   d | any (dep x) depend -> True --flip dep?
-                   _ -> any (flip go indep) depend
-        where
-        (depend, indep) = partition (flip dep a) as
-
---TODO tests
--- stability - without dependencies order is unchanged
--- topology - either topo order is satisfied or it is cycle (or no dependency)
-sttsort :: (a -> a -> Bool) -> [a] -> [a]
-sttsort depOn = f
-    where
-    f (x : xs) = dep ++ [x] ++ f indep
-        where
-        (dep, indep) = g x xs
-    f [] = []
-
-    g x xs
-        = case pickFirst (depOn x) xs of
-            (Just x1, x1s) ->
-                let
-                    (dep1, indep1) = g x1 x1s
-                    (dep, indep) = g x indep1
-                in
-                    (dep1++[x1]++dep , indep )
-            (Nothing, xs1) -> ([], xs1)
-
+--------------------------------------------------------------------------------
 
 dependsOn :: Deps DgExt -> Deps DgExt -> Bool
 a `dependsOn` b = sinks b `someIsIn` nodes a
@@ -344,11 +278,11 @@ a `dependsOn` b = sinks b `someIsIn` nodes a
     where
     someIsIn x y = any (flip elem y) x
 
-comesBefore :: Deps DgExt -> Deps DgExt -> Bool
-b `comesBefore` a = sinks b `someIsIn` nodes a
-                    || conns b `someIsIn` conts a
-    where
-    someIsIn x y = any (flip elem y) x
+-- comesBefore :: Deps DgExt -> Deps DgExt -> Bool
+-- b `comesBefore` a = sinks b `someIsIn` nodes a
+--                     || conns b `someIsIn` conts a
+--     where
+--     someIsIn x y = any (flip elem y) x
 
 data Deps p = Deps { nodes, sinks, conts, conns :: [p] }
     deriving (Show)
