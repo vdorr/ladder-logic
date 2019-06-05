@@ -383,6 +383,10 @@ cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 --------------------------------------------------------------------------------
 
 --TODO TEST every list elemen has all nodes on same line, 'sameLine'
+--XXX it don't give element spatially sorted, right?
+cut1'
+    :: [Cofree (Diagram () d s) DgExt]
+    -> [Cofree (Diagram DgExt d s) DgExt]
 cut1' = foldMap (uncurry (:) . cut1)
 
 sameLine :: Cofree (Diagram c d s) DgExt -> Bool
@@ -412,18 +416,20 @@ cut1 (p :< a) = f a
 
     h g w = bimap ((p :<) . g) id w
 
+--specialized to 'DgExt' intentionaly
+position :: Cofree f DgExt -> DgExt
 position (p :< _) = p
 
 --------------------------------------------------------------------------------
 
 generate2 ::
-    Monad m0 =>
-    Show b0 =>
-    Show s1 =>
-    Show s0 =>
-    Eq b0 =>
-    Eq c =>
-    Show c
+    ( Monad m0
+    , Show b0
+    , Show s1
+    , Show s0
+    , Eq b0
+    , Eq c
+    , Show c)
     => ([Instruction String w] -> m0 ())
     -> [Cofree (Diagram c (Op Operand s0) s1) b0]
                       -> Cofree (Diagram c (Op Operand s0) s1) b0
@@ -495,12 +501,12 @@ generate2 emit stk0 asts = go stk0 asts
     bringToTop 0 = return ()
     bringToTop i = emit [IPick i]
 
-    emitDevice d =
-        case d of
-                And  (Var addr) -> emit [ILdBit addr, IAnd]
-                AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
-                St   (Var addr) -> emit [IStBit addr]
-                _               -> error $ show (here, d)
+    emitDevice d
+        = case d of
+            And  (Var addr) -> emit [ILdBit addr, IAnd]
+            AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
+            St   (Var addr) -> emit [IStBit addr]
+            _               -> error $ show (here, d)
 
 --------------------------------------------------------------------------------
 
