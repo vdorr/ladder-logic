@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
 
 module Ladder.Lexer where
 
@@ -11,9 +12,21 @@ import Control.Applicative.Combinators (between)
 import qualified Data.Text as T
 import Data.Text (Text)
 
-import Preprocess (ParseErr(..), withPos)
+--------------------------------------------------------------------------------
+
+-- import Preprocess (ParseErr(..), withPos)
+type ParseErr = String
+
+instance ShowErrorComponent ParseErr where
+    showErrorComponent  = show
 
 --------------------------------------------------------------------------------
+
+withPos :: Parsec ParseErr Text a -> Parsec ParseErr Text ((SourcePos, SourcePos), a)
+withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
+
+--------------------------------------------------------------------------------
+
 {-
 letter       : 'A'..'Z' | '_'
 number       : '0'..'9'
@@ -200,5 +213,13 @@ basicBlocks t = (lbl, this) : basicBlocks rest
             xs                -> (Nothing, xs)
     isLabel [Label _] = True
     isLabel _         = False
+
+--------------------------------------------------------------------------------
+
+stripPos
+    :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
+    -> [ (Int, [((Int, Int), a)]) ]
+stripPos = fmap (bimap (unPos.sourceLine)
+    (fmap (bimap (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)) id)))
 
 --------------------------------------------------------------------------------

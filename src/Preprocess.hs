@@ -18,6 +18,7 @@ import Data.Text (Text)
 
 -- import Text.Megaparsec.Debug
 -- import Debug.Trace
+import Ladder.Lexer (stripPos, ParseErr(..), withPos)
 
 --------------------------------------------------------------------------------
 
@@ -25,9 +26,6 @@ import Data.Text (Text)
 
 --TODO nice leading column
 --maybe parse even rungs
-type ParseErr = String
-instance ShowErrorComponent ParseErr where
-	showErrorComponent  = show
 
 -- test4 :: Parsec ParseErr String [(Maybe String, [String])]
 -- test4 = ladder <* eof
@@ -259,11 +257,6 @@ preproc5 src
 
 --------------------------------------------------------------------------------
 
-withPos :: Parsec ParseErr Text a -> Parsec ParseErr Text ((SourcePos, SourcePos), a)
-withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
-
---------------------------------------------------------------------------------
-
 #if 0
 test6 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
 test6 = many ln <* eof
@@ -365,13 +358,5 @@ preproc4'' = fmap stripPos . preproc4
 -- preproc4' :: String -> Either Text [(Int, [((Int, Int), Tok Text)])]
 -- preproc4' = fmap stripPos . preproc4 . T.pack
 #endif
-
---------------------------------------------------------------------------------
-
-stripPos
-	:: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
-	-> [ (Int, [((Int, Int), a)]) ]
-stripPos = fmap (bimap (unPos.sourceLine)
-	(fmap (bimap (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)) id)))
 
 --------------------------------------------------------------------------------

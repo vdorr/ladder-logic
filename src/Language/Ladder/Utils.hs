@@ -51,6 +51,7 @@ pickFirst p s
         (a, b:bs) -> (Just b , a ++ bs)
         _         -> (Nothing, s)
 
+--------------------------------------------------------------------------------
 
 istopo :: (a -> a -> Bool) -> [a] -> Bool
 istopo dep (x : xs) = all (\y -> not $ dep x y) xs && istopo dep xs

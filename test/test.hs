@@ -5,26 +5,22 @@ import Test.Tasty
 -- import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 import Test.Tasty.Hedgehog
-
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+import Hedgehog.Range
 
 import Data.List
 import Data.Ord
 import Control.Monad
-
 import NeatInterpolation
 import Data.Text (Text, pack, unpack)
 import qualified Data.Text
 import Data.Bifunctor
-import GHC.Exts
-
-import Preprocess
-
--- import qualified LadderParser (Symbol_(..))
--- import LadderParser (Cofree(..), Symbol_(End, Source))
--- import DiagramParser (Pos(..))
+import GHC.Exts --hiding (toList)
+import Data.Function
+import Data.Traversable
+-- import Data.Foldable
 
 import Ladder.Zipper
 import Ladder.Lexer
@@ -367,11 +363,39 @@ testN01 =
 
 --------------------------------------------------------------------------------
 
+analysisTests :: TestTree
+analysisTests = testGroup "Analysis"
+    [ testProperty "sttsort" prop_sttsort
+    ]
+
+genGraph :: Gen [([Int], Int)]
+genGraph = do --Gen.sample $ 
+    let k = 10
+    n <- Gen.int $ constant 0 k
+    let l = [0..n]
+    ll <- for [0..n] $ \v -> do
+        deps <- Gen.list (linear 0 k) (Gen.int $ constant 0 k)
+        return (deps, v)
+    return ll
+
+gDepends :: ([Int], Int) -> ([Int], Int) -> Bool
+gDepends = (\(as, a) (bs, b) -> elem b as)
+
+prop_sttsort :: Property
+prop_sttsort =
+    withTests 1000 . property $ do
+        g <- forAll genGraph
+        let g' = sttsort gDepends g
+        Nothing === isSpatialOrTopo gDepends (compare `on` snd) g'
+
+--------------------------------------------------------------------------------
+
 testBox ln input
     = bimap (Data.Text.unpack) mkDgZp (preproc4'' input)
     >>= applyDgp (box001 ln)
 -- fmap (dgTrim.psStr.snd) 
 
+boxTests :: TestTree
 boxTests = testGroup "Box parser"
     [ testCase "1" $
         fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized))
@@ -433,6 +457,7 @@ tests = testGroup "Tests"
     , dgpTests
     , ladderTests
     , boxTests
+    , analysisTests
     ]
 
 main :: IO ()
