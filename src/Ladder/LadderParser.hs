@@ -18,7 +18,6 @@ import Language.Ladder.Utils
 import Ladder.Lexer
 import Ladder.DiagramParser
 
-
 --------------------------------------------------------------------------------
 
 data Diagram c d s a

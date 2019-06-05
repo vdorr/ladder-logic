@@ -32,6 +32,7 @@ library
                      , Ladder.Lexer
                      , Tooling
                      , Language.Ladder.Utils
+                     , Language.Ladder.Analysis
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
