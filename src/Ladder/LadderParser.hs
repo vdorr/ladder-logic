@@ -154,7 +154,7 @@ labelOnTop' p = bimap unpack id <$> labelOnTop p
 --------------------------------------------------------------------------------
 
 hline = do
-    HLine _ <- eat
+    HLine _ _ <- eat
     return ()
 
 vline = do
@@ -225,7 +225,29 @@ eol2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
 hline'2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-hline'2 = some hline2 *> (coil2 <|> contact2 <|> node2 <|> eol2) --TODO vline crossing
+hline'2
+    = some (hline2 <* option crossing)
+    *> (coil2 <|> contact2 <|> node2 <|> eol2)
+    where
+--     xxx = do
+--         w <- peekM
+--         case w of
+--             Just VLine -> do
+-- --                  ww <- peekM
+--                  undefined
+--             _ -> undefined
+--     -- use as vlineToSkip <|> (pure ())
+--     vlineToSkip = do
+--         VLine <- peek
+--         step
+--         w <- peek --if nothing follows, it is not vline to be skipped
+--         case w of
+--              VLine   -> undefined
+--              HLine _ -> undefined
+--              _       -> fail here
+-- "--|--" or "--|||--" but never "--|" followed by something else than vline or hline
+    crossing = skipSome (==VLine) *> hline2
+
 
 vline2 :: DgP ()
 vline2 = do
@@ -234,8 +256,12 @@ vline2 = do
 
 hline2 :: DgP () --TODO vline crossing
 hline2 = do
-    HLine _ <- eat
+    HLine _ vl <- eat
+    when (vl > 0) $ do
+        (ln, (co, _)) <- currentPos
+        setPos (ln, (co + vl, ()))
     return ()
+--TODO TEST move to same location is noop
 
 device :: DgP (Bool, String) -> DgP (Cofree (Diagram c Dev String) DgExt)
 device p = do

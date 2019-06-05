@@ -13,6 +13,20 @@ import Ladder.Zipper
 
 --------------------------------------------------------------------------------
 
+-- |Returns number of remaining tokens
+dgLength :: Dg a -> Int
+dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
+
+dgNull :: Dg a -> Bool
+dgNull = (>0) . dgLength --FIXME
+
+-- |Drop empty lines
+dgTrim :: Dg a -> Dg a
+dgTrim (Zp l r) = Zp (trim l) (trim r)
+    where trim = filter (not . zpNull . snd)
+
+--------------------------------------------------------------------------------
+
 --XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
 newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
 
@@ -54,22 +68,10 @@ type Dg a = Zp (Int, Zp ((Int, Int), a))
 -- |Token position and extent
 type DgExt = (Int, (Int, Int))
 
--- |Returns number of remaining tokens
-dgLength :: Dg a -> Int
-dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
-
-dgNull :: Dg a -> Bool
-dgNull = (>0) . dgLength --FIXME
-
--- |Drop empty lines
-dgTrim :: Dg a -> Dg a
-dgTrim (Zp l r) = Zp (trim l) (trim r)
-    where trim = filter (not . zpNull . snd)
-
 --------------------------------------------------------------------------------
 
 -- |Move in some direction from provided origin
-type MoveToNext tok = (Int, (Int, Int)) -> Dg tok -> Either String (Dg tok)
+type MoveToNext tok = DgExt -> Dg tok -> Either String (Dg tok)
 
 -- |Parser state
 data DgPState tok = DgPSt
@@ -148,10 +150,30 @@ currentPos = do
     Just p <- (pos . psStr) <$> get
     return p
 
+--TODO implement in terms of 'peekM'
 peek :: SFM (DgPState tok) tok
 peek = do
     Just p <- (cursor . psStr) <$> get
     return p
+
+peekM :: SFM (DgPState tok) (Maybe tok)
+peekM = (cursor . psStr) <$> get
+
+--for VLine crossing impl
+skipSome :: (tok -> Bool) -> SFM (DgPState tok) ()
+skipSome f
+    = peekM >>= \case
+         Just x | f x -> step >> skipSome f
+         _            -> return ()
+
+skip :: (tok -> Bool) -> SFM (DgPState tok) ()
+skip f
+    = peekM >>= \case
+         Just x | f x -> step
+         _            -> return ()
+
+option :: (SFM st a) -> SFM st (Maybe a)
+option p = (Just <$> p) <|> pure Nothing
 
 --------------------------------------------------------------------------------
 
@@ -221,7 +243,7 @@ colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 --------------------------------------------------------------------------------
 
--- |Pop focused item, its extent and updated zipper
+-- |Pop focused item, return its extent and updated zipper
 dgPop :: Dg a -> Maybe (a, DgExt, Dg a)
 dgPop (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
     = Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))

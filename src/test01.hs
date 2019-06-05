@@ -274,7 +274,7 @@ tsort2 mergedNodes asts = fmap snd $ f asts'
     --assuming p is in list in mergedNodes
     allNodeLocs p = fromMaybe [p] $ lookup p mergedNodes
 
-    f = tststs (dependsOn `on` fst)
+    f = sttsort (dependsOn `on` fst)
 
 
 pickFirst :: (a -> Bool) -> [a] -> (Maybe a, [a])
@@ -296,6 +296,14 @@ istopoM dep (x : xs)
     = fst (pickFirst (dep x) xs) <|> istopoM dep xs
 istopoM _ [] = Nothing
 
+--i think i don't need to check for cycles here
+isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
+isSpatialOrTopo dep spa = go
+    where
+    go (x : xs : xss)
+        | spa x xs == LT || dep xs x = go (xs : xss)
+        | otherwise = Just x
+    go _ = Nothing
 
 iscycle :: (a -> a -> Bool) -> (a -> a -> Bool) -> a -> [a] -> Bool
 iscycle eq dep x = go x
@@ -310,8 +318,8 @@ iscycle eq dep x = go x
 --TODO tests
 -- stability - without dependencies order is unchanged
 -- topology - either topo order is satisfied or it is cycle (or no dependency)
-tststs :: (a -> a -> Bool) -> [a] -> [a]
-tststs depOn = f
+sttsort :: (a -> a -> Bool) -> [a] -> [a]
+sttsort depOn = f
     where
     f (x : xs) = dep ++ [x] ++ f indep
         where
@@ -531,7 +539,7 @@ generateStk2 ast' = do
 
 main :: IO ()
 main = do
-#if 0
+#if 1
     [file] <- getArgs
     src <- TIO.readFile file
     case stripPos <$> runLexer src of

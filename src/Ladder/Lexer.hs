@@ -55,7 +55,7 @@ data Tok a
 --sole thing that occupy whole line
     | Label        a   -- ^ network label "LABEL:"
 --horizontal things
-    | HLine        Int
+    | HLine        Int Int --number of '-' consumed, number of following '|' seen
     | REdge            -- ^ as block input "--->"
     | FEdge            -- ^ as block input "---<"
 
@@ -86,7 +86,7 @@ renderLexeme t = case t of
     Cross          -> "+"
     VLine          -> "|"
     Label        a -> a ++ ":"
-    HLine        n -> replicate (n+1) '-'
+    HLine        n _ -> replicate (n+1) '-'
     REdge          -> ">"
     FEdge          -> "<"
     Number       n -> show n
@@ -109,7 +109,10 @@ lexeme
     <|> VLine        <$  char '|'
     <|> Cross        <$  char '+'
     <|> Continuation <$> try (between' ">" ">" name)
+
     <|> HLine        <$> (((+(-1)).length) <$> some (char '-'))
+                     <*> (lookAhead (length <$> many (char '|')))
+
     <|> Jump'        <$> (try (chunk ">>") *> labelName)
     <|> Return       <$  try (chunk "<RETURN>")
     <|> Contact      <$> between'' "[" "]"
