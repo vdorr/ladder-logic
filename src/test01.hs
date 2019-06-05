@@ -26,25 +26,15 @@ import Control.Applicative
 import Data.Maybe
 import Control.Monad.Writer.Strict
 
-import Debug.Trace
-
-import Preprocess
+-- import Debug.Trace
 
 import Ladder.Zipper
-import Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
+import Ladder.Lexer
 import Ladder.DiagramParser
 import Ladder.LadderParser
 import Language.Ladder.Utils
 
--- import NeatInterpolation
-
 import Tooling
-
--- import qualified Data.List.NonEmpty as NE
--- import Data.List.NonEmpty (NonEmpty(..))
-
-import qualified Hedgehog.Gen as Gen
-import Hedgehog.Range
 
 --------------------------------------------------------------------------------
 
@@ -504,7 +494,7 @@ main = do
                 Left err -> print (here, err)
 #else
     let dep01 = (\(as, a) (bs, b) -> elem b as)
-    let ts = tststs dep01
+    let ts = sttsort dep01
     let testts lbl s =
             let s2 = ts s
             in print
@@ -541,13 +531,4 @@ main = do
         , ([2], 3)
         , ([], 4)
         ]
-    x <- Gen.sample $ do
-        let k = 10
-        n <- Gen.int $ constant 0 k
-        let l = [0..n]
-        ll <- for [0..n] $ \v -> do
-            deps <- Gen.list (linear 0 k) (Gen.int $ constant 0 k)
-            return (deps, v)
-        return ll
-    print (here, x)
 #endif
