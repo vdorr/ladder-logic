@@ -34,6 +34,7 @@ import Ladder.Zipper
 import Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
 import Ladder.DiagramParser
 import Ladder.LadderParser
+import Language.Ladder.Utils
 
 -- import NeatInterpolation
 
@@ -371,14 +372,6 @@ dependencies = cata' go
         f (Node     as) = Deps [p] [] [] [] <> mconcat as
         f (Conn c     ) = Deps [] [] [] [p]
         f (Cont c   a ) = Deps [] [] [p] [] <> a
-
---------------------------------------------------------------------------------
-
-unFix' :: Cofree f a -> (a, f (Cofree f a))
-unFix' (a :< f) = (a, f)
-
-cata' :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
-cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 
 --------------------------------------------------------------------------------
 

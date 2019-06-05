@@ -23,6 +23,7 @@ import Control.Monad.Writer.Strict
 import Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
 import Ladder.DiagramParser
 import Ladder.LadderParser
+import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------
 
