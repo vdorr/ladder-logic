@@ -365,7 +365,21 @@ testN01 =
 
 analysisTests :: TestTree
 analysisTests = testGroup "Analysis"
-    [ testProperty "sttsort" prop_sttsort
+    [ testCase "1" $
+        isSpatialOrTopo gDepends (compare `on` snd) (sttsort gDepends g01)
+            @?= Nothing
+--     , testProperty "sttsort" prop_sttsort
+    ]
+
+g01 =
+    [ ( [] , 0 )
+    , ( [] , 1 )
+    , ( [ 7 , 4 ] , 2 )
+    , ( [] , 3 )
+    , ( [] , 4 )
+    , ( [] , 5 )
+    , ( [] , 6 )
+    , ( [ 3 ] , 7 )
     ]
 
 genGraph :: Gen [([Int], Int)]
