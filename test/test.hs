@@ -126,7 +126,7 @@ tokenizerTests = testGroup "Tokenizer"
 
 prop_lexeme_trip :: Property
 prop_lexeme_trip =
-    withTests 1000 . property $ do
+    withTests 100 . property $ do
         tok <- forAll genToken
         tripping [tok]
             (pack . foldMap (renderLexeme . fmap unpack))
@@ -365,20 +365,18 @@ testN01 =
 
 analysisTests :: TestTree
 analysisTests = testGroup "Analysis"
-    [ testCase "1" $
-        isSpatialOrTopo gDepends (compare `on` snd) (sttsort gDepends g01)
+    [ testCase "1" $ do
+--         print g01'
+        isSpatialOrTopo gDepends (compare `on` snd) g01'
             @?= Nothing
---     , testProperty "sttsort" prop_sttsort
+    , testProperty "sttsort" prop_sttsort
     ]
 
+g01' = sttsort gDepends g01
 g01 =
-    [ ( [] , 0 )
-    , ( [] , 1 )
-    , ( [ 7 , 4 ] , 2 )
+    [ ( [ 7 , 4 ] , 2 )
     , ( [] , 3 )
     , ( [] , 4 )
-    , ( [] , 5 )
-    , ( [] , 6 )
     , ( [ 3 ] , 7 )
     ]
 

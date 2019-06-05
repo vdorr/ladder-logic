@@ -70,7 +70,7 @@ isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
 isSpatialOrTopo dep spa = go
     where
     go (x : xs : xss)
-        | spa x xs == LT || dep xs x = go (xs : xss)
+        | spa x xs == LT || any (flip dep x) (xs:xss) = go (xs : xss)
         | otherwise = Just x
     go _ = Nothing
 
