@@ -66,13 +66,21 @@ istopoM dep (x : xs)
 istopoM _ [] = Nothing
 
 --i think i don't need to check for cycles here
+--XXX but i need to identify spatial vertices, probably by their dependencies
 isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
-isSpatialOrTopo dep spa = go
+isSpatialOrTopo dep spa g = go g
     where
     go (x : xs : xss)
         | spa x xs == LT || any (flip dep x) (xs:xss) = go (xs : xss)
         | otherwise = Just x
     go _ = Nothing
+
+--TODO i should check if this fires in hedgehog
+--is it true that this list is spatially sorted?
+--TODO
+--     sources = filter (noPreds) g
+--     noPreds v = all (\w -> spa v w /= EQ && not (dep v w)) g
+
 
 iscycle :: (a -> a -> Bool) -> (a -> a -> Bool) -> a -> [a] -> Bool
 iscycle eq dep x = go x

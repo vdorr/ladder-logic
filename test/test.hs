@@ -365,12 +365,58 @@ testN01 =
 
 analysisTests :: TestTree
 analysisTests = testGroup "Analysis"
-    [ testCase "1" $ do
+    [ testCase "sttsort 1" $ do
 --         print g01'
         isSpatialOrTopo gDepends (compare `on` snd) g01'
             @?= Nothing
-    , testProperty "sttsort" prop_sttsort
+    , testCase "sttsort 2"
+        $ ts [([2], 1)] @?= [1]
+    , testCase "sttsort 3" $ ts
+            [ ([],  1)
+            , ([1], 2)
+            , ([],  3)
+            , ([1], 4)
+            ]
+            @?= [1,2,3,4]
+    , testCase "sttsort 4" $ ts
+            [ ([],  1)
+            , ([3], 2)
+            , ([] , 3)
+            , ([1], 4)
+            ]
+            @?= [1,3,2,4]
+    , testCase "sttsort 5" $ ts
+            [ ([2], 1)
+            , ([1], 2)
+            , ([], 3)
+            ]
+            @?= [2,1,3]
+    , testCase "sttsort 6" $ ts
+            [ ([2,3], 1)
+            , ([], 2)
+            , ([2], 3)
+            , ([], 4)
+            ]
+            @?= [2,3,1,4]
+    , testProperty "sttsort isSpatialOrTopo" prop_sttsort
     ]
+
+    where
+    ts = fmap snd . sttsort gDepends
+
+--     let dep01 = (\(as, a) (bs, b) -> elem b as)
+--     let ts = sttsort dep01
+--     let testts lbl s =
+--             let s2 = ts s
+--             in print
+--                 ( lbl
+--                 , istopo dep01 s
+--                 , istopo dep01 s2
+--                 , istopoM dep01 s2
+--                 , fmap
+--                     (\p -> iscycle (on (==) snd) dep01 p s2)
+--                     $ istopoM dep01 s2
+--                 , s2)
 
 g01' = sttsort gDepends g01
 g01 =

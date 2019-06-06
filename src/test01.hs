@@ -462,7 +462,6 @@ generateStk2 ast' = do
 
 main :: IO ()
 main = do
-#if 1
     [file] <- getArgs
     src <- TIO.readFile file
     case stripPos <$> runLexer src of
@@ -492,43 +491,3 @@ main = do
 
 
                 Left err -> print (here, err)
-#else
-    let dep01 = (\(as, a) (bs, b) -> elem b as)
-    let ts = sttsort dep01
-    let testts lbl s =
-            let s2 = ts s
-            in print
-                ( lbl
-                , istopo dep01 s
-                , istopo dep01 s2
-                , istopoM dep01 s2
-                , fmap
-                    (\p -> iscycle (on (==) snd) dep01 p s2)
-                    $ istopoM dep01 s2
-                , s2)
-    testts here
-        [([2], 1)]
-    testts here
-        [ ([],  1)
-        , ([1], 2)
-        , ([],  3)
-        , ([1], 4)
-        ]
-    testts here
-        [ ([],  1)
-        , ([3], 2)
-        , ([] , 3)
-        , ([1], 4)
-        ]
-    testts here
-        [ ([2], 1)
-        , ([1], 2)
-        , ([], 3)
-        ]
-    testts here
-        [ ([2,3], 1)
-        , ([], 2)
-        , ([2], 3)
-        , ([], 4)
-        ]
-#endif
