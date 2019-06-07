@@ -5,8 +5,6 @@
     LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns
     , FlexibleContexts #-}
 
--- OverloadedStrings, 
-
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO

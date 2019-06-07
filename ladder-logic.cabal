@@ -47,6 +47,7 @@ library
                      , containers
                      , text
                      , warp, wai, http-types, aeson, bytestring
+                     , bits, bytes, base16-bytestring
 
   hs-source-dirs:      src
                        .
