@@ -395,7 +395,6 @@ generate2 emit stk0 asts = go stk0 asts
                 (go
     --emit Dup's here? --so that stack level is kept low
                 )
---                 ([nd] ++ dups ++ stk)
                 (copiesOnStack ++ stk)
                 b
         f (pp:stk) (Conn c) = do
