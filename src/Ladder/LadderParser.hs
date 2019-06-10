@@ -5,9 +5,7 @@
 module Ladder.LadderParser where
 
 import Data.Text (Text, unpack)
-
 import Prelude hiding (fail)
-
 import Control.Monad.Fail
 import Control.Applicative --hiding (fail)
 import Control.Monad hiding (fail)
@@ -46,8 +44,6 @@ mapDg z x y = f
     f (Cont c   a) = Cont   (z c) a
 --     f  Stub        = Stub
 
---------------------------------------------------------------------------------
-
 data Operand
     = Var String
     | Lit Int
@@ -66,6 +62,7 @@ type Next = MoveToNext (Tok Text)
 
 --TODO
 --vertical combinators
+#if 0
 labelOnTop
     :: SFM (DgPState (Tok txt)) a -- ^Device parser e.g. "(S)"
     -> SFM (DgPState (Tok txt)) (txt, a)
@@ -77,6 +74,10 @@ labelOnTop p = do
     lbl      <- name
     setPos next
     return (lbl, x)
+
+labelOnTop' :: SFM (DgPState (Tok Text)) a -> SFM (DgPState (Tok Text)) (String, a)
+labelOnTop' p = bimap unpack id <$> labelOnTop p
+#endif
 
 --TODO
 --TODO
@@ -92,10 +93,28 @@ labelOnTop p = do
 withAbove :: SFM (DgPState tok) a -> SFM (DgPState tok) b -> SFM (DgPState tok) (a, b)
 withAbove a b = undefined
 
-operand = ((Var . unpack) <$> name)
+variable :: DgP Operand
+variable = (Var . unpack) <$> name
+
+operand :: DgP Operand
+operand = variable
     <|> (do
             Number n <- eat
             return $ Lit n)
+
+test p pp = do
+    current <- currentPos
+    x       <- p
+    next    <- currentPos
+    y       <- pp current
+    setPos next
+    return (x, y)
+
+above p pp = test p $ \(ln, co) -> setPos (ln - 1, co) >> pp
+
+below p pp = test p $ \(ln, co) -> setPos (ln + 1, co) >> pp
+
+withOperands1 p = below (above p variable) operand
 
 withOperands
     :: SFM (DgPState (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presend of second operand
@@ -105,7 +124,7 @@ withOperands p = do
     (b, x)   <- p
     next     <- currentPos
     setPos (ln - 1, co)
-    op       <- (Var . unpack) <$> name
+    op       <- variable
     op2 <- if b
         then do
             setPos (ln + 1, co)
@@ -115,34 +134,18 @@ withOperands p = do
     setPos next
     return (op, op2, x)
 
-labelOnTop' :: SFM (DgPState (Tok Text)) a -> SFM (DgPState (Tok Text)) (String, a)
-labelOnTop' p = bimap unpack id <$> labelOnTop p
-
 --------------------------------------------------------------------------------
 
+hline :: DgP ()
 hline = do
     HLine _ _ <- eat
     return ()
 
+vline :: DgP ()
 vline = do
     VLine <- eat
     return ()
 
---------------------------------------------------------------------------------
-#if 0
---FIXME parse it with DgP's pos type and then fmap it to 'Pos'
-currentPos2 :: DgP Pos
-currentPos2 = fmap Pos $ fmap (fmap fst) currentPos
-
-extToPos :: DgExt -> Pos
-extToPos = (\(ln, co) -> Pos (co, ln)) . fmap fst
-    
-toPos2 :: Cofree (Diagram Dev String) DgExt -> Cofree (Diagram Dev String) Pos
-toPos2 = fmap extToPos
-
--- test002 :: DgP (Cofree (Diagram Dev String) Pos)
--- test002 = fmap extToPos <$> test002'
-#endif
 --------------------------------------------------------------------------------
 
 {-
@@ -196,25 +199,7 @@ hline'2
     = some (hline2 <* option crossing)
     *> (coil2 <|> contact2 <|> node2 <|> eol2)
     where
---     xxx = do
---         w <- peekM
---         case w of
---             Just VLine -> do
--- --                  ww <- peekM
---                  undefined
---             _ -> undefined
---     -- use as vlineToSkip <|> (pure ())
---     vlineToSkip = do
---         VLine <- peek
---         step
---         w <- peek --if nothing follows, it is not vline to be skipped
---         case w of
---              VLine   -> undefined
---              HLine _ -> undefined
---              _       -> fail here
--- "--|--" or "--|||--" but never "--|" followed by something else than vline or hline
     crossing = skipSome (==VLine) *> hline2
-
 
 vline2 :: DgP ()
 vline2 = do
@@ -241,7 +226,7 @@ coil2 = device $ do
     Coil f <- eat
     return (False, "(" <> unpack f <> ")")
 
--- contact2 :: DgP (Bool, Cofree (Diagram c Dev String) DgExt)
+contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 contact2 = device $ do
     Contact f <- eat
     return (elem f cmp, "[" <> unpack f <> "]")
