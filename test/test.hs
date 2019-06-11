@@ -548,13 +548,9 @@ fileTestsNeg path = do
                                    Right (Zp [] []) -> assertFailure here
                                    Left _ -> return ()
                                    _ -> return ()
-
---             fullyConsumed tk
--- fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
-
---     let tests = []
     return $ testGroup "File tests - negative" tests
 
+--TODO TODO exercise embedded test vectors
 fileTests :: FilePath -> IO TestTree
 fileTests path = do
     files <- filter ((".txt"==).takeExtension) <$> listDirectory path
