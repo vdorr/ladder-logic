@@ -11,6 +11,8 @@ import Data.Traversable
 
 import Ladder.Zipper
 
+import Debug.Trace
+
 --------------------------------------------------------------------------------
 
 -- |Returns number of remaining tokens
@@ -123,6 +125,19 @@ setPos (ln, (co, _)) = do
     Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
     put (DgPSt b zp' ps True)
 
+setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState tok) (Bool)
+setPosOrBlur (ln, (co, _)) = do
+    DgPSt b zp ps _ <- get
+    zp'             <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
+    case zp' of
+        Just zp' ->
+                traceShowM (here, ln, "setPosOrBlur")
+                >> put (DgPSt b zp' ps True )
+                >> return True
+        Nothing  ->
+                traceShowM (here, ln, "setPosOrBlur") >> put (DgPSt b zp  ps False)
+                >> return False
+
 --------------------------------------------------------------------------------
 
 -- |Succeeds FIXME FIXME i am not sure when
@@ -179,9 +194,15 @@ option p = (Just <$> p) <|> pure Nothing
 
 -- |Fail if input stream is not empty
 dgIsEmpty :: SFM (DgPState tok) ()
+-- dgIsEmpty :: Show tok => SFM (DgPState tok) ()
 dgIsEmpty
     =   (dgNull . psStr) <$> get
     >>= flip when (fail $ here ++ "not empty")
+--     = do
+--         zp@(Zp zpl zpr) <- psStr <$> get
+--         when (dgNull zp) $ do
+--             forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
+--             error here
 
 {-
    |

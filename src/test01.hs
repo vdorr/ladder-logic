@@ -33,6 +33,7 @@ import Ladder.LadderParser
 import Language.Ladder.Utils
 
 import Tooling
+import TestUtils
 
 --------------------------------------------------------------------------------
 
@@ -336,6 +337,20 @@ position :: Cofree f DgExt -> DgExt
 position (p :< _) = p
 
 --------------------------------------------------------------------------------
+
+-- could hide writer monad stuff
+-- or data I m  = I { ldOn :: m () }
+--not that i need monad, monoid or even semigroup would do the job
+
+{-
+class I d m where
+    emLdOn :: m ()
+    emDrop :: m ()
+    emDev :: d -> m ()
+--     emBranch :: lbl -> m () -- ???
+    emPick :: Int -> m ()
+    emDup :: m ()
+    -}
 
 generate2 ::
     ( Monad m0

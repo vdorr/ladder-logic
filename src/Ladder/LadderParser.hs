@@ -16,6 +16,8 @@ import Language.Ladder.Utils
 import Ladder.Lexer
 import Ladder.DiagramParser
 
+import Debug.Trace
+
 --------------------------------------------------------------------------------
 
 data Diagram c d s a
@@ -96,29 +98,109 @@ withAbove a b = undefined
 variable :: DgP Operand
 variable = (Var . unpack) <$> name
 
+number :: DgP Int
+number = do
+    Number n <- eat
+    return n
+
 operand :: DgP Operand
 operand = variable
     <|> (do
             Number n <- eat
             return $ Lit n)
-
+#if 0
 test p pp = do
     current <- currentPos
     x       <- p
     next    <- currentPos
-    y       <- pp current
+    y       <- pp current x
     setPos next
     return (x, y)
 
-above p pp = test p $ \(ln, co) -> setPos (ln - 1, co) >> pp
+test1 mapPos p pp = do
+    begin <- currentPos
+    x     <- p
+    next  <- currentPos
+    setPos (mapPos begin)
+    y     <- pp x
+    setPos next
+    return (x, y)
 
-below p pp = test p $ \(ln, co) -> setPos (ln + 1, co) >> pp
+test11 lbl mapPos p pp = do
+    begin <- currentPos
+    traceShowM (here, lbl, "--->>", begin)
+    x     <- p
+    traceShowM (here, lbl, begin)
+    next  <- currentPos
+    traceShowM (here, lbl, "setPos")
+    qq <- setPosOrBlur (mapPos begin)
+    traceShowM (here, lbl, "begin:", begin, "next:", next, "mapped:", mapPos begin, qq)
+    y     <- pp x
+    setPos next
+    p <- currentPosM
+    traceShowM (here, lbl, "<<---", p)
+    return y
 
-withOperands1 p = below (above p variable) operand
+
+--TODO should be usable also for block labels
+above_ p pp = test p $ \(ln, co) _ -> setPos (ln - 1, co) >> pp
+
+below_ p pp = test p $ \(ln, co) _ -> setPos (ln + 1, co) >> pp
+
+above p pp = test p $ \(ln, co) x -> setPos (ln - 1, co) >> pp x
+below p pp = test p $ \(ln, co) x -> setPos (ln + 1, co) >> pp x
+
+-- above1_ p pp = test1 (\(ln, co) -> (ln - 1, co)) p (const pp)
+above1_ p pp = above1 p (const pp)
+above1 = test1 (\(ln, co) -> (ln - 1, co))
+
+below11 = test11 "below" (\(ln, co) -> (ln + 1, co))
+
+above11_
+    :: SFM (DgPState tok) a
+    -> SFM (DgPState tok) b
+    -> SFM (DgPState tok) (a, b)
+above11_ p pp = test11 "above" (\(ln, co) -> (ln - 1, co))
+    (p)
+    (\x -> pp >>= \y -> return (x, y))
+
+withOperands11 p
+    = (below11
+        (above11_ 
+            (traceShowM here >> 
+                (p) <* (traceShowM here))
+            (currentPos >>= \pos -> traceShowM (here, pos) >> variable
+                <* (currentPos >>= \pos -> traceShowM (here, pos))
+                ))
+        optOper)
+    <* (currentPos >>= \pos -> traceShowM (here, pos))
+    where
+    optOper ((True, a), op) = undefined -- (op,,a) <$> fmap Just operand
+    optOper ((_   , a), op) = traceShowM here >> return (op, Nothing, a)
+
+
+withOperands1 p = below (above_ p variable) optionalOperand
+    where
+    optionalOperand (x, _) = Just <$> operand
+    optionalOperand _      = return Nothing
+
+
+-- withOperands2 :: _
+withOperands2 p
+    = (\(((_, a), op), mop) -> (op, mop, a))
+    <$> below (above_ p variable) optOper
+    where
+    optOper ((True, _), _) = Just <$> operand
+    optOper _              = return Nothing
+#endif
 
 withOperands
-    :: SFM (DgPState (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presend of second operand
+    :: SFM (DgPState (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
     -> SFM (DgPState (Tok Text)) (Operand, Maybe Operand, a)
+#if 0
+withOperands = withOperands11
+-- withOperands p = above11_ p variable >>= (\((_, b), a) -> return (a, Nothing, b) )
+#else
 withOperands p = do
     (ln, co) <- currentPos
     (b, x)   <- p
@@ -133,6 +215,7 @@ withOperands p = do
             return Nothing
     setPos next
     return (op, op2, x)
+#endif
 
 --------------------------------------------------------------------------------
 
@@ -222,16 +305,20 @@ device p = do
     (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline'2)
 
 coil2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-coil2 = device $ do
-    Coil f <- eat
-    return (False, "(" <> unpack f <> ")")
+coil2 = do
+--     traceShowM (here, "trying Coil")
+    device $ do
+        Coil f <- eat
+        return (False, "(" <> unpack f <> ")")
 
 contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-contact2 = device $ do
-    Contact f <- eat
-    return (elem f cmp, "[" <> unpack f <> "]")
-    where
-    cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
+contact2 = do
+--     traceShowM (here, "trying Contact")
+    device $ do
+        Contact f <- eat
+        return (elem f cmp, "[" <> unpack f <> "]")
+        where
+        cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
 
 --------------------------------------------------------------------------------
 

@@ -1,0 +1,15 @@
+(* --- test 01 --- *)
+
+{ T01
+  \{ testVect = [ (1, [("IX0", X False),("QX0", X False)])
+               , (1, [("IX0", X True)])
+               , (1, [("IX0", X False)])
+               ]
+  , watch    = ["QX0"]
+  , expected = [[X False], [X True], [X False]]
+  \}
+}
+
+|  QX0
++--( )--
+|

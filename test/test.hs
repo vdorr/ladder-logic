@@ -1,5 +1,7 @@
 {-# LANGUAGE QuasiQuotes, OverloadedStrings, TypeApplications #-}
 
+#define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
+
 import Test.Tasty
 -- import Test.Tasty.SmallCheck as SC
 -- import Test.Tasty.QuickCheck as QC
@@ -15,18 +17,25 @@ import Data.Ord
 import Control.Monad
 import NeatInterpolation
 import Data.Text (Text, pack, unpack)
-import qualified Data.Text
+-- import qualified Data.Text
 import Data.Bifunctor
 import GHC.Exts --hiding (toList)
 import Data.Function
 import Data.Traversable
 -- import Data.Foldable
 
+import System.Directory
+import System.FilePath
+import qualified Data.Text.IO as TIO
+import qualified Data.Text as T
+
 import Ladder.Zipper
 import Ladder.Lexer
 import Ladder.DiagramParser
 import Ladder.LadderParser
 import Language.Ladder.Utils
+
+import TestUtils
 
 --------------------------------------------------------------------------------
 
@@ -242,9 +251,6 @@ ladderTests = testGroup "Ladder parser"
     ]
     where
 
-    dgParse = applyDgp test002' . mkDgZp
-    getDg = dgTrim.psStr.snd
-    fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
 
 --     fullyConsumed' tk
 --         = getDg <$> (either (id) (dgParse) (preproc4'' tk))
@@ -260,6 +266,10 @@ ladderTests = testGroup "Ladder parser"
     Right t05 = test05_tokenized
     Right t07 = test07_tokenized
     Right t07a = test07a_tokenized
+
+fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
+getDg = dgTrim.psStr.snd
+dgParse = applyDgp test002' . mkDgZp
 
 test00_tokenized = preproc4'' test00
 
@@ -508,8 +518,8 @@ box03 =
 
 --------------------------------------------------------------------------------
 
-tests :: TestTree
-tests = testGroup "Tests"
+basicTests :: [TestTree]
+basicTests = 
     [ tokenizerTests
     , zipperTests
     , dgpTests
@@ -518,5 +528,23 @@ tests = testGroup "Tests"
     , analysisTests
     ]
 
+getTests :: IO TestTree
+getTests = do
+    ft <- fileTests "./test/"
+    return $ testGroup "Tests" [testGroup "Basic" basicTests, ft]
+
+fileTests :: FilePath -> IO TestTree
+fileTests path = do
+    files <- filter ((".txt"==).takeExtension) <$> listDirectory path
+    print (here, files, xxx)
+
+    tests <- for files $ \fn -> do
+        src <- TIO.readFile $ path </> fn
+        return $ testCase fn $ do
+            Right tk <- return $ preproc4'' src
+            fullyConsumed tk
+
+    return $ testGroup "File tests" tests
+
 main :: IO ()
-main = defaultMain tests
+main = getTests >>= defaultMain
