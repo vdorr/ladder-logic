@@ -352,45 +352,57 @@ class I d m where
     emDup :: m ()
     -}
 
-generate2 ::
-    ( Monad m0
-    , Show b0
-    , Show s1
-    , Show s0
-    , Eq b0
-    , Eq c
-    , Show c)
-    => ([Instruction String w] -> m0 ())
-    -> [Cofree (Diagram c (Op Operand s0) s1) b0]
-                      -> Cofree (Diagram c (Op Operand s0) s1) b0
-                      -> m0 [Cofree (Diagram c (Op Operand s0) s1) b0]
+data Emit ca w d m = Emit
+    { emLdOn :: m ()
+    , emDrop :: m ()
+    , emDevice :: d -> m ()
+    , emBranch :: ca -> m () -- ???
+    , emPick :: Int -> m ()
+    , emDup :: m ()
+    }
 
-generate2 emit stk0 asts = go stk0 asts
+-- generate2 ::
+--     ( Monad m0
+--     , Show b0
+--     , Show s1
+--     , Show s0
+--     , Eq b0
+--     , Eq c
+--     , Show c)
+--     => ([Instruction String w] -> m0 ())
+--     -> [Cofree (Diagram c (Op Operand s0) s1) b0]
+--                       -> Cofree (Diagram c (Op Operand s0) s1) b0
+--                       -> m0 [Cofree (Diagram c (Op Operand s0) s1) b0]
+
+-- genStk :: _
+genStk emit' emitDevice' stk0 asts = go stk0 asts
 
     where
+    emit = emit' . fmap EISimple
+    emitDevice = emit . emitDevice'
 
     go stack nd@(p :< a) = f stack a
         where
 
-        f stk (Source b)       = do
+        f stk     (Source b)      = do
             emit [ILdOn]
             go (nd:stk) b
-        f (_:stk) Sink         = do
+        f (_:stk)  Sink           = do
             return (nd:stk)
 --             case lookup p sinkToNode of --XXX here is argument for distinguishing 'Sink' and 'Stub'
 --                 Just _  -> return (nd:stk) --put value back under name with which is referenced
 --                 Nothing -> do
 --                     emit [IDrop]
 --                     return (stk)
-        f stk End              = return (stk) --XXX emit Drop?
-        f (x:stk) (Device d b) = do
+        f stk      End         = return (stk) --XXX emit Drop?
+        f (x:stk) (Device d b)    = do
             emitDevice d
             go (nd:stk) b
-        f stk (Jump s)         = error here --later
-        f (_:stk) (Node b)     = do
-
+        f (_:stk) (Jump s)        = do
+            emit' [EIJump s]
+            return stk
+        f (_:stk) (Node b)        = do
 --i think dups should be emitted only AFTER node value is computed
-
     --fold over stack, picking sinks(aka stubs), emitting Or's
             --depth of stack stays the same during evaluation of preds
             for_ (zip stk [0..]) $ \(x, i) -> do
@@ -400,23 +412,16 @@ generate2 emit stk0 asts = go stk0 asts
                          emit [IOr]
                      _ -> return ()
 
---             let dups = replicate (length b - 1) nd
---             for_ dups $ const $ emit [IDup]
             let copiesOnStack = fmap (const nd) b
             replicateM (length b - 1) $ emit [IDup]
 
---             liftIO $ print (here)
             foldlM
-                (go
-    --emit Dup's here? --so that stack level is kept low
-                )
+                (go) --emit Dup's here? --so that stack level is kept low
                 (copiesOnStack ++ stk)
                 b
-        f (pp:stk) (Conn c) = do
---             liftIO $ print here
+        f (pp:stk) (Conn c)       = do
             return (nd:stk)
-        f stk (Cont stubP b) = do
---             liftIO $ print here
+        f stk      (Cont stubP b) = do
             case findIndex (isConn stubP) stk of
                 Just i -> bringToTop i
                 Nothing -> error here --should not happen
@@ -430,16 +435,18 @@ generate2 emit stk0 asts = go stk0 asts
     bringToTop 0 = return ()
     bringToTop i = emit [IPick i]
 
-    emitDevice d
-        = case d of
-            And  (Var addr) -> emit [ILdBit addr, IAnd]
-            AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
-            St   (Var addr) -> emit [IStBit addr]
-            _               -> error $ show (here, d)
+emitBasicDevice d
+    = case d of
+        And  (Var addr) -> [ILdBit addr, IAnd]
+        AndN (Var addr) -> [ILdBit addr, INot, IAnd]
+        St   (Var addr) -> [IStBit addr]
+        _               -> error $ show (here, d)
 
 --------------------------------------------------------------------------------
 
-generateStk2 :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String Int]
+generateStk2
+    :: Cofree (Diagram () Dev String) DgExt
+    -> IO [ExtendedInstruction String String Int]
 generateStk2 ast' = do
     let ast = parseOps $ dropEnd ast'
 
@@ -464,7 +471,7 @@ generateStk2 ast' = do
     for_ a7 print
     print (here, "-----------------------")
 
-    code <- execWriterT $ foldlM (generate2 tell) [] a7
+    code <- execWriterT $ foldlM (genStk tell emitBasicDevice) [] a7
     for_ code print
     print (here, "-----------------------")
 

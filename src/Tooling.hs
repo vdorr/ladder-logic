@@ -156,7 +156,8 @@ run2 = undefined
 
 data ExtendedInstruction ca a w
     = EIJump ca
-    | Simple (Instruction a w)
+    | EISimple (Instruction a w)
+    deriving Show
 
 data Instruction a w
     = ITrap --invoke debugger

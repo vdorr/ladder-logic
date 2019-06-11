@@ -530,13 +530,35 @@ basicTests =
 
 getTests :: IO TestTree
 getTests = do
-    ft <- fileTests "./test/"
-    return $ testGroup "Tests" [testGroup "Basic" basicTests, ft]
+    ftPos <- fileTests "test"
+    ftNeg <- fileTestsNeg $ "test" </> "negative"
+    return $ testGroup "Tests" [testGroup "Basic" basicTests, ftPos, ftNeg]
+
+fileTestsNeg :: FilePath -> IO TestTree
+fileTestsNeg path = do
+    files <- filter ((".txt"==).takeExtension) <$> listDirectory path
+    print (here, files)
+
+    tests <- for files $ \fn -> do
+        src <- TIO.readFile $ path </> fn
+        return $ testCase fn $ do
+            case preproc4'' src of
+                 Left _ -> return () --preproc failed -> test succeeeded
+                 Right lxs -> case getDg <$> dgParse lxs of
+                                   Right (Zp [] []) -> assertFailure here
+                                   Left _ -> return ()
+                                   _ -> return ()
+
+--             fullyConsumed tk
+-- fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
+
+--     let tests = []
+    return $ testGroup "File tests - negative" tests
 
 fileTests :: FilePath -> IO TestTree
 fileTests path = do
     files <- filter ((".txt"==).takeExtension) <$> listDirectory path
-    print (here, files, xxx)
+--     print (here, files)
 
     tests <- for files $ \fn -> do
         src <- TIO.readFile $ path </> fn
@@ -544,7 +566,9 @@ fileTests path = do
             Right tk <- return $ preproc4'' src
             fullyConsumed tk
 
-    return $ testGroup "File tests" tests
+    return $ testGroup "File tests - positive" tests
+
+--------------------------------------------------------------------------------
 
 main :: IO ()
 main = getTests >>= defaultMain
