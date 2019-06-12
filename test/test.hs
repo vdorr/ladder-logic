@@ -22,7 +22,7 @@ import Data.Bifunctor
 import GHC.Exts --hiding (toList)
 import Data.Function
 import Data.Traversable
--- import Data.Foldable
+import Data.Foldable hiding (toList)
 
 import System.Directory
 import System.FilePath
@@ -559,8 +559,12 @@ fileTests path = do
     tests <- for files $ \fn -> do
         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
-            Right tk <- return $ preproc4'' src
-            fullyConsumed tk
+            Right lxs <- return $ preproc4'' src
+--             fullyConsumed lxs
+            let blocks = basicBlocks' lxs
+--             return ()
+            for_ blocks $ \(_, lxs') ->
+                fullyConsumed lxs'
 
     return $ testGroup "File tests - positive" tests
 
