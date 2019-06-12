@@ -197,6 +197,20 @@ isWsTok Pragma{}  = True
 isWsTok Comment{} = True
 isWsTok _         = False
 
+basicBlocks'
+    :: [(pos, [((pos, pos), Tok a)])]
+    -> [(Maybe a, [(pos, [((pos, pos), Tok a)])])]
+basicBlocks' [] = []
+basicBlocks' t = (lbl, this) : basicBlocks' rest
+    where
+    (this, rest) = break isLabel t'
+    (lbl, t')
+        = case t of
+            ((_, [(_, Label x)]) : xs) -> (Just x, xs)
+            xs                -> (Nothing, xs)
+    isLabel (_, [(_, Label _)]) = True
+    isLabel _         = False
+
 -- |Chop by network labels
 -- does not look for labels floating among logic, that is left to parser
 -- produced list of (labeled) networks

@@ -258,6 +258,12 @@ test002'
     *> ((:<) <$> currentPos <*> fmap Source vline'2)
     <* dgIsEmpty
 
+-- like test002' but do not check if all consumed
+test003' :: DgP (Cofree (Diagram () Dev String) DgExt)
+test003'
+    = setDir goDown
+    *> ((:<) <$> currentPos <*> fmap Source vline'2)
+
 node2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 node2 = (:<) <$> currentPos <*> (Ladder.LadderParser.Node <$> node2')
 
@@ -282,9 +288,15 @@ eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 hline'2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 hline'2
     = some (hline2 <* option crossing)
-    *> (coil2 <|> contact2 <|> node2 <|> eol2)
+    *> (coil2 <|> contact2 <|> node2 <|> jump <|> eol2)
     where
     crossing = skipSome (==VLine) *> hline2
+
+jump :: DgP (Cofree (Diagram c Dev String) DgExt)
+jump = do
+    pos <- currentPos
+    Jump' name <- eat
+    return $ pos :< Jump (unpack name)
 
 vline2 :: DgP ()
 vline2 = do

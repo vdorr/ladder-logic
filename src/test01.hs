@@ -394,28 +394,29 @@ main = do
     src <- TIO.readFile file
     case stripPos <$> runLexer src of
         Left err -> TIO.putStrLn err
-        Right x -> do
+        Right lxs -> do
 
-            let zp = mkDgZp $ dropWhitespace x
-            forM_ (zpToList zp) (print . (here,))
+            let lxs' = dropWhitespace lxs
+            let blocks = basicBlocks' lxs'
+
+            forM_ blocks $ \(lbl, lxs'') -> do
+
+                print (here, lbl)
+
+                let zp = mkDgZp lxs''
+
+                forM_ (zpToList zp) (print . (here,))
 
 --             print (here, "--------------------------------------------------")
 
-            case applyDgp test002' zp of
-                Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
---                     print (here, a, c)
-                    print (here, "--------------------------------------------------")
-                    for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
+                case applyDgp test003' zp of
+                    Left err -> print (here, err)
+                    Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
+                        print (here, "--------------------------------------------------")
+                        for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 --                     for_ zpr $ \q -> print (here, q)
 
-                    print (here, "--------------------------------------------------")
---                     print (here, ast)
---                     print (here)
---                     printAst 0 ast
-                    TIO.putStrLn src
-                    testAst ast
-                    print (here, "--------------------------------------------------")
+                        print (here, "--------------------------------------------------")
+                        TIO.putStrLn src
+                        print (here, "--------------------------------------------------")
 
-
-
-                Left err -> print (here, err)
