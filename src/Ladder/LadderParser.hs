@@ -104,10 +104,12 @@ number = do
     return n
 
 operand :: DgP Operand
-operand = variable
-    <|> (do
-            Number n <- eat
-            return $ Lit n)
+operand
+    = variable
+    <|> Lit <$> number
+
+--------------------------------------------------------------------------------
+
 #if 0
 test p pp = do
     current <- currentPos

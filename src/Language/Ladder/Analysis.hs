@@ -91,6 +91,7 @@ cut1' = foldMap (uncurry (:) . cut1)
 sameLine :: Cofree (Diagram c d s) DgExt -> Bool
 sameLine n@((ln, _) :< _) = getAll $ foldMap (All.(ln==).fst) n
 
+--TODO better name
 --TODO ensure cut when line number changes
 cut1
     :: Cofree (Diagram () d s) DgExt

@@ -57,11 +57,13 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --------------------------------------------------------------------------------
 
+-- |Look for first pragma in list of lexemes
 getPragma :: [Tok a] -> Maybe a
 getPragma (Pragma p : xs) = Just p
 getPragma (_ : xs)        = getPragma xs
 getPragma _               = Nothing
 
+-- |Discard position informations from list of lexemes
 tokens
     :: [(p, [((p, p), Tok a)])]
     -> [Tok a]
@@ -142,7 +144,7 @@ vect01 =
 -- http://hackage.haskell.org/package/haskell-modbus
 -- https://github.com/yaacov/ArduinoModbusSlave/blob/master/examples/full/full.ino
 
- --wire stack count, wire stack, arg stack, memory???
+--wire stack count, wire stack, arg stack, memory???
 type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
 
 eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
@@ -161,7 +163,7 @@ data ExtendedInstruction ca a w
 
 data Instruction a w
     = ITrap --invoke debugger
-    | ISysRq
+--     | ISysRq
     | ILdOn -- push #1 onto wire stack {- w: -- #1 -}
     | IDup -- coudl be replaced by IPick 0, dup value on top of wire stack {- w: x -- x x -}
     | IPick  Int -- push wire stack value at index onto wire stack {- w: -- x -}

@@ -253,11 +253,22 @@ data Emit ca w d m = Emit
     , emDup :: m ()
     }
 
-resolveJumps
-    :: Eq ca
-    => [(Maybe ca, [ExtendedInstruction ca a w])]
+--get rid of text
+resolveLabels
+    :: (Show lbl, Eq lbl)
+    => [(Maybe lbl, [ExtendedInstruction lbl a w])]
     -> Either String [ExtendedInstruction Int a w]
-resolveJumps = undefined
+resolveLabels l = for (foldMap snd l) g
+    where
+    l' = fmap (fmap length) l
+
+    (_, l'') = foldl f (0, []) l'
+    f (acc, xs) (lbl, blkLen) = (acc + blkLen, (lbl, acc) : xs)
+
+    g (EIJump lbl) = case lookup (Just lbl) l'' of
+                       Just a -> Right (EIJump a)
+                       Nothing -> Left $ show (here, lbl)
+    g (EISimple i) = Right (EISimple i)
 
 -- generate2 ::
 --     ( Monad m0
