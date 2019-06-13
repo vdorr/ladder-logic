@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
 
-module Ladder.Lexer where
+module Language.Ladder.Lexer where
 
 --FIXME FIXME get rid of megaparsec
 import Text.Megaparsec hiding (Label) --as P hiding (runParser', Pos)

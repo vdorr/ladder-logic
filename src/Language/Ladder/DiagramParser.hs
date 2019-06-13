@@ -1,6 +1,6 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-module Ladder.DiagramParser where
+module Language.Ladder.DiagramParser where
 
 import Prelude hiding (fail)
 import Control.Monad.Fail
@@ -9,7 +9,7 @@ import Control.Monad hiding (fail)
 import Data.Maybe
 import Data.Traversable
 
-import Ladder.Zipper
+import Language.Ladder.Zipper
 
 import Debug.Trace
 

@@ -26,10 +26,10 @@ library
                      , LadderParser
                      , Compile
                      , Ladder.Javascript
-                     , Ladder.LadderParser
-                     , Ladder.DiagramParser
-                     , Ladder.Zipper
-                     , Ladder.Lexer
+                     , Language.Ladder.LadderParser
+                     , Language.Ladder.DiagramParser
+                     , Language.Ladder.Zipper
+                     , Language.Ladder.Lexer
                      , Tooling
                      , TestUtils
                      , Language.Ladder.Utils

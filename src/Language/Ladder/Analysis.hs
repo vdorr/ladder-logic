@@ -7,8 +7,8 @@ import Data.Maybe
 import Data.Bifunctor
 import Data.Semigroup
 
-import Ladder.LadderParser
-import Ladder.DiagramParser
+import Language.Ladder.LadderParser
+import Language.Ladder.DiagramParser
 import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------

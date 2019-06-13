@@ -20,9 +20,9 @@ import Data.Word
 import Control.Monad.Writer.Strict
 
 -- import Ladder.Zipper
-import Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
-import Ladder.DiagramParser
-import Ladder.LadderParser
+import Language.Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
+import Language.Ladder.DiagramParser
+import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------

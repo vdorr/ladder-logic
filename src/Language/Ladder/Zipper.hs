@@ -1,5 +1,5 @@
 
-module Ladder.Zipper where
+module Language.Ladder.Zipper where
 
 --------------------------------------------------------------------------------
 

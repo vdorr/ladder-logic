@@ -18,7 +18,7 @@ import Data.Text (Text)
 
 -- import Text.Megaparsec.Debug
 -- import Debug.Trace
-import Ladder.Lexer (stripPos, ParseErr(..), withPos)
+import Language.Ladder.Lexer (stripPos, ParseErr(..), withPos)
 
 --------------------------------------------------------------------------------
 

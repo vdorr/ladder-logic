@@ -25,10 +25,10 @@ import Control.Monad.Writer.Strict
 
 -- import Debug.Trace
 
-import Ladder.Zipper
-import Ladder.Lexer
-import Ladder.DiagramParser
-import Ladder.LadderParser
+import Language.Ladder.Zipper
+import Language.Ladder.Lexer
+import Language.Ladder.DiagramParser
+import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Analysis
 

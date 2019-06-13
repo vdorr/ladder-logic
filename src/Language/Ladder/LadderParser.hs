@@ -2,7 +2,7 @@
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-module Ladder.LadderParser where
+module Language.Ladder.LadderParser where
 
 import Data.Text (Text, unpack)
 import Prelude hiding (fail)
@@ -13,8 +13,8 @@ import Data.Bifunctor
 import Data.Foldable
 
 import Language.Ladder.Utils
-import Ladder.Lexer
-import Ladder.DiagramParser
+import Language.Ladder.Lexer
+import Language.Ladder.DiagramParser
 
 import Debug.Trace
 
@@ -265,7 +265,7 @@ test003'
     *> ((:<) <$> currentPos <*> fmap Source vline'2)
 
 node2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-node2 = (:<) <$> currentPos <*> (Ladder.LadderParser.Node <$> node2')
+node2 = (:<) <$> currentPos <*> (Language.Ladder.LadderParser.Node <$> node2')
 
 node2' :: DgP [Cofree (Diagram c Dev String) DgExt]
 node2'

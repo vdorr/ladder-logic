@@ -7,10 +7,10 @@ import Text.Read
 import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
 
-import Ladder.Zipper
-import Ladder.Lexer
-import Ladder.DiagramParser
-import Ladder.LadderParser
+import Language.Ladder.Zipper
+import Language.Ladder.Lexer
+import Language.Ladder.DiagramParser
+import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 
 import Tooling
