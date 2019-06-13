@@ -544,10 +544,11 @@ fileTestsNeg path = do
         return $ testCase fn $ do
             case preproc4'' src of
                  Left _ -> return () --preproc failed -> test succeeeded
-                 Right lxs -> case getDg <$> dgParse lxs of
-                                   Right (Zp [] []) -> assertFailure here
-                                   Left _ -> return ()
-                                   _ -> return ()
+                 Right lxs ->
+                    case getDg <$> dgParse lxs of
+                        Right (Zp [] []) -> assertFailure here
+                        Left _ -> return ()
+                        _ -> return ()
     return $ testGroup "File tests - negative" tests
 
 --TODO TODO exercise embedded test vectors
