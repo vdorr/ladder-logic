@@ -96,21 +96,21 @@ data Tok a
 
 renderLexeme :: Tok String -> String
 renderLexeme t = case t of
-    Cross          -> "+"
-    VLine          -> "|"
-    Label        a -> a ++ ":"
+    Cross            -> "+"
+    VLine            -> "|"
+    Label        a   -> a ++ ":"
     HLine        n _ -> replicate (n+1) '-'
-    REdge          -> ">"
-    FEdge          -> "<"
-    Number       n -> show n
-    Contact      a -> "[" ++ a ++ "]"
-    Coil         a -> "(" ++ a ++ ")"
-    Continuation a -> ">" ++ a ++ ">"
-    Return         -> "<RETURN>"
-    Jump'        a -> ">>" ++ a
-    Name         a -> a
-    Comment      a -> "(*" ++ a ++ "*)"
-    Pragma       a -> "{" ++ a ++ "}"
+    REdge            -> ">"
+    FEdge            -> "<"
+    Number       n   -> show n
+    Contact      a   -> "[" ++ a ++ "]"
+    Coil         a   -> "(" ++ a ++ ")"
+    Continuation a   -> ">" ++ a ++ ">"
+    Return           -> "<RETURN>"
+    Jump'        a   -> ">>" ++ a
+    Name         a   -> a
+    Comment      a   -> "(*" ++ a ++ "*)"
+    Pragma       a   -> "{" ++ a ++ "}"
 
 lexeme :: Parsec ParseErr Text (Tok Text)
 lexeme
@@ -179,11 +179,13 @@ preproc5'
 
 --------------------------------------------------------------------------------
 
+-- |Discard comments and pragmas
 dropWhitespace
     :: [(p, [((p, p), Tok a)])]
     -> [(p, [((p, p), Tok a)])]
 dropWhitespace = filter (not.null.snd) . fmap (fmap (filter (not.isWsTok.snd)))
 
+-- |Break list of tokens into list of lists of tokens with same line number
 breakLines
     :: [((SourcePos, SourcePos), tok)]
     -> [(SourcePos, [((SourcePos, SourcePos), tok)])]
@@ -192,14 +194,19 @@ breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
     (a, b) = span ((sourceLine p==).sourceLine.fst.fst) xs
 breakLines [] = []
 
+-- |Returns True if lexeme is comment or pragma
 isWsTok :: Tok a -> Bool
 isWsTok Pragma{}  = True
 isWsTok Comment{} = True
 isWsTok _         = False
 
+-- |Chop by network labels
+--TODO keep source pos for start of block
+-- does not look for labels floating among logic, that is left to parser
+-- produced list of (labeled) networks
 basicBlocks'
-    :: [(pos, [((pos, pos), Tok a)])]
-    -> [(Maybe a, [(pos, [((pos, pos), Tok a)])])]
+    :: [(p, [((p, p), Tok a)])]
+    -> [(Maybe a, [(p, [((p, p), Tok a)])])]
 basicBlocks' [] = []
 basicBlocks' t = (lbl, this) : basicBlocks' rest
     where
@@ -211,25 +218,17 @@ basicBlocks' t = (lbl, this) : basicBlocks' rest
     isLabel (_, [(_, Label _)]) = True
     isLabel _         = False
 
--- |Chop by network labels
--- does not look for labels floating among logic, that is left to parser
--- produced list of (labeled) networks
 basicBlocks
     :: [[Tok a]]
     -> [(Maybe a, [[Tok a]])]
-basicBlocks [] = []
-basicBlocks t = (lbl, this) : basicBlocks rest
-    where
-    (this, rest) = break isLabel t'
-    (lbl, t')
-        = case t of
-            ([Label x] : xs) -> (Just x, xs)
-            xs                -> (Nothing, xs)
-    isLabel [Label _] = True
-    isLabel _         = False
+basicBlocks
+    = fmap (fmap (fmap (snd . fmap(fmap snd))))
+    . basicBlocks'
+    . (fmap (((),).fmap (((),()),)))
 
 --------------------------------------------------------------------------------
 
+-- |Discard 'SourcePos', keep only integer line numbers and column ranges
 stripPos
     :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
     -> [ (Int, [((Int, Int), a)]) ]

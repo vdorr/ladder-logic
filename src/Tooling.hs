@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ViewPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -6,7 +6,7 @@ module Tooling where
 
 import Data.Semigroup
 import Data.List
-import qualified Data.List.NonEmpty as NE
+-- import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Function
 import Data.Foldable
@@ -63,6 +63,8 @@ getPragma (Pragma p : xs) = Just p
 getPragma (_ : xs)        = getPragma xs
 getPragma _               = Nothing
 
+
+-- should be called "dropPos" or something like that
 -- |Discard position informations from list of lexemes
 tokens
     :: [(p, [((p, p), Tok a)])]

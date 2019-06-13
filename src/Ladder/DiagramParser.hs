@@ -128,7 +128,7 @@ setPos (ln, (co, _)) = do
 setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState tok) (Bool)
 setPosOrBlur (ln, (co, _)) = do
     DgPSt b zp ps _ <- get
-    zp'             <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
+    let zp' = move ln co zp --FIXME can only move to direct neighbour!!!!!!!
     case zp' of
         Just zp' ->
                 traceShowM (here, ln, "setPosOrBlur")

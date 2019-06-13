@@ -14,6 +14,7 @@ import Data.Bits.Coding
 import Data.ByteString.Lazy as L
 import Data.Word
 import Data.Foldable
+import Data.List
 
 import Tooling
 
@@ -89,9 +90,8 @@ xxy l
             C16 x -> putBitsFrom 15 x
         flush
 
-xxz :: L.ByteString -> [ExtendedInstruction Int Word8 Word16]
-xxz = runGetL $ runDecode $ do
-    f
+xxz :: L.ByteString -> [(Int, ExtendedInstruction Int Word8 Word16)]
+xxz = runGetL $ runDecode f
     where
     f = do
         empty <- isEmpty
@@ -100,14 +100,28 @@ xxz = runGetL $ runDecode $ do
         else (:) <$> getOne <*> f
 
     getOne = getBitsFrom 3 (0::Word8) >>= \case
-        0  -> return               $ EISimple $ ITrap
-        1  -> EIJump              <$> (fromIntegral <$> getBitsFrom 11 (0::Word16))
-        4  -> (EISimple . IPick)  <$> (fromIntegral <$> getBitsFrom 3 (0::Word8))
-        6  -> (EISimple . ILdBit) <$> (getBitsFrom 7 (0::Word8))
+        0  -> return               (1, EISimple ITrap)
+        1  -> ((1+3,).EIJump)              <$> (fromIntegral <$> getBitsFrom 11 (0::Word16))
+        4  -> ((1+1,).EISimple . IPick)  <$> (fromIntegral <$> getBitsFrom 3 (0::Word8))
+        6  -> ((1+2,).EISimple . ILdBit) <$> (getBitsFrom 7 (0::Word8))
         12 -> getBitsFrom 3 (0::Word8) >>= \case
-            1 -> (EISimple . ILdCnA) <$> getBitsFrom 15 (0::Word16)
+            1 -> ((1+1+4,).EISimple . ILdCnA) <$> getBitsFrom 15 (0::Word16)
             _ -> error here
         other -> error $ show (here, other)
+
+
+xx0
+    :: [(Int, ExtendedInstruction Int Word8 Word16)]
+    -> [ExtendedInstruction Int Word8 Word16]
+xx0 l = fmap f l
+    where
+    (_, l' ) = Prelude.foldl h (0, []) l
+    h (acc, xs) (chnLen, i) = (acc + chnLen, xs ++ [(acc, i)])
+
+    f (_, EIJump lbl) = case Data.List.findIndex ((lbl==).fst) l' of
+                             Nothing -> error here
+                             Just idx -> EIJump idx
+    f (_, EISimple i) = EISimple i
 
 main :: IO ()
 main = do
@@ -137,5 +151,5 @@ main = do
     print (here, p)
     print (here, xxx p)
     print (here, B16.encode $ xxy $ xxx p)
-    print (here, xxz $ xxy $ xxx p)
+    print (here, xx0 $ xxz $ xxy $ xxx p)
 

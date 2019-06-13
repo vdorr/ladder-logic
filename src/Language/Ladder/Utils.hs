@@ -13,25 +13,7 @@ data Cofree f a = a :< f (Cofree f a)
 
 instance (Eq a, Eq (f (Cofree f a))) => Eq (Cofree f a) where
     a :< b == c :< d = a == c && b == d
-
---unFix :: Cofree f a -> (a, f (Cofree f a))
---unFix (a :< x) = (a, x)
---cata :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
---cata alg = alg . fmap (fmap (cata alg)) . unFix
--- unFix :: Cofree f a -> f (Cofree f a)
--- unFix (_ :< f) = f
--- cata :: Functor f => (f a -> a) -> Cofree f w -> a
--- cata alg = alg . fmap (cata alg) . unFix
 -- 
--- unFix' :: Cofree f a -> (a, f (Cofree f a))
--- unFix' (a :< f) = (a, f)
--- cata' :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
--- cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
--- 
--- type Symbol = Cofree (Symbol_ String) Pos
--- 
--- cof a f = (a :<) . f
-
 instance (forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
     show (a :< as) = "(" ++ show a ++ " :< " ++ show as ++ ")"
 
@@ -55,39 +37,21 @@ pickFirst p s
 
 istopo :: (a -> a -> Bool) -> [a] -> Bool
 istopo dep (x : xs) = all (\y -> not $ dep x y) xs && istopo dep xs
-istopo _ [] = True
+istopo _   []       = True
 
 istopoM :: (a -> a -> Bool) -> [a] -> Maybe a
-istopoM dep (x : xs)
---     = case filter (dep x) xs of
---                             [] -> istopoM dep xs
---                             offender : _ -> Just offender
-    = fst (pickFirst (dep x) xs) <|> istopoM dep xs
-istopoM _ [] = Nothing
+istopoM dep (x : xs) = fst (pickFirst (dep x) xs) <|> istopoM dep xs
+istopoM _   []       = Nothing
 
-#if 0
---i think i don't need to check for cycles here
---XXX but i need to identify spatial vertices, probably by their dependencies
-isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
-isSpatialOrTopo dep spa g = go g
-    where
-    go (x : xs : xss)
-        | spa x xs == LT || any (flip dep x) (xs:xss) = go (xs : xss)
-        | otherwise = Just x
-    go _ = Nothing
-
---TODO i should check if this fires in hedgehog
---is it true that this list is spatially sorted?
---TODO
---     sources = filter (noPreds) g
---     noPreds v = all (\w -> spa v w /= EQ && not (dep v w)) g
-#else
-
+-- isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
+-- isSpatialOrTopo dep spa g = go g
+--     where
+--     go (x : xs : xss)
+--         | spa x xs == LT || any (flip dep x) (xs:xss) = go (xs : xss)
+--         | otherwise = Just x
+--     go _ = Nothing
 isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe (a, a)
 isSpatialOrTopo dep spa g = (,) <$> istopoM dep g <*> isSorted sources
---     case (istopoM dep g, isSorted sources) of
---                                  (Just _, Just x) -> Just x
---                                  _ -> Nothing
     where
     isSorted (x:xs:xss)
         | spa x xs == LT = isSorted (xs:xss)
@@ -96,10 +60,8 @@ isSpatialOrTopo dep spa g = (,) <$> istopoM dep g <*> isSorted sources
 
 --TODO i should check if this fires in hedgehog
 --is it true that this list is spatially sorted?
---TODO
     sources = filter noPreds g
     noPreds v = all (\w -> spa v w /= EQ && not (dep v w)) g
-#endif
 
 
 iscycle :: (a -> a -> Bool) -> (a -> a -> Bool) -> a -> [a] -> Bool
