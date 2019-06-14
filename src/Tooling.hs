@@ -24,6 +24,7 @@ import Language.Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
+import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
@@ -33,26 +34,6 @@ data D
     deriving (Show, Eq, Ord)
 
 data E op = Op op [D] -- and, or, ld #on, ...
-    deriving Show
-
-data V
-    = X Bool 
-    | I Int
-    deriving (Show, Read, Eq)
-
-data Op n s
-    = And n -- wire out <- wire in and memory cell
-    | AndN n
-    | Ld    -- ^ set wire state same as argument
-    | On    -- ^ set wire state to #on
-    | St n
---     | StN | StOn | StOff
-    | Jmp s
-    | Cmp CmpOp n n
-    -- | FB String [(String, D)] [(String, D)]
-    deriving Show
-
-data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
     deriving Show
 
 --------------------------------------------------------------------------------
@@ -149,46 +130,14 @@ vect01 =
 --wire stack count, wire stack, arg stack, memory???
 type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
 
-eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
-eval2 = undefined
+-- eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
+-- eval2 = undefined
 
-run2
-    :: ItpSt2
-    -> [(String, [ExtendedInstruction String Int Int16])]
-    -> Either (ItpSt2, String) ItpSt2
-run2 = undefined
-
-data ExtendedInstruction ca a w
-    = EIJump ca
-    | EISimple (Instruction a w)
-    deriving Show
-
-data Instruction a w
-    = ITrap --invoke debugger
---     | ISysRq
-    | ILdOn -- push #1 onto wire stack {- w: -- #1 -}
-    | IDup -- coudl be replaced by IPick 0, dup value on top of wire stack {- w: x -- x x -}
-    | IPick  Int -- push wire stack value at index onto wire stack {- w: -- x -}
-    | IDrop --drop value from wire stack {- w: x -- -}
-
-    | ILdBit a -- push bit from address onto wire stack
-    | IStBit a -- dtto for store
-
---     | IJump  String
-    | IAnd -- and two values on wire stack, push result back
-    | IOr -- dtto, or
-    | INot -- negate value on top of wire stack
---     | IXor
-
-    | ILdCnA w {- push int const onto argument stack, a: -- l -}
-    | ILdM {- a: size addr -- <value> -}
-    | IStM
-
---     | IOp Operator --instead of lt,gt,etc
-    | IEq -- compare two value on arg stack and push result onto wire stack
-    | ILt
-    | IGt
-    deriving Show
+-- run2
+--     :: ItpSt2
+--     -> [(String, [ExtendedInstruction String Int Int16])]
+--     -> Either (ItpSt2, String) ItpSt2
+-- run2 = undefined
 
 -- data ItSt = ItSt [Bool] [V] [(String, V)]
 type ItpSt = ([Bool], [V], [(String, V)])
@@ -220,65 +169,6 @@ eval = f
 --     f st@(ItSt ws     (Var n:os) m)  ILdM
 --         | Just v <- lookup n m                 = undefined --pure $ ItSt ws os m
 --         | otherwise                            = Left (st, "var not found")
-
---------------------------------------------------------------------------------
-
--- |Return list of annotations (usually positions) of 'Sink' nodes
-stubs
-    :: Cofree (Diagram c d s) p
-    -> [p]
-stubs (p :< a) = f a
-    where
-    f (Source a)   = stubs a --ugh what is ungawa for this?
-    f  Sink        = [p]
-    f  End         = []
-    f (Device d a) = stubs a
-    f (Jump s)     = []
-    f (Node a)     = foldMap stubs a
-    f (Conn c    ) = [] --XXX i am not sure !!!
-    f (Cont c   a) = []
-
---just remove initial Source and tree of Nodes
---quite useless operation, i think
-forest
-    :: Cofree (Diagram c d s) p
-    -> Maybe [Cofree (Diagram c d s) p]
--- forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
-forest (_ :< Source a) = Just $ fmap (\n@(p :< _) -> p :< Source n) $ fst $ succs' a
-forest _               = Nothing
-
-merge'
-    :: Cofree (Diagram c d s) p -- ^input tree
-    -> ([(p, [p])], Cofree (Diagram c d s) p)
--- ^pairs of position of 'Node' still in tree and 'Node' positions merged into it and new tree
-merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
--- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
-    where
-    f ns _ []  = ns
-    f ns p nss = (p, nss) : ns
-
-merge
-    :: Cofree (Diagram c d s) p
-    -> Cofree (Diagram c d s) ([p], p)
-merge = g
-    where
-    g (p :< Node as) = (ns, p) :< Node (fmap merge as')
-        where
-        (as', ns) = foldMap succs' as
-    g (p :< other)   = ([], p) :< fmap merge other
-
--- succs
---     :: Cofree (Diagram d s) p
---     -> [Cofree (Diagram d s) p]
--- succs (_ :< Node xs) = foldMap succs xs
--- succs other          = [other]
-
-succs'
-    :: Cofree (Diagram c d s) p
-    -> ([Cofree (Diagram c d s) p], [p])
-succs' (p :< Node xs) = fmap (++[p]) $ foldMap succs' xs
--- succs' (p :< Node xs) = foldMap succs' xs
-succs' other          = ([other], [])
 
 --------------------------------------------------------------------------------
 
@@ -510,16 +400,3 @@ evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
         return (tr ++ [tr'], st')
         where
         mem' = updateMemory mem stim
-
---------------------------------------------------------------------------------
-
-parseOps
-    :: Cofree (Diagram c Dev s) p
-    -> Cofree (Diagram c (Op Operand s) s) p
-parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
-    where
-    f (Dev "[ ]" [n]   ) = And  n
-    f (Dev "[/]" [n]   ) = AndN  n
-    f (Dev "[>]" [a, b]) = Cmp Gt a b
-    f (Dev "( )" [n]   ) = St n
-    f _                  = error here
