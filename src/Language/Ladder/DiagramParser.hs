@@ -75,6 +75,8 @@ type DgExt = (Int, (Int, Int))
 -- |Move in some direction from provided origin
 type MoveToNext tok = DgExt -> Dg tok -> Either String (Dg tok)
 
+--TODO TODO make some tests for psFocused behaviour (e.g. gap test)
+
 -- |Parser state
 data DgPState tok = DgPSt
     { psNext     :: MoveToNext tok -- ^select next token

@@ -34,6 +34,7 @@ library
                      , TestUtils
                      , Language.Ladder.Utils
                      , Language.Ladder.Analysis
+                     , Language.Ladder.Interpreter
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts

@@ -20,6 +20,8 @@ import Tooling
 
 import Data.ByteString.Base16.Lazy as B16
 
+--------------------------------------------------------------------------------
+
 -- runEncode :: MonadPut m => Coding m () -> m () 
 -- encode :: MonadPut m => c -> Coding m () 
 
@@ -122,6 +124,8 @@ xx0 l = fmap f l
                              Nothing -> error here
                              Just idx -> EIJump idx
     f (_, EISimple i) = EISimple i
+
+--------------------------------------------------------------------------------
 
 main :: IO ()
 main = do
