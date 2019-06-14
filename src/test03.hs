@@ -16,9 +16,14 @@ import Data.Word
 import Data.Foldable
 import Data.List
 
-import Tooling
+-- import Tooling
+import Language.Ladder.Interpreter
 
 import Data.ByteString.Base16.Lazy as B16
+
+-- http://hackage.haskell.org/package/bits
+-- http://hackage.haskell.org/package/haskell-modbus
+-- https://github.com/yaacov/ArduinoModbusSlave/blob/master/examples/full/full.ino
 
 --------------------------------------------------------------------------------
 

@@ -14,13 +14,13 @@ import Data.Tuple
 import Data.Maybe
 import Data.Bifunctor
 
-import Data.Int
-import Data.Word
+-- import Data.Int
+-- import Data.Word
 
 import Control.Monad.Writer.Strict
 
 -- import Ladder.Zipper
-import Language.Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
+-- import Language.Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
@@ -35,22 +35,6 @@ data D
 
 data E op = Op op [D] -- and, or, ld #on, ...
     deriving Show
-
---------------------------------------------------------------------------------
-
--- |Look for first pragma in list of lexemes
-getPragma :: [Tok a] -> Maybe a
-getPragma (Pragma p : xs) = Just p
-getPragma (_ : xs)        = getPragma xs
-getPragma _               = Nothing
-
-
--- should be called "dropPos" or something like that
--- |Discard position informations from list of lexemes
-tokens
-    :: [(p, [((p, p), Tok a)])]
-    -> [Tok a]
-tokens = foldMap (fmap snd . snd)
 
 --------------------------------------------------------------------------------
 
@@ -73,7 +57,8 @@ sparkline trace = fmap (bar.asInt) trace
     where
 --     trace' = fmap asInt trace
     asInt (X True)  = 5
-    asInt (X False) = 0
+--     asInt (X False) = 0
+    asInt _ = 0 --FIXME implement integers
 --     asInt (I i)     = i
     bar = ("_▂▃▄▅▆▇█" !!)
 
@@ -120,55 +105,6 @@ vect01 =
     , (1, [("a", X True)])
     , (1, [("a", X False)])
     ]
-
---------------------------------------------------------------------------------
-
--- http://hackage.haskell.org/package/bits
--- http://hackage.haskell.org/package/haskell-modbus
--- https://github.com/yaacov/ArduinoModbusSlave/blob/master/examples/full/full.ino
-
---wire stack count, wire stack, arg stack, memory???
-type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
-
--- eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
--- eval2 = undefined
-
--- run2
---     :: ItpSt2
---     -> [(String, [ExtendedInstruction String Int Int16])]
---     -> Either (ItpSt2, String) ItpSt2
--- run2 = undefined
-
--- data ItSt = ItSt [Bool] [V] [(String, V)]
-type ItpSt = ([Bool], [V], [(String, V)])
-
-eval :: ItpSt -> Instruction String Int -> Either (ItpSt, String) ItpSt
-eval = f
-    where
-    f st                 ITrap      = Left (st, "trap")
-    f    (  ws, os, m)   ILdOn      = pure (True:ws, os, m)
-    f    (w:ws, os, m)   IDup       = pure (w:w:ws, os, m)
-    f st@(  ws, os, m)  (IPick i)
-        | i >= 0 && i < length ws   = pure (ws!!i:ws, os, m)
-        | otherwise                 = Left (st, "stk idx out of range")
-    f    (_:ws, os, m)   IDrop      = pure (ws, os, m)
-    f st@(ws,   os, m)  (ILdBit a)
-        | Just (X v) <- lookup a m  = pure (v:ws, os, m)
-        | otherwise                 = Left (st, "invalid memory access")
-    f st@(w:ws, os, m)  (IStBit a)
-        | (m0,(_,X _):m1) <- break ((==a).fst) m
-                                    = pure (w:ws, os, (m0 ++ (a, X w) : m1))
-        | otherwise                 = Left (st, "invalid memory access")
-    f st@(a:b:ws, os, m) IAnd       = pure ((a&&b):ws, os, m)
-    f st@(a:b:ws, os, m) IOr        = pure ((a||b):ws, os, m)
-    f st@(a:ws,   os, m) INot       = pure (not a:ws,  os, m)
-
---     f _ i = error $ show (here, i)
-
---     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
---     f st@(ItSt ws     (Var n:os) m)  ILdM
---         | Just v <- lookup n m                 = undefined --pure $ ItSt ws os m
---         | otherwise                            = Left (st, "var not found")
 
 --------------------------------------------------------------------------------
 
@@ -221,6 +157,7 @@ generate emit nodeToSink asts = go ([], asts)
             case d of
                  And (Var addr) -> emit [ILdBit addr, IAnd]
                  St (Var addr)  -> emit [IStBit addr]
+                 _ -> error here
             go (p:stk, (stubs, b):xs)
         f stk (Jump s)         = error here --later
         f (_:stk) (Node b)     = do
@@ -320,6 +257,7 @@ ldlines tr = let (a, b) = f tr in a :| b
     f (p :< End)        = (p :< End, [])
     f (p :< Device d a) = bimap ((p:<) . Device d) id $ f a
     f (p :< Jump s)     = (p :< Jump s, [])
+    f _                 = error here
 
 --------------------------------------------------------------------------------
 

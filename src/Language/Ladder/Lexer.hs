@@ -236,3 +236,19 @@ stripPos = fmap (bimap (unPos.sourceLine)
     (fmap (bimap (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)) id)))
 
 --------------------------------------------------------------------------------
+
+-- |Look for first pragma in list of lexemes
+getPragma :: [Tok a] -> Maybe a
+getPragma (Pragma p : xs) = Just p
+getPragma (_ : xs)        = getPragma xs
+getPragma _               = Nothing
+
+
+-- should be called "dropPos" or something like that
+-- |Discard position informations from list of lexemes
+tokens
+    :: [(p, [((p, p), Tok a)])]
+    -> [Tok a]
+tokens = foldMap (fmap snd . snd)
+
+--------------------------------------------------------------------------------

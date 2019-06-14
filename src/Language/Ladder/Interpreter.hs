@@ -7,6 +7,8 @@ import Data.Traversable
 import Control.Monad.Writer.Strict
 -- import Data.Function
 import Data.List
+import Data.Int
+import Data.Word
 
 -- import Language.Ladder.Zipper
 -- import Language.Ladder.Lexer
@@ -231,8 +233,6 @@ generateStk2 ast' = do
 
 --------------------------------------------------------------------------------
 
---------------------------------------------------------------------------------
-
 -- |Return list of annotations (usually positions) of 'Sink' nodes
 stubs
     :: Cofree (Diagram c d s) p
@@ -303,3 +303,50 @@ parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
     f (Dev "[>]" [a, b]) = Cmp Gt a b
     f (Dev "( )" [n]   ) = St n
     f _                  = error here
+
+--------------------------------------------------------------------------------
+
+--wire stack count, wire stack, arg stack, memory???
+type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
+
+-- eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
+-- eval2 = undefined
+
+-- run2
+--     :: ItpSt2
+--     -> [(String, [ExtendedInstruction String Int Int16])]
+--     -> Either (ItpSt2, String) ItpSt2
+-- run2 = undefined
+
+-- data ItSt = ItSt [Bool] [V] [(String, V)]
+type ItpSt = ([Bool], [V], [(String, V)])
+
+eval :: ItpSt -> Instruction String Int -> Either (ItpSt, String) ItpSt
+eval = f
+    where
+    f st                 ITrap      = Left (st, "trap")
+    f    (  ws, os, m)   ILdOn      = pure (True:ws, os, m)
+    f    (w:ws, os, m)   IDup       = pure (w:w:ws, os, m)
+    f st@(  ws, os, m)  (IPick i)
+        | i >= 0 && i < length ws   = pure (ws!!i:ws, os, m)
+        | otherwise                 = Left (st, "stk idx out of range")
+    f    (_:ws, os, m)   IDrop      = pure (ws, os, m)
+    f st@(ws,   os, m)  (ILdBit a)
+        | Just (X v) <- lookup a m  = pure (v:ws, os, m)
+        | otherwise                 = Left (st, "invalid memory access")
+    f st@(w:ws, os, m)  (IStBit a)
+        | (m0,(_,X _):m1) <- break ((==a).fst) m
+                                    = pure (w:ws, os, (m0 ++ (a, X w) : m1))
+        | otherwise                 = Left (st, "invalid memory access")
+    f st@(a:b:ws, os, m) IAnd       = pure ((a&&b):ws, os, m)
+    f st@(a:b:ws, os, m) IOr        = pure ((a||b):ws, os, m)
+    f st@(a:ws,   os, m) INot       = pure (not a:ws,  os, m)
+
+--     f _ i = error $ show (here, i)
+
+--     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
+--     f st@(ItSt ws     (Var n:os) m)  ILdM
+--         | Just v <- lookup n m                 = undefined --pure $ ItSt ws os m
+--         | otherwise                            = Left (st, "var not found")
+
+--------------------------------------------------------------------------------
