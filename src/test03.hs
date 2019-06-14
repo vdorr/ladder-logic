@@ -11,10 +11,13 @@ import Data.Bytes.Put
 import Data.Bytes.Get
 import Data.Bits.Coded
 import Data.Bits.Coding
-import Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy as L
 import Data.Word
 import Data.Foldable
 import Data.List
+import Numeric
+-- import Data.List
+import Data.Functor.Identity
 
 -- import Tooling
 import Language.Ladder.Interpreter
@@ -34,6 +37,35 @@ type LabelIn = Int
 type AddressIn = Int
 type ConstWordIn = Int
 
+instructions
+    :: Applicative f0
+    => f0 Int
+    -> f0 ca
+    -> f0 a
+    -> f0 w
+    -> [f0 (ExtendedInstruction ca a w)]
+instructions stk lbl addr lit = 
+    [ EIJump <$> lbl
+    , pure $ EISimple ITrap
+    , pure $ EISimple ILdOn
+    , pure $ EISimple IDup
+    , (EISimple . IPick) <$> stk
+    , pure $ EISimple IDrop
+    , (EISimple . ILdBit) <$> addr
+    , (EISimple . IStBit) <$> addr
+    , pure $ EISimple IAnd
+    , pure $ EISimple IOr
+    , pure $ EISimple INot
+    , (EISimple . ILdCnA) <$> lit
+    , pure $ EISimple ILdM
+    , pure $ EISimple IStM
+    , pure $ EISimple IEq
+    , pure $ EISimple ILt
+    , pure $ EISimple IGt
+    ]
+
+i0 = instructions (Identity 0) (Identity 0) (Identity 0) (Identity 0)
+
 -- xxx
 --     :: [ExtendedInstruction LabelIn AddressIn ConstWordIn]
 --     -> Either String [Chunk]
@@ -41,6 +73,7 @@ type ConstWordIn = Int
 -- xxx
 --     :: [ExtendedInstruction LabelIn AddressIn ConstWordIn]
 --     -> [Chunk]
+xxx :: [ExtendedInstruction Int Word8 Word16] -> [Chunk]
 xxx l = foldMap snd l''
     where
     l' = fmap g l
@@ -130,6 +163,9 @@ xx0 l = fmap f l
                              Just idx -> EIJump idx
     f (_, EISimple i) = EISimple i
 
+asCArray :: L.ByteString -> String
+asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
@@ -161,4 +197,4 @@ main = do
     print (here, xxx p)
     print (here, B16.encode $ xxy $ xxx p)
     print (here, xx0 $ xxz $ xxy $ xxx p)
-
+    print (here, xxx $ fmap runIdentity i0)
