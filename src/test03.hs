@@ -30,49 +30,10 @@ import Data.ByteString.Base16.Lazy as B16
 
 --------------------------------------------------------------------------------
 
--- runEncode :: MonadPut m => Coding m () -> m () 
--- encode :: MonadPut m => c -> Coding m () 
-
 type LabelIn = Int
 type AddressIn = Int
 type ConstWordIn = Int
 
-instructions
-    :: Applicative f0
-    => f0 Int
-    -> f0 ca
-    -> f0 a
-    -> f0 w
-    -> [f0 (ExtendedInstruction ca a w)]
-instructions stk lbl addr lit = 
-    [ EIJump <$> lbl
-    , pure $ EISimple ITrap
-    , pure $ EISimple ILdOn
-    , pure $ EISimple IDup
-    , (EISimple . IPick) <$> stk
-    , pure $ EISimple IDrop
-    , (EISimple . ILdBit) <$> addr
-    , (EISimple . IStBit) <$> addr
-    , pure $ EISimple IAnd
-    , pure $ EISimple IOr
-    , pure $ EISimple INot
-    , (EISimple . ILdCnA) <$> lit
-    , pure $ EISimple ILdM
-    , pure $ EISimple IStM
-    , pure $ EISimple IEq
-    , pure $ EISimple ILt
-    , pure $ EISimple IGt
-    ]
-
-i0 = instructions (Identity 0) (Identity 0) (Identity 0) (Identity 0)
-
--- xxx
---     :: [ExtendedInstruction LabelIn AddressIn ConstWordIn]
---     -> Either String [Chunk]
--- xxx l = Right $ foldMap snd l''
--- xxx
---     :: [ExtendedInstruction LabelIn AddressIn ConstWordIn]
---     -> [Chunk]
 xxx :: [ExtendedInstruction Int Word8 Word16] -> [Chunk]
 xxx l = foldMap snd l''
     where
@@ -104,7 +65,6 @@ xxx l = foldMap snd l''
     f  IEq       = [C4 12, C4 4]
     f  ILt       = [C4 12, C4 5]
     f  IGt       = [C4 12, C4 6]
-
 
 chunkLength = f
     where
@@ -149,7 +109,6 @@ xxz = runGetL $ runDecode f
             _ -> error here
         other -> error $ show (here, other)
 
-
 xx0
     :: [(Int, ExtendedInstruction Int Word8 Word16)]
     -> [ExtendedInstruction Int Word8 Word16]
@@ -162,6 +121,75 @@ xx0 l = fmap f l
                              Nothing -> error here
                              Just idx -> EIJump idx
     f (_, EISimple i) = EISimple i
+
+--------------------------------------------------------------------------------
+
+instructions
+    :: Applicative f
+    => f Int
+    -> f ca
+    -> f a
+    -> f w
+    -> [f (ExtendedInstruction ca a w)]
+instructions stk lbl addr lit = 
+    [ EIJump <$> lbl
+    , pure $ EISimple ITrap
+    , pure $ EISimple ILdOn
+    , pure $ EISimple IDup
+    , (EISimple . IPick) <$> stk
+    , pure $ EISimple IDrop
+    , (EISimple . ILdBit) <$> addr
+    , (EISimple . IStBit) <$> addr
+    , pure $ EISimple IAnd
+    , pure $ EISimple IOr
+    , pure $ EISimple INot
+    , (EISimple . ILdCnA) <$> lit
+    , pure $ EISimple ILdM
+    , pure $ EISimple IStM
+    , pure $ EISimple IEq
+    , pure $ EISimple ILt
+    , pure $ EISimple IGt
+    ]
+
+i0 = instructions (Identity 0) (Identity 0) (Identity 0) (Identity 0)
+
+cstub1 = unlines (concat (concat q))
+    where
+    l = fmap (\(Identity i) -> (i, xxx [i])) i0
+    l' = groupBy (\(_, C4 a : _) (_, C4 b : _) -> a == b) l
+    q = fmap f l'
+    f [] = error here
+    f [(op, ch)] = [opcase op ch]
+    f is@((op, C4 ic : _) : _)
+--         = undefined -- [["{"] ++ switch ++ ["}"]]
+        = [ swcase (show ic) (show op)
+            [ mkget "subop" (C4 0)
+            , unlines $ fmap ("    "++) $ switch "subop"
+                (fmap (uncurry opcase) (fmap (fmap (drop 1)) is))
+            ]
+            ]
+
+    opcase op (C4 ic : ops) = sw
+        where
+        sw = swcase (show ic) (show op)
+            (zipWith (\i op -> mkget ("f" ++ show i) op) [0..] ops)
+    opcase _ _ = error here
+
+    switch val cases =
+        [ "switch ( " ++ val ++ " ) {" ]
+        ++ fmap (unlines . fmap ("    "++)) cases ++
+        [ "}" ]
+
+    swcase val comment body =
+        [ "case ( " ++ val ++ " ) { //" ++ comment ]
+        ++ fmap ("    "++) (body ++ ["break;"]) ++
+        [ "}"
+        ]
+
+    mkget n C4 {} = "const uint8_t " ++ n ++ " = get4(blob, addr);";
+    mkget n C8 {} = "const uint8_t " ++ n ++ " = get8(blob, addr);";
+    mkget n C12{} = "const uint16_t " ++ n ++ " = get12(blob, addr);";
+    mkget n C16{} = "const uint16_t " ++ n ++ " = get12(blob, addr);";
 
 asCArray :: L.ByteString -> String
 asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
@@ -198,3 +226,6 @@ main = do
     print (here, B16.encode $ xxy $ xxx p)
     print (here, xx0 $ xxz $ xxy $ xxx p)
     print (here, xxx $ fmap runIdentity i0)
+--     putStrLn cstub
+    putStrLn cstub1
+
