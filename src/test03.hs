@@ -155,41 +155,49 @@ i0 = instructions (Identity 0) (Identity 0) (Identity 0) (Identity 0)
 
 cstub1 = unlines (concat (concat q))
     where
+
     l = fmap (\(Identity i) -> (i, xxx [i])) i0
     l' = groupBy (\(_, C4 a : _) (_, C4 b : _) -> a == b) l
     q = fmap f l'
-    f [] = error here
-    f [(op, ch)] = [opcase op ch]
-    f is@((op, C4 ic : _) : _)
---         = undefined -- [["{"] ++ switch ++ ["}"]]
-        = [ swcase (show ic) (show op)
+
+    f []         = error here
+    f [(op, ch)] = [ opcase op ch ]
+    f is         = [ subop is ]
+
+    subop is@((op, ops@(C4 ic : _)) : _) = swcase (show ic) (show op)
             [ mkget "subop" (C4 0)
-            , unlines $ fmap ("    "++) $ switch "subop"
+            , unlines $ indentBlock $ switch "subop"
                 (fmap (uncurry opcase) (fmap (fmap (drop 1)) is))
             ]
-            ]
 
-    opcase op (C4 ic : ops) = sw
+    opcase op (C4 ic : ops) = swcase (show ic) (show op) (argLoads ++ [opCall])
         where
-        sw = swcase (show ic) (show op)
-            (zipWith (\i op -> mkget ("f" ++ show i) op) [0..] ops)
+        argNames = zipWith (\i _ -> "f" ++ show i) [0..] ops
+        argLoads = zipWith (\an op -> mkget an op) argNames ops
+        opCall = mkopstub op ++ "(" ++ intercalate ", " argNames ++ ");"
     opcase _ _ = error here
 
     switch val cases =
         [ "switch ( " ++ val ++ " ) {" ]
-        ++ fmap (unlines . fmap ("    "++)) cases ++
+        ++ fmap (unlines . indentBlock) cases ++
         [ "}" ]
 
     swcase val comment body =
-        [ "case ( " ++ val ++ " ) { //" ++ comment ]
-        ++ fmap ("    "++) (body ++ ["break;"]) ++
-        [ "}"
-        ]
+        [ "case " ++ val ++ " : { //" ++ comment ]
+        ++ indentBlock (body ++ ["break;"]) ++
+        [ "}" ]
+
+    indentBlock = fmap ("    "++)
 
     mkget n C4 {} = "const uint8_t " ++ n ++ " = get4(blob, addr);";
     mkget n C8 {} = "const uint8_t " ++ n ++ " = get8(blob, addr);";
     mkget n C12{} = "const uint16_t " ++ n ++ " = get12(blob, addr);";
     mkget n C16{} = "const uint16_t " ++ n ++ " = get12(blob, addr);";
+
+    mkopstub (EISimple op) = "op_" ++ name
+        where
+        name = head $ words $ show op
+    mkopstub (EIJump _) = "op_jump"
 
 asCArray :: L.ByteString -> String
 asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
