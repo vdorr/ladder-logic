@@ -9,14 +9,11 @@ import Prelude hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative --hiding (fail)
 import Control.Monad hiding (fail)
-import Data.Bifunctor
 import Data.Foldable
 
 import Language.Ladder.Utils
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
-
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -90,71 +87,6 @@ operand :: DgP Operand
 operand
     = variable
     <|> Lit <$> number
-
---------------------------------------------------------------------------------
-
--- test p pp = do
---     current <- currentPos
---     x       <- p
---     next    <- currentPos
---     y       <- pp current x
---     setPos next
---     return (x, y)
-
--- test1 mapPos p pp = do
---     begin <- currentPos
---     x     <- p
---     next  <- currentPos
---     setPos (mapPos begin)
---     y     <- pp x
---     setPos next
---     return (x, y)
-
-colocated
-    :: (DgExt -> (Int, (Int, b)))
-    -> SFM (DgPState tok) t
-    -> (t -> SFM (DgPState tok) b1)
-    -> SFM (DgPState tok) b1
-colocated mapPos p pp = do
-    begin <- currentPos
---     traceShowM (here, lbl, "--->>", begin)
-    x     <- p
---     traceShowM (here, lbl, begin)
-    next  <- currentPos
---     traceShowM (here, lbl, "setPos")
-    qq <- setPosOrBlur (mapPos begin)
---     traceShowM (here, lbl, "begin:", begin, "next:", next, "mapped:", mapPos begin, qq)
-    y     <- pp x
-    setPos next
-    p <- currentPosM
---     traceShowM (here, lbl, "<<---", p)
-    return y
-
-
---TODO should be usable also for block labels
--- above0_ p pp = test p $ \(ln, co) _ -> setPos (ln - 1, co) >> pp
--- below0_ p pp = test p $ \(ln, co) _ -> setPos (ln + 1, co) >> pp
-
--- above0 p pp = test p $ \(ln, co) x -> setPos (ln - 1, co) >> pp x
--- below0 p pp = test p $ \(ln, co) x -> setPos (ln + 1, co) >> pp x
-
--- above1_ p pp = test1 (\(ln, co) -> (ln - 1, co)) p (const pp)
--- above1_ p pp = above1 p (const pp)
--- above1 = test1 (\(ln, co) -> (ln - 1, co))
-
-below
-    :: SFM (DgPState tok) t
-    -> (t -> SFM (DgPState tok) b)
-    -> SFM (DgPState tok) b
-below = colocated (\(ln, co) -> (ln + 1, co))
-
-above_
-    :: SFM (DgPState tok) a
-    -> SFM (DgPState tok) b
-    -> SFM (DgPState tok) (a, b)
-above_ p pp = colocated (\(ln, co) -> (ln - 1, co))
-    (p)
-    (\x -> pp >>= \y -> return (x, y))
 
 --------------------------------------------------------------------------------
 
