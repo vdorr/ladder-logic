@@ -342,7 +342,7 @@ eval = f
     f st@(a:b:ws, os, m) IOr        = pure ((a||b):ws, os, m)
     f st@(a:ws,   os, m) INot       = pure (not a:ws,  os, m)
 
---     f _ i = error $ show (here, i)
+    f _                  i          = error $ show (here, i)
 
 --     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
 --     f st@(ItSt ws     (Var n:os) m)  ILdM

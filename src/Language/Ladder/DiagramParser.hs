@@ -11,8 +11,6 @@ import Data.Traversable
 
 import Language.Ladder.Zipper
 
-import Debug.Trace
-
 --------------------------------------------------------------------------------
 
 -- |Returns number of remaining tokens
