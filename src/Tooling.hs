@@ -160,6 +160,7 @@ generate emit nodeToSink asts = go ([], asts)
         f (x:stk) (Device d b) = do
             case d of
                  And (Var addr) -> emit [ILdBit addr, IAnd]
+                 AndN (Var addr) -> emit [ILdBit addr, INot, IAnd]
                  St (Var addr)  -> emit [IStBit addr]
                  _ -> error here
             go (p:stk, (stubs, b):xs)
