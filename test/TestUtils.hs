@@ -6,6 +6,7 @@ import Data.List
 import Text.Read
 import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
+import Control.Monad
 
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
@@ -26,21 +27,21 @@ data LadderTest = T01
 
 --------------------------------------------------------------------------------
 
-runLadderTest :: LadderTest -> Cofree (Diagram () Dev String) DgExt -> IO ()
-runLadderTest test@T01{} ast = do
-    print here
+runLadderTest :: Bool -> LadderTest -> Cofree (Diagram () Dev String) DgExt -> IO Bool
+runLadderTest verbose test@T01{} ast = do
+    when verbose $ print here
 
     prog <- generateStk ast
 
     let xxy = evalTestVect'' prog (watch test) (testVect test)
-    print (here, xxy)
+    when verbose $ print (here, xxy)
     let Right tr2 = xxy
-    putStrLn $ unlines $ prettyTrace $ zip (watch test) $ transpose tr2
+    when verbose $ putStrLn $ unlines $ prettyTrace $ zip (watch test) $ transpose tr2
 
     let passed = expected test == tr2
-    print (here, passed, if passed then "PASSED" else "FAILED")
+    when verbose $ print (here, passed, if passed then "PASSED" else "FAILED")
 
-    return ()
+    return passed
 
 --------------------------------------------------------------------------------
 
@@ -54,7 +55,7 @@ parseOrDie lxs = do
 #endif
     case applyDgp parseLadder zp of
         Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
-            print (here, "--------------------------------------------------")
+--             print (here, "--------------------------------------------------")
             return ast
         Left err -> fail $ show (here, err)
 

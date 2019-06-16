@@ -14,7 +14,6 @@ import Data.Text (Text)
 
 --------------------------------------------------------------------------------
 
--- import Preprocess (ParseErr(..), withPos)
 type ParseErr = String
 
 instance ShowErrorComponent ParseErr where
@@ -111,6 +110,8 @@ renderLexeme t = case t of
     Name         a   -> a
     Comment      a   -> "(*" ++ a ++ "*)"
     Pragma       a   -> "{" ++ a ++ "}"
+
+--------------------------------------------------------------------------------
 
 lexeme :: Parsec ParseErr Text (Tok Text)
 lexeme

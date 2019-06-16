@@ -45,7 +45,9 @@ import TestUtils
 preproc5'
     :: Text
     -> Either Text [ (Int, [((Int, Int), Tok Text)]) ]
-preproc5' = fmap (stripPos . dropWhitespace) . runLexer
+preproc5' = preproc . runLexer
+    where
+    preproc = fmap (stripPos . dropWhitespace)
 
 -- test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
 -- test7 = (breakLines . filter (not.isWsTok.snd)) <$> lexerP
@@ -256,13 +258,13 @@ ladderTests = testGroup "Ladder parser"
         (fmap (const ()) . fst) <$> dgParse t00
 --             @?= Right ( Pos (-1,-1) :< LadderParser.End )
             @?= Right (() :< Source (() :< End))
-    , testCase "test00" $ fullyConsumed t00
+    , testCase "test00" $ assertFullyConsumed t00
     , testCase "test01" $ fullyConsumed' test01
-    , testCase "test04" $ fullyConsumed t04
+    , testCase "test04" $ assertFullyConsumed t04
 --     , testCase "test05" $
 --         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t05))
 --             @?= Right (Zp [] [])
-    , testCase "test07a" $ fullyConsumed t07a
+    , testCase "test07a" $ assertFullyConsumed t07a
 --     , testCase "test07" $
 --         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
 --             @?= Right (Zp [] [])
@@ -302,7 +304,7 @@ ladderTests = testGroup "Ladder parser"
     Right t07 = test07_tokenized
     Right t07a = test07a_tokenized
 
-fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
+assertFullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
 getDg = dgTrim.psStr.snd
 dgParse = applyDgp parseLadder . mkDgZp
 
@@ -586,21 +588,25 @@ fileTestsNeg path = do
                         _ -> return ()
     return $ testGroup "File tests - negative" tests
 
---TODO TODO exercise embedded test vectors
 fileTests :: FilePath -> IO TestTree
 fileTests path = do
     files <- filter ((".txt"==).takeExtension) <$> listDirectory path
 --     print (here, files)
 
     tests <- for files $ \fn -> do
-        src <- TIO.readFile $ path </> fn
+--         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
-            Right lxs <- return $ preproc5' src
---             fullyConsumed lxs
+            (tst, lxs) <- fmap dropWhitespace <$> loadLadderTest (path </> fn)
             let blocks = basicBlocks' lxs
---             return ()
-            for_ blocks $ \(_, lxs') ->
-                fullyConsumed lxs'
+            for_ blocks $ \(_, lxs') -> do
+                case tst of
+                    Nothing -> do
+                        Right remaining <- return $ getDg <$> dgParse lxs'
+                        remaining @?= Zp [] []
+                    Just t -> do
+                        ast <- parseOrDie lxs'
+                        passed <- runLadderTest False t ast
+                        passed @?= True
 
     return $ testGroup "File tests - positive" tests
 

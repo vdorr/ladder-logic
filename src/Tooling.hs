@@ -28,6 +28,10 @@ import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
+verbose = False
+
+--------------------------------------------------------------------------------
+
 data D
     = R Int
 --     | DD -- dummy
@@ -268,7 +272,7 @@ generateStk :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String In
 generateStk ast' = do
     let ast = parseOps ast'
 
-    print (here, "-----------------------")
+    when verbose $ print (here, "-----------------------")
 
     --chop
     let Just (x1_0 ::[Cofree (Diagram () (Op Operand String) String) DgExt])
@@ -298,20 +302,22 @@ generateStk ast' = do
     let nodesMerged :: [(DgExt, [DgExt])] = foldMap (snd . fst) q
     let allNodes = nub $ fmap fst nodesMerged ++ foldMap snd nodesMerged
     let sinksLeadingToNodes = filter (flip elem allNodes) allStubs --aka sinks
-    print (here, "allNodes:", allNodes)
-    print (here, "nodesMerged:", nodesMerged)
-    print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
+    when verbose $ do
+        print (here, "allNodes:", allNodes)
+        print (here, "nodesMerged:", nodesMerged)
+        print (here, "sinksLeadingToNodes:", sinksLeadingToNodes)
     let oldNodeToNewNode = nodeTable nodesMerged
     let nodeToSink
             = fmap (\p -> (fromJust $ lookup p oldNodeToNewNode, p)) sinksLeadingToNodes
-    print (here, "nodeToSink:", nodeToSink)
+    when verbose $ print (here, "nodeToSink:", nodeToSink)
 
-    print (here, "-----------------------")
-    for_ q $ \((stubs, _), tr) -> do
-        print $ filter (flip elem allNodes) stubs
-        print tr
+    when verbose $ do
+        print (here, "-----------------------")
+        for_ q $ \((stubs, _), tr) -> do
+            print $ filter (flip elem allNodes) stubs
+            print tr
 
-    print (here, "-----------------------")
+        print (here, "-----------------------")
     let subTrees = fmap (\((stubs, _), tr) -> (stubs, tr)) q
 --     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
 --         subTrees

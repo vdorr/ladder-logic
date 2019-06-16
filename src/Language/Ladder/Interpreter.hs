@@ -21,6 +21,7 @@ import Language.Ladder.Analysis
 
 --------------------------------------------------------------------------------
 
+-- |Memory cell value, also represents its type and default value
 data V
     = X Bool 
     | I Int
@@ -40,6 +41,8 @@ data Op n s
 
 data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
     deriving Show
+
+--------------------------------------------------------------------------------
 
 data ExtendedInstruction ca a w
     = EIJump ca
@@ -198,6 +201,7 @@ emitBasicDevice d
 
 --------------------------------------------------------------------------------
 
+--FIXME IO
 generateStk2
     :: Cofree (Diagram () Dev String) DgExt
     -> IO [ExtendedInstruction String String Int]
