@@ -101,6 +101,10 @@ updateMemory old new = nubBy (on (==) fst) $ new ++ old --yeah performace be dam
 type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
 
+-- |Returns names of signals in test vector
+testVectSignals :: TestVect -> [VarName]
+testVectSignals = nub . foldMap (fmap fst . snd)
+
 --------------------------------------------------------------------------------
 
 vect01 :: TestVect
@@ -330,9 +334,9 @@ evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
 evalBlock p st = foldlM eval st p
 
 evalTestVect''
-    :: [Instruction String Int]
-    -> [VarName]
-    -> [(Int, [(VarName, V)])]
+    :: [Instruction String Int] -- ^program
+    -> [VarName] -- ^watched memory variables
+    -> [(Int, [(VarName, V)])] -- ^test vector
     -> Either (ItpSt, String) [[V]]
 evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
     where
