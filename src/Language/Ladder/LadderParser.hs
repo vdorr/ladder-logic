@@ -62,8 +62,6 @@ type Next = MoveToNext (Tok Text)
 
 --------------------------------------------------------------------------------
 
---TODO
---vertical combinators
 #if 0
 labelOnTop
     :: SFM (DgPState (Tok txt)) a -- ^Device parser e.g. "(S)"
@@ -81,19 +79,6 @@ labelOnTop' :: SFM (DgPState (Tok Text)) a -> SFM (DgPState (Tok Text)) (String,
 labelOnTop' p = bimap unpack id <$> labelOnTop p
 #endif
 
---TODO
---TODO
---TODO
---vertical combinators
--- p `withAbove` name
---   `withBelow` (optional name)
---TODO
---TODO
---TODO
-
--- |If a succeeds, parse also b positioned above first char of a
-withAbove :: SFM (DgPState tok) a -> SFM (DgPState tok) b -> SFM (DgPState tok) (a, b)
-withAbove a b = undefined
 
 variable :: DgP Operand
 variable = (Var . unpack) <$> name

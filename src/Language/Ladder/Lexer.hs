@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE OverloadedStrings, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Ladder.Lexer where
 
@@ -167,18 +167,6 @@ runLexer
 
 --------------------------------------------------------------------------------
 
-test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
-test7 = (breakLines . filter (not.isWsTok.snd)) <$> lexerP
-
-preproc5'
-    :: Text
-    -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
-preproc5'
-    = bimap (T.pack . errorBundlePretty) id
-    . parse test7 "(file)"
-
---------------------------------------------------------------------------------
-
 -- |Discard comments and pragmas
 dropWhitespace
     :: [(p, [((p, p), Tok a)])]
@@ -243,12 +231,11 @@ getPragma (Pragma p : xs) = Just p
 getPragma (_ : xs)        = getPragma xs
 getPragma _               = Nothing
 
-
 -- should be called "dropPos" or something like that
 -- |Discard position informations from list of lexemes
-tokens
+dropPos
     :: [(p, [((p, p), Tok a)])]
     -> [Tok a]
-tokens = foldMap (fmap snd . snd)
+dropPos = foldMap (fmap snd . snd)
 
 --------------------------------------------------------------------------------

@@ -39,11 +39,26 @@ import TestUtils
 
 --------------------------------------------------------------------------------
 
-preproc4'' :: Text -> Either Text [(Int, [((Int, Int), Tok Text)])]
-preproc4'' = fmap stripPos . preproc5'
+--discards whitespace tokens
+preproc5'
+    :: Text
+    -> Either Text [ (Int, [((Int, Int), Tok Text)]) ]
+preproc5' = fmap (stripPos . dropWhitespace) . runLexer
+
+-- test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+-- test7 = (breakLines . filter (not.isWsTok.snd)) <$> lexerP
+-- 
+-- preproc5'
+--     :: Text
+--     -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+-- preproc5'
+--     = bimap (T.pack . errorBundlePretty) id
+--     . parse test7 "(file)"
+
+--------------------------------------------------------------------------------
 
 preproc5'' :: Text -> Either String [(Int, [((Int, Int), Tok Text)])]
-preproc5'' = bimap unpack stripPos . preproc5'
+preproc5'' = bimap unpack id . preproc5'
 
 testPreproc4 :: Text -> Either Text [[(Tok Text)]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
@@ -51,13 +66,13 @@ testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 testPreproc5 :: Text -> Either Text [Tok Text]
 testPreproc5 = fmap concat . testPreproc4
 
---keep comments and pragmas
-testPreproc6 :: Text -> Either Text [[(Tok Text)]]
-testPreproc6 = fmap (fmap (snd . fmap (fmap snd))) . runLexer
+--keep comments and pragmas, drop position info
+-- runLexer1 :: Text -> Either Text [[(Tok Text)]]
+-- runLexer1 = fmap (fmap (snd . fmap (fmap snd))) . runLexer
 
---keep comments and pragmas
+--keep comments and pragmas, drop position info, concat lines
 testLexer :: Text -> Either Text [Tok Text]
-testLexer = fmap concat . testPreproc6
+testLexer = fmap dropPos . runLexer
 
 tokenizerTests = testGroup "Tokenizer"
     [ testCase "empty string" $
@@ -253,7 +268,7 @@ ladderTests = testGroup "Ladder parser"
 
 
 --     fullyConsumed' tk
---         = getDg <$> (either (id) (dgParse) (preproc4'' tk))
+--         = getDg <$> (either (id) (dgParse) (preproc5' tk))
 --         @?= Right (Zp [] [])
 
     fullyConsumed' tk = parse tk @?= Right (Zp [] [])
@@ -271,13 +286,13 @@ fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
 getDg = dgTrim.psStr.snd
 dgParse = applyDgp test002' . mkDgZp
 
-test00_tokenized = preproc4'' test00
+test00_tokenized = preproc5' test00
 
--- test01_tokenized = preproc4'' test01
-test04_tokenized = preproc4'' test04
-test05_tokenized = preproc4'' test05
-test07_tokenized = preproc4'' test07
-test07a_tokenized = preproc4'' test07a
+-- test01_tokenized = preproc5' test01
+test04_tokenized = preproc5' test04
+test05_tokenized = preproc5' test05
+test07_tokenized = preproc5' test07
+test07a_tokenized = preproc5' test07a
 
 test00 =
     [text|
@@ -459,7 +474,7 @@ prop_sttsort =
 --------------------------------------------------------------------------------
 
 testBox ln input
-    = bimap (Data.Text.unpack) mkDgZp (preproc4'' input)
+    = bimap (Data.Text.unpack) mkDgZp (preproc5' input)
     >>= applyDgp (box001 ln)
 -- fmap (dgTrim.psStr.snd) 
 
@@ -485,8 +500,8 @@ boxTests = testGroup "Box parser"
             @?= Right (Zp [] [])
     ]
     where
-    Right box01_tokenized = preproc4'' box01
---     Right box01b_tokenized = preproc4'' box01b
+    Right box01_tokenized = preproc5' box01
+--     Right box01b_tokenized = preproc5' box01b
 
 box01 =
     [text|
@@ -542,7 +557,7 @@ fileTestsNeg path = do
     tests <- for files $ \fn -> do
         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
-            case preproc4'' src of
+            case preproc5' src of
                  Left _ -> return () --preproc failed -> test succeeeded
                  Right lxs ->
                     case getDg <$> dgParse lxs of
@@ -560,7 +575,7 @@ fileTests path = do
     tests <- for files $ \fn -> do
         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
-            Right lxs <- return $ preproc4'' src
+            Right lxs <- return $ preproc5' src
 --             fullyConsumed lxs
             let blocks = basicBlocks' lxs
 --             return ()

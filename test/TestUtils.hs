@@ -67,7 +67,7 @@ loadLadderTest file = do
         Right x -> do
 --             print (here, getPragma $ tokens x)
 --             let Just pgma = fmap (filter (/='\\') . T.unpack) $getPragma $ tokens x
-            let pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ tokens x
+            let pgma = fmap (filter (/='\\') . T.unpack) $ getPragma $ dropPos x
 --             print ((read pgma) :: LadderTest)
             return (pgma >>= readMaybe, x)
 --                     fail $ show (here, "no embedded test found")

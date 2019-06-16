@@ -153,16 +153,17 @@ instructions stk lbl addr lit =
 
 i0 = instructions (Identity 0) (Identity 0) (Identity 0) (Identity 0)
 
+cstub1 :: String
 cstub1 = unlines (concat (concat q))
     where
 
     l = fmap (\(Identity i) -> (i, xxx [i])) i0
     l' = groupBy (\(_, C4 a : _) (_, C4 b : _) -> a == b) l
-    q = fmap f l'
+    (_stubs, q) = unzip $ fmap f l'
 
     f []         = error here
-    f [(op, ch)] = [ opcase op ch ]
-    f is         = [ subop is ]
+    f [(op, ch)] = ([], [ opcase op ch ])
+    f is         = ([], [ subop is ])
 
     subop is@((op, ops@(C4 ic : _)) : _) = swcase (show ic) (show op)
             [ mkget "subop" (C4 0)
