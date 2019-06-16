@@ -19,7 +19,7 @@ import NeatInterpolation
 import Data.Text (Text, pack, unpack)
 -- import qualified Data.Text
 import Data.Bifunctor
-import GHC.Exts --hiding (toList)
+-- import GHC.Exts --hiding (toList)
 import Data.Function
 import Data.Traversable
 import Data.Foldable hiding (toList)
@@ -34,6 +34,8 @@ import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
+
+-- import Debug.Trace
 
 import TestUtils
 
@@ -73,6 +75,14 @@ testPreproc5 = fmap concat . testPreproc4
 --keep comments and pragmas, drop position info, concat lines
 testLexer :: Text -> Either Text [Tok Text]
 testLexer = fmap dropPos . runLexer
+
+-- simpleResult :: (Bifunctor f, IsList e) => f e a -> f Bool a
+-- simpleResult = bimap ((>0).length.toList) id
+
+simpleResult :: (Bifunctor f, Eq e, Monoid e) => f e a -> f Bool a
+simpleResult = bimap (/=mempty) id
+
+--------------------------------------------------------------------------------
 
 tokenizerTests = testGroup "Tokenizer"
     [ testCase "empty string" $
@@ -193,9 +203,6 @@ genToken =
     smallNumber = Gen.int (Range.linear 0 999999)
     number = Gen.int (Range.linear 0 maxBound)
 
-simpleResult :: (Bifunctor f, IsList e) => f e a -> f Bool a
-simpleResult = bimap ((>0).length.toList) id
-
 zipperTests = testGroup "Zipper"
     [ testCase "from/to list" $
         zpToList <$> (stepRight $ zpFromList [1,2,3,4]) @=? Just [1,2,3,4]
@@ -273,8 +280,9 @@ ladderTests = testGroup "Ladder parser"
 
     fullyConsumed' tk = parse tk @?= Right (Zp [] [])
 
+    parse :: Text -> Either String (Dg (Tok Text))
     parse = preproc5'' >=> dgParse >=> return.getDg
-    
+
     Right t00 = test00_tokenized
 --     Right t01 = test01_tokenized
     Right t04 = test04_tokenized
@@ -473,6 +481,7 @@ prop_sttsort =
 
 --------------------------------------------------------------------------------
 
+testBox :: Int -> Text -> Either String ((), DgPState (Tok Text))
 testBox ln input
     = bimap (Data.Text.unpack) mkDgZp (preproc5' input)
     >>= applyDgp (box001 ln)
