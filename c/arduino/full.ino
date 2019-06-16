@@ -26,6 +26,10 @@
 
 */
 
+/*
+arduino --board arduino:avr:uno --port /dev/ttyACM0 --upload full.ino
+*/
+
 #include <EEPROM.h>
 #include <ModbusSlave.h>
 

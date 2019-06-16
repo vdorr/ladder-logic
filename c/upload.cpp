@@ -4,6 +4,10 @@
 
 #include <modbus/modbus.h>
 
+/*
+gcc upload.cpp -lmodbus
+*/
+
 int main() {
 	modbus_t *ctx = modbus_new_rtu("/dev/ttyACM0", 9600, 'N', 8, 1);
 
