@@ -304,7 +304,7 @@ ladderTests = testGroup "Ladder parser"
 
 fullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
 getDg = dgTrim.psStr.snd
-dgParse = applyDgp test002' . mkDgZp
+dgParse = applyDgp parseLadder . mkDgZp
 
 test00_tokenized = preproc5' test00
 

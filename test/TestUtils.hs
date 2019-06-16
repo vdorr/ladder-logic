@@ -52,7 +52,7 @@ parseOrDie lxs = do
 #if 0
     forM_ (zpToList zp) (print . (here,))
 #endif
-    case applyDgp test002' zp of
+    case applyDgp parseLadder zp of
         Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
             print (here, "--------------------------------------------------")
             return ast

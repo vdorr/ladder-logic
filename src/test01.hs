@@ -246,7 +246,7 @@ main = do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 forM_ (zpToList zp) (print . (here,))
-                case applyDgp test003' zp of
+                case applyDgp parseLadderLiberal zp of
                     Left err -> print (here, err)
                     Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
                         print (here, "--------------------------------------------------")

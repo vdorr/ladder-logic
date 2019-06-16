@@ -2,7 +2,16 @@
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-module Language.Ladder.LadderParser where
+module Language.Ladder.LadderParser 
+    ( Diagram(..)
+    , mapDg
+    , Operand(..)
+    , Dev(..)
+    , parseLadder
+    , parseLadderLiberal
+-- *for stesting only
+    , box001
+    ) where
 
 import Data.Text (Text, unpack)
 import Prelude hiding (fail)
@@ -17,6 +26,7 @@ import Language.Ladder.DiagramParser
 
 --------------------------------------------------------------------------------
 
+-- |Ladder AST type
 data Diagram c d s a
     = Source a   -- ^start of power rail
     | Sink       -- ^where wire connects to (implied) right rail
@@ -43,9 +53,10 @@ mapDg z x y = f
     f (Cont c   a) = Cont   (z c) a
 --     f  Stub        = Stub
 
+-- |Contact operand, located above or below
 data Operand
-    = Var String
-    | Lit Int
+    = Var String -- ^name of memory location
+    | Lit Int -- ^integer literal, usually allowed only below contact
     deriving (Show, Eq)
 
 data Dev = Dev String [Operand]
@@ -74,19 +85,16 @@ type Next = MoveToNext (Tok Text)
 -- labelOnTop' :: SFM (DgPState (Tok Text)) a -> SFM (DgPState (Tok Text)) (String, a)
 -- labelOnTop' p = bimap unpack id <$> labelOnTop p
 
-
 variable :: DgP Operand
 variable = (Var . unpack) <$> name
 
-number :: DgP Int
+number :: DgP Operand
 number = do
     Number n <- eat
-    return n
+    return (Lit n)
 
 operand :: DgP Operand
-operand
-    = variable
-    <|> Lit <$> number
+operand = variable <|> number
 
 --------------------------------------------------------------------------------
 
@@ -145,17 +153,19 @@ coilType    : ...
 
 -}
 
-test002' :: DgP (Cofree (Diagram () Dev String) DgExt)
-test002'
+parseLadder :: DgP (Cofree (Diagram () Dev String) DgExt)
+parseLadder
     = setDir goDown
     *> ((:<) <$> currentPos <*> fmap Source vline'2)
     <* dgIsEmpty
 
--- like test002' but do not check if all consumed
-test003' :: DgP (Cofree (Diagram () Dev String) DgExt)
-test003'
+-- like 'parseLadder' but do not check if all lexemes consumed
+parseLadderLiberal :: DgP (Cofree (Diagram () Dev String) DgExt)
+parseLadderLiberal
     = setDir goDown
     *> ((:<) <$> currentPos <*> fmap Source vline'2)
+
+--------------------------------------------------------------------------------
 
 node2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 node2 = (:<) <$> currentPos <*> (Language.Ladder.LadderParser.Node <$> node2')
@@ -212,20 +222,16 @@ device p = do
     (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline'2)
 
 coil2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-coil2 = do
---     traceShowM (here, "trying Coil")
-    device $ do
-        Coil f <- eat
-        return (False, "(" <> unpack f <> ")")
+coil2 = device $ do
+    Coil f <- eat
+    return (False, "(" <> unpack f <> ")")
 
 contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-contact2 = do
---     traceShowM (here, "trying Contact")
-    device $ do
-        Contact f <- eat
-        return (elem f cmp, "[" <> unpack f <> "]")
-        where
-        cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
+contact2 =  device $ do
+    Contact f <- eat
+    return (elem f cmp, "[" <> unpack f <> "]")
+    where
+    cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
 
 --------------------------------------------------------------------------------
 
