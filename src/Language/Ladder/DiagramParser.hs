@@ -127,18 +127,21 @@ setPos (ln, (co, _)) = do
     Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
     put (DgPSt b zp' ps True)
 
+-- |Clear 'psFocused' flag if there is not lexeme at desired position
+-- used by vertical diagram combinators
 setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState tok) (Bool)
 setPosOrBlur (ln, (co, _)) = do
     DgPSt b zp ps _ <- get
     let zp' = move ln co zp --FIXME can only move to direct neighbour!!!!!!!
     case zp' of
         Just zp' ->
-                traceShowM (here, ln, "setPosOrBlur")
-                >> put (DgPSt b zp' ps True )
-                >> return True
+--             traceShowM (here, ln, "setPosOrBlur") >>
+            put (DgPSt b zp' ps True ) >>
+            return True
         Nothing  ->
-                traceShowM (here, ln, "setPosOrBlur") >> put (DgPSt b zp  ps False)
-                >> return False
+--             traceShowM (here, ln, "setPosOrBlur") >> 
+            put (DgPSt b zp  ps False)
+            >> return False
 
 --------------------------------------------------------------------------------
 

@@ -95,7 +95,7 @@ operand
 
 --------------------------------------------------------------------------------
 
-#if 0
+#if 1
 test p pp = do
     current <- currentPos
     x       <- p
@@ -115,17 +115,17 @@ test1 mapPos p pp = do
 
 test11 lbl mapPos p pp = do
     begin <- currentPos
-    traceShowM (here, lbl, "--->>", begin)
+--     traceShowM (here, lbl, "--->>", begin)
     x     <- p
-    traceShowM (here, lbl, begin)
+--     traceShowM (here, lbl, begin)
     next  <- currentPos
-    traceShowM (here, lbl, "setPos")
+--     traceShowM (here, lbl, "setPos")
     qq <- setPosOrBlur (mapPos begin)
-    traceShowM (here, lbl, "begin:", begin, "next:", next, "mapped:", mapPos begin, qq)
+--     traceShowM (here, lbl, "begin:", begin, "next:", next, "mapped:", mapPos begin, qq)
     y     <- pp x
     setPos next
     p <- currentPosM
-    traceShowM (here, lbl, "<<---", p)
+--     traceShowM (here, lbl, "<<---", p)
     return y
 
 
@@ -152,18 +152,13 @@ above11_ p pp = test11 "above" (\(ln, co) -> (ln - 1, co))
     (\x -> pp >>= \y -> return (x, y))
 
 withOperands11 p
-    = (below11
-        (above11_ 
-            (traceShowM here >> 
-                (p) <* (traceShowM here))
-            (currentPos >>= \pos -> traceShowM (here, pos) >> variable
-                <* (currentPos >>= \pos -> traceShowM (here, pos))
-                ))
-        optOper)
-    <* (currentPos >>= \pos -> traceShowM (here, pos))
+    = below11
+        (above11_ p variable)
+        optOper
+
     where
-    optOper ((True, a), op) = undefined -- (op,,a) <$> fmap Just operand
-    optOper ((_   , a), op) = traceShowM here >> return (op, Nothing, a)
+    optOper ((True, a), op) = (op,,a) <$> fmap Just operand
+    optOper ((_   , a), op) = return (op, Nothing, a)
 
 
 withOperands1 p = below (above_ p variable) optionalOperand
@@ -184,7 +179,7 @@ withOperands2 p
 withOperands
     :: SFM (DgPState (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
     -> SFM (DgPState (Tok Text)) (Operand, Maybe Operand, a)
-#if 0
+#if 1
 withOperands = withOperands11
 -- withOperands p = above11_ p variable >>= (\((_, b), a) -> return (a, Nothing, b) )
 #else

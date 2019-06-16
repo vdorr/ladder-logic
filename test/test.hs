@@ -82,8 +82,12 @@ testLexer = fmap dropPos . runLexer
 simpleResult :: (Bifunctor f, Eq e, Monoid e) => f e a -> f Bool a
 simpleResult = bimap (/=mempty) id
 
+isEmpty :: (Eq a, Monoid a) => a -> Bool
+isEmpty = (==mempty)
+
 --------------------------------------------------------------------------------
 
+tokenizerTests :: TestTree
 tokenizerTests = testGroup "Tokenizer"
     [ testCase "empty string" $
         (@?= Right []) $ testPreproc4  ""
@@ -203,6 +207,9 @@ genToken =
     smallNumber = Gen.int (Range.linear 0 999999)
     number = Gen.int (Range.linear 0 maxBound)
 
+--------------------------------------------------------------------------------
+
+zipperTests :: TestTree
 zipperTests = testGroup "Zipper"
     [ testCase "from/to list" $
         zpToList <$> (stepRight $ zpFromList [1,2,3,4]) @=? Just [1,2,3,4]
@@ -220,6 +227,9 @@ zipperTests = testGroup "Zipper"
         tip (focus (zpFromList [])) @=? (Nothing @())
     ]
 
+--------------------------------------------------------------------------------
+
+dgpTests :: TestTree
 dgpTests = testGroup "Diagram parser"
     [ testCase "length" $
         dgLength (mkDgZp []) @=? 0
@@ -238,7 +248,9 @@ dgpTests = testGroup "Diagram parser"
     where
     someDg = Zp [] [(1, Zp [] [((1, 1), VLine)])]
 
+--------------------------------------------------------------------------------
 
+ladderTests :: TestTree
 ladderTests = testGroup "Ladder parser"
     [ testCase "test00" $
         (fmap (const ()) . fst) <$> dgParse t00
@@ -483,9 +495,8 @@ prop_sttsort =
 
 testBox :: Int -> Text -> Either String ((), DgPState (Tok Text))
 testBox ln input
-    = bimap (Data.Text.unpack) mkDgZp (preproc5' input)
+    = mkDgZp <$> (preproc5'' input)
     >>= applyDgp (box001 ln)
--- fmap (dgTrim.psStr.snd) 
 
 boxTests :: TestTree
 boxTests = testGroup "Box parser"
