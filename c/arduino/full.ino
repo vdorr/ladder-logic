@@ -32,7 +32,9 @@
 /* slave id = 1, control-pin = 8, baud = 9600
  */
 #define SLAVE_ID 1
+#if 0
 #define CTRL_PIN 8
+#endif
 #define BAUDRATE 9600
 
 #define PIN_MODE_INPUT 0
@@ -41,12 +43,15 @@
 /**
  *  Modbus object declaration.
  */
-Modbus slave(SLAVE_ID, CTRL_PIN);
+Modbus slave(SLAVE_ID, MODBUS_CONTROL_PIN_NONE);
 
 void setup() {
+
+    pinMode(LED_BUILTIN, OUTPUT);
+
+#if 0
     uint16_t pinIndex;
     uint16_t eepromValue;
-    
     /* set pins for mode.
      */
     for (pinIndex = 3; pinIndex < 14; pinIndex++) {
@@ -63,10 +68,13 @@ void setup() {
                 break;
         }
     }
-    
+#endif
+
+#if 0
     // RS485 control pin must be output
     pinMode(CTRL_PIN, OUTPUT);
-    
+#endif
+
     /* register handler functions.
      * into the modbus slave callback vector.
      */
@@ -170,7 +178,7 @@ uint8_t writeMemory(uint8_t fc, uint16_t address, uint16_t length) {
         value = slave.readRegisterFromBuffer(i);
         
         EEPROM.put(registerIndex * 2, value);
-        
+#if 0
         /* if this register sets digital pins mode, 
          * set the digital pins mode.
          */
@@ -185,6 +193,7 @@ uint8_t writeMemory(uint8_t fc, uint16_t address, uint16_t length) {
                     break;
             }
         }
+#endif
     }
 
     return STATUS_OK;

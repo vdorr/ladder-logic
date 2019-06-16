@@ -9,7 +9,7 @@ module Language.Ladder.LadderParser
     , Dev(..)
     , parseLadder
     , parseLadderLiberal
--- *for stesting only
+-- *for testing only
     , box001
     ) where
 
