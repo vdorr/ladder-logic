@@ -19,6 +19,7 @@ import Control.Monad.Fail
 import Control.Applicative --hiding (fail)
 import Control.Monad hiding (fail)
 import Data.Foldable
+import Data.Functor.Identity
 
 import Language.Ladder.Utils
 import Language.Ladder.Lexer
@@ -40,17 +41,38 @@ data Diagram c d s a
     | Conn c
     deriving (Show, Functor, Eq, Foldable, Traversable)
 
+--TODO lift Conn  <$> (z c) etc
 mapDg :: (c -> c') -> (d -> d') -> (s -> s') -> Diagram c d s a -> Diagram c' d' s' a
-mapDg z x y = f
+mapDg z x y = runIdentity . mapDgA (pure . z) (pure . x) (pure . y)
+-- mapDg z x y = f
+--     where
+--     f (Source   a) = Source       a
+--     f  Sink        = Sink
+--     f  End         = End
+--     f (Device d a) = Device (x d) a
+--     f (Jump s    ) = Jump   (y s)
+--     f (Node     a) = Node         a
+--     f (Conn c    ) = Conn   (z c)
+--     f (Cont c   a) = Cont   (z c) a
+-- --     f  Stub        = Stub
+
+mapDgA
+    :: Applicative f
+    => (c -> f c')
+    -> (d -> f d')
+    -> (s -> f s')
+    -> Diagram c d s a
+    -> f (Diagram c' d' s' a)
+mapDgA z x y = f
     where
-    f (Source   a) = Source       a
-    f  Sink        = Sink
-    f  End         = End
-    f (Device d a) = Device (x d) a
-    f (Jump s    ) = Jump   (y s)
-    f (Node     a) = Node         a
-    f (Conn c    ) = Conn   (z c)
-    f (Cont c   a) = Cont   (z c) a
+    f (Source   a) = pure $ Source     a
+    f  Sink        = pure $ Sink
+    f  End         = pure $ End
+    f (Device d a) =        Device <$> x d <*> pure a
+    f (Jump s    ) =        Jump   <$> y s
+    f (Node     a) = pure $ Node       a
+    f (Conn c    ) =        Conn   <$> z c
+    f (Cont c   a) =        Cont   <$> z c <*> pure a
 --     f  Stub        = Stub
 
 -- |Contact operand, located above or below
@@ -66,7 +88,7 @@ data Dev = Dev String [Operand]
 
 type DgP = SFM DgPSt
 type DgPSt = DgPState (Tok Text)
-type Next = MoveToNext (Tok Text)
+-- type Next = MoveToNext (Tok Text)
 
 --------------------------------------------------------------------------------
 

@@ -20,6 +20,9 @@ import Numeric
 import Data.Functor.Identity
 
 -- import Tooling
+import Language.Ladder.Utils
+import Language.Ladder.DiagramParser
+import Language.Ladder.LadderParser
 import Language.Ladder.Interpreter
 
 import Data.ByteString.Base16.Lazy as B16
@@ -202,6 +205,45 @@ cstub1 = unlines (concat (concat q))
 
 asCArray :: L.ByteString -> String
 asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
+
+--------------------------------------------------------------------------------
+
+data CellType = Bit | BitWithEdge | Word -- | TON | TOF
+    deriving (Show, Read)
+
+-- possibly fetched from config file or pragma
+-- ".var "Start" BitWithEdge"
+type MemoryVariables = [(String, CellType)]
+
+--here vars already have their place in memory
+type MemoryConfiguration = [(String, CellType, Address)]
+
+-- data CellAddress a = Bits Int | Word Int
+zgh :: MemoryConfiguration -> [(String, CellType, Int)]
+zgh = undefined
+
+data Address = BitAddr Int | WordAddr Int
+    deriving (Show, Eq)
+
+data Operand' = Mem Address | Lit Int
+    deriving (Show, Eq)
+
+data Dev' = Dev' String [Operand']
+    deriving (Show, Eq)
+
+assignAddresses
+    :: Cofree (Diagram () Dev String) DgExt
+    -> MemoryConfiguration
+    -> Either String (Cofree (Diagram () Dev' String) DgExt)
+assignAddresses = undefined
+
+allocatMemory :: MemoryVariables -> MemoryConfiguration
+allocatMemory = undefined
+
+--evil approach
+extractVariables :: Cofree (Diagram () Dev String) DgExt -> MemoryVariables
+extractVariables = undefined
+-- data Dev = Dev String [Operand]
 
 --------------------------------------------------------------------------------
 

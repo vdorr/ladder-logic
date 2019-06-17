@@ -42,6 +42,7 @@ runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
 
     prog <- generateStk ast
+--     prog <- generateStk2 ast
 
     let allSigs = testVectSignals (testVect test)
     let displaySigs = allSigs -- or (watch test)

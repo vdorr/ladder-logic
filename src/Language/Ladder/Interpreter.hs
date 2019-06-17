@@ -34,7 +34,7 @@ data Op n s
     | On    -- ^ set wire state to #on
     | St n
 --     | StN | StOn | StOff
-    | Jmp s
+--     | Jmp s
     | Cmp CmpOp n n
     -- | FB String [(String, D)] [(String, D)]
     deriving Show
@@ -311,19 +311,33 @@ parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
 --------------------------------------------------------------------------------
 
 --wire stack count, wire stack, arg stack, memory???
-type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
+-- type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
 
 -- eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
 -- eval2 = undefined
 
--- run2
---     :: ItpSt2
---     -> [(String, [ExtendedInstruction String Int Int16])]
---     -> Either (ItpSt2, String) ItpSt2
--- run2 = undefined
+type Program = [ExtendedInstruction String String Int]
+
+data Trigger = Periodic Int | Memory String
+
+type ItpSt3 = (Int, [(Trigger, Program)], Memory)
+run
+    :: ItpSt2
+    -> [(String, [ExtendedInstruction String String Int])]
+    -> Either (ItpSt3, String) ItpSt3
+run = undefined
+
+type ItpSt2 = (Int, Memory) -- add program counter
+execute
+    :: ItpSt2
+    -> [(String, [ExtendedInstruction String String Int])]
+    -> Either (ItpSt2, String) ItpSt2
+execute = undefined
+
+type Memory = [(String, V)]
 
 -- data ItSt = ItSt [Bool] [V] [(String, V)]
-type ItpSt = ([Bool], [V], [(String, V)])
+type ItpSt = ([Bool], [V], Memory)
 
 eval :: ItpSt -> Instruction String Int -> Either (ItpSt, String) ItpSt
 eval = f
