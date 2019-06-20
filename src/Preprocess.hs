@@ -8,7 +8,7 @@ import Data.Char
 import Text.Megaparsec --as P hiding (runParser', Pos)
 import Text.Megaparsec.Char --as PC
 -- import Text.Megaparsec.Char.Lexer (symbol)
-import Data.Bifunctor
+--import Data.Bifunctor
 -- import Control.Monad hiding (fail)
 
 -- import Control.Applicative.Combinators (between)
@@ -18,7 +18,7 @@ import Data.Text (Text)
 
 -- import Text.Megaparsec.Debug
 -- import Debug.Trace
-import Language.Ladder.Lexer (stripPos, ParseErr(..), withPos)
+import Language.Ladder.Lexer (ParseErr(..)) --stripPos, , withPos
 
 --------------------------------------------------------------------------------
 

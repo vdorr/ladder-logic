@@ -186,6 +186,7 @@ xxxxXxx devs vars nodes nets = do
 	f pwr (Pair _ Sink) = return (pwr, []) -- error $ show (here, "FIXME") --right rail
 	f _ (Pair _ Source{}) = error $ show (here, "should not happen")
 	f _ (Pair _ LadderParser.Label{}) = error "should not happen"
+	f _ _ = error here
 
 	doNode pwr p
 		= case M.lookup p nodes of

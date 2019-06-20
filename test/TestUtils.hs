@@ -32,6 +32,7 @@ getSignal :: String -> TestVect -> [[V]] -> [[V]]
 getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))
     where
     Just i = findIndex ((s==) . fst) slice
+getSignal _ [] = const []
 
 getSignals :: [String] -> TestVect -> [[V]] -> [[V]]
 getSignals sg vect trace = 
@@ -45,7 +46,8 @@ runLadderTest verbose test@T01{} ast = do
 --     prog <- generateStk2 ast
 
     let allSigs = testVectSignals (testVect test)
-    let displaySigs = allSigs -- or (watch test)
+--TODO select signals for display independently from signals for test evaluation
+--     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
 
     let xxy = evalTestVect'' prog allSigs (testVect test)

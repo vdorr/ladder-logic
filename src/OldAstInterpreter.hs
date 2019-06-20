@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ViewPatterns #-}
+{-# LANGUAGE CPP, ViewPatterns, BangPatterns #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -8,7 +8,7 @@ import Data.Foldable
 import Data.List
 
 import Language.Ladder.Zipper
-import Language.Ladder.Lexer
+-- import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
@@ -16,7 +16,7 @@ import Language.Ladder.Interpreter
 
 import Tooling
 
-import TestUtils
+-- import TestUtils
 
 --------------------------------------------------------------------------------
 
@@ -61,6 +61,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
         (st, op <> [(R cnt, Op (Jmp s) [R r])], cnt + 1) --XXX XXX beware wires crossing jump point
     f (Node la) =
         foldl (\st' x' -> ffff st' r p x') (st <> [(p, r)], op, cnt) la
+    f _ = error here
 
 --------------------------------------------------------------------------------
 
@@ -190,7 +191,7 @@ testAstOld ast' = do
 #if 1
 
     let ast = parseOps ast'
-    let (st, op, cnt) = fffff ast
+    let (_st, op, _cnt) = fffff ast
     print (here, "-----------------------")
     let Just p01 = tsort [] $ or'd [] op
     print (here, "memory after single eval:", network' p01 memory)
