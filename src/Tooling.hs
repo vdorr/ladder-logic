@@ -274,6 +274,11 @@ ldlines tr = let (a, b) = f tr in a :| b
 nodeTable :: [(p, [p])] -> [(p, p)]
 nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
+generateStk1
+    :: Cofree (Diagram () Dev String) DgExt
+    -> IO [ExtendedInstruction String String Int]
+generateStk1 ast = (EISimple <$>) <$> generateStk ast
+
 generateStk :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String Int]
 generateStk ast' = do
     let ast = parseOps ast'
@@ -331,6 +336,39 @@ generateStk ast' = do
 
 --------------------------------------------------------------------------------
 
+evalTestVect'''
+    :: [(Maybe String, [ExtendedInstruction String String Int])] -- ^program
+    -> [VarName] -- ^watched memory variables
+    -> [(Int, [(VarName, V)])] -- ^test vector
+    -> Either (Memory, String) [[V]]
+evalTestVect''' prog watch vect
+
+--     = fst <$> foldlM step ([], ([],[],[])) vect'
+    = case foldlM step ([], p) vect' of
+        Left _ -> undefined
+        Right (y, _) -> return y
+    where
+
+    vect' = flattenTestVect vect
+
+    Right prog' = resolveLabels prog --FIXME fail properly
+
+    p = makeItpSt3 [] [(1, 0, prog')]
+
+    evalBlock'
+        :: ItpSt3
+        -> Either (ItpSt, String) ItpSt3
+    evalBlock' = run
+--     run
+
+--     step = undefined
+    step (tr, st@(x, y, mem)) stim = do
+        st'@(_, _, mem'') <- evalBlock' (x, y, mem')
+        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+        return (tr ++ [tr'], st')
+        where
+        mem' = updateMemory mem stim
+
 evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
 evalBlock p st = foldlM eval st p
 
@@ -338,8 +376,13 @@ evalTestVect''
     :: [Instruction String Int] -- ^program
     -> [VarName] -- ^watched memory variables
     -> [(Int, [(VarName, V)])] -- ^test vector
-    -> Either (ItpSt, String) [[V]]
-evalTestVect'' prog watch vect = fst <$> foldlM step ([], ([],[],[])) vect'
+    -> Either (Memory, String) [[V]]
+evalTestVect'' prog watch vect
+--     = bimap (bimap (\((_, _, mem1), _) -> mem1) id) fst
+--         $ 
+    = case foldlM step ([], ([],[],[])) vect' of
+        Left _ -> undefined
+        Right (y, _) -> return y
     where
 
     vect' = flattenTestVect vect

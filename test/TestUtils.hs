@@ -42,7 +42,7 @@ runLadderTest :: Bool -> LadderTest -> Cofree (Diagram () Dev String) DgExt -> I
 runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
 
-    prog <- generateStk ast
+    prog <- generateStk1 ast
 --     prog <- generateStk2 ast
 
     let allSigs = testVectSignals (testVect test)
@@ -50,7 +50,8 @@ runLadderTest verbose test@T01{} ast = do
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
 
-    let xxy = evalTestVect'' prog allSigs (testVect test)
+--     let xxy = evalTestVect'' prog allSigs (testVect test)
+    let xxy = evalTestVect''' [(Nothing, prog)] allSigs (testVect test)
 --     let xxy = evalTestVect'' prog (watch test) (testVect test)
     when verbose $ print (here, xxy)
     let Right traces = xxy

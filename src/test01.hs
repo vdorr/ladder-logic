@@ -1,10 +1,6 @@
 {-# OPTIONS_GHC -Wunused-imports #-}
-
-{-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    QuasiQuotes, PatternSynonyms,TypeApplications,DeriveAnyClass,
-    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns
-    , FlexibleContexts #-}
-
+{-# LANGUAGE CPP, TupleSections, FlexibleInstances, QuasiQuotes, LambdaCase,
+    ScopedTypeVariables, FlexibleContexts #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO
@@ -25,7 +21,6 @@ import Language.Ladder.Interpreter
 
 testAst :: Cofree (Diagram () Dev String) DgExt -> IO ()
 testAst ast' = do
-
     generateStk2 ast'
     return ()
 

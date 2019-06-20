@@ -195,6 +195,8 @@ emitBasicDevice d
 
 --------------------------------------------------------------------------------
 
+verbose1 = False
+
 --FIXME IO
 generateStk2
     :: Cofree (Diagram () Dev String) DgExt
@@ -209,14 +211,14 @@ generateStk2 ast' = do
     let a6 = sortOn position a5
     let a7 = tsort2 nodes a6
     code <- execWriterT $ foldlM (genStk tell emitBasicDevice) [] a7 --need failure here
-
-    print (here, "-----------------------")
-    for_ a1 print
-    print (here, "-----------------------")
-    for_ a7 print
-    print (here, "-----------------------")
-    for_ (code :: [ExtendedInstruction String String Int]) print
-    print (here, "-----------------------")
+    when verbose1 $ do
+        print (here, "-----------------------")
+        for_ a1 print
+        print (here, "-----------------------")
+        for_ a7 print
+        print (here, "-----------------------")
+        for_ (code :: [ExtendedInstruction String String Int]) print
+        print (here, "-----------------------")
     return code
 
 --------------------------------------------------------------------------------
