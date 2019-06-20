@@ -237,8 +237,8 @@ assignAddresses
     -> Either String (Cofree (Diagram () Dev' String) DgExt)
 assignAddresses = undefined
 
-allocatMemory :: MemoryVariables -> MemoryConfiguration
-allocatMemory = undefined
+allocateMemory :: MemoryVariables -> MemoryConfiguration
+allocateMemory = undefined
 
 --evil approach
 extractVariables :: Cofree (Diagram () Dev String) DgExt -> MemoryVariables

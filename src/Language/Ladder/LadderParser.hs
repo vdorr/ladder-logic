@@ -41,20 +41,8 @@ data Diagram c d s a
     | Conn c
     deriving (Show, Functor, Eq, Foldable, Traversable)
 
---TODO lift Conn  <$> (z c) etc
 mapDg :: (c -> c') -> (d -> d') -> (s -> s') -> Diagram c d s a -> Diagram c' d' s' a
 mapDg z x y = runIdentity . mapDgA (pure . z) (pure . x) (pure . y)
--- mapDg z x y = f
---     where
---     f (Source   a) = Source       a
---     f  Sink        = Sink
---     f  End         = End
---     f (Device d a) = Device (x d) a
---     f (Jump s    ) = Jump   (y s)
---     f (Node     a) = Node         a
---     f (Conn c    ) = Conn   (z c)
---     f (Cont c   a) = Cont   (z c) a
--- --     f  Stub        = Stub
 
 mapDgA
     :: Applicative f
@@ -88,24 +76,8 @@ data Dev = Dev String [Operand]
 
 type DgP = SFM DgPSt
 type DgPSt = DgPState (Tok Text)
--- type Next = MoveToNext (Tok Text)
 
 --------------------------------------------------------------------------------
-
--- labelOnTop
---     :: SFM (DgPState (Tok txt)) a -- ^Device parser e.g. "(S)"
---     -> SFM (DgPState (Tok txt)) (txt, a)
--- labelOnTop p = do
---     (ln, co) <- currentPos
---     x        <- p
---     next     <- currentPos
---     setPos (ln-1, co)
---     lbl      <- name
---     setPos next
---     return (lbl, x)
--- 
--- labelOnTop' :: SFM (DgPState (Tok Text)) a -> SFM (DgPState (Tok Text)) (String, a)
--- labelOnTop' p = bimap unpack id <$> labelOnTop p
 
 variable :: DgP Operand
 variable = (Var . unpack) <$> name
@@ -234,7 +206,6 @@ hline2 = do
     when (vl > 0) $ do
         (ln, (co, _)) <- currentPos
         setPos (ln, (co + vl, ()))
-    return ()
 --TODO TEST move to same location is noop
 
 device :: DgP (Bool, String) -> DgP (Cofree (Diagram c Dev String) DgExt)

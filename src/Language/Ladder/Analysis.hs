@@ -6,6 +6,7 @@ import Data.Function
 import Data.Maybe
 import Data.Bifunctor
 import Data.Semigroup
+import Data.List
 
 import Language.Ladder.LadderParser
 import Language.Ladder.DiagramParser
@@ -119,5 +120,64 @@ cut1 (p :< a) = f a
 --specialized to 'DgExt' intentionaly
 position :: Cofree f DgExt -> DgExt
 position (p :< _) = p
+
+--------------------------------------------------------------------------------
+
+-- |Return list of annotations (usually positions) of 'Sink' nodes
+stubs
+    :: Cofree (Diagram c d s) p
+    -> [p]
+stubs (p :< a) = f a
+    where
+    f (Source a)   = stubs a --ugh what is ungawa for this?
+    f  Sink        = [p]
+    f  End         = []
+    f (Device d a) = stubs a
+    f (Jump s)     = []
+    f (Node a)     = foldMap stubs a
+    f (Conn c    ) = [] --XXX i am not sure !!!
+    f (Cont c   a) = []
+
+--just remove initial Source and tree of Nodes
+--quite useless operation, i think
+forest
+    :: Cofree (Diagram c d s) p
+    -> Maybe [Cofree (Diagram c d s) p]
+-- forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
+forest (_ :< Source a) = Just $ fmap (\n@(p :< _) -> p :< Source n) $ fst $ succs' a
+forest _               = Nothing
+
+merge'
+    :: Cofree (Diagram c d s) p -- ^input tree
+    -> ([(p, [p])], Cofree (Diagram c d s) p)
+-- ^pairs of position of 'Node' still in tree and 'Node' positions merged into it and new tree
+merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
+-- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
+    where
+    f ns _ []  = ns
+    f ns p nss = (p, nss) : ns
+
+merge
+    :: Cofree (Diagram c d s) p
+    -> Cofree (Diagram c d s) ([p], p)
+merge = g
+    where
+    g (p :< Node as) = (ns, p) :< Node (fmap merge as')
+        where
+        (as', ns) = foldMap succs' as
+    g (p :< other)   = ([], p) :< fmap merge other
+
+-- succs
+--     :: Cofree (Diagram d s) p
+--     -> [Cofree (Diagram d s) p]
+-- succs (_ :< Node xs) = foldMap succs xs
+-- succs other          = [other]
+
+succs'
+    :: Cofree (Diagram c d s) p
+    -> ([Cofree (Diagram c d s) p], [p])
+succs' (p :< Node xs) = fmap (++[p]) $ foldMap succs' xs
+-- succs' (p :< Node xs) = foldMap succs' xs
+succs' other          = ([other], [])
 
 --------------------------------------------------------------------------------

@@ -127,19 +127,13 @@ setPos (ln, (co, _)) = do
 
 -- |Clear 'psFocused' flag if there is not lexeme at desired position
 -- used by vertical diagram combinators
-setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState tok) (Bool)
+setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState tok) ()
 setPosOrBlur (ln, (co, _)) = do
     DgPSt b zp ps _ <- get
     let zp' = move ln co zp --FIXME can only move to direct neighbour!!!!!!!
-    case zp' of
-        Just zp' ->
---             traceShowM (here, ln, "setPosOrBlur") >>
-            put (DgPSt b zp' ps True ) >>
-            return True
-        Nothing  ->
---             traceShowM (here, ln, "setPosOrBlur") >> 
-            put (DgPSt b zp  ps False)
-            >> return False
+    put $ case zp' of
+        Just zp' -> DgPSt b zp' ps True
+        Nothing  -> DgPSt b zp  ps False
 
 --------------------------------------------------------------------------------
 
@@ -165,13 +159,13 @@ currentPosM = (pos . psStr) <$> get
 
 currentPos :: SFM (DgPState tok) DgExt
 currentPos = do
-    Just p <- (pos . psStr) <$> get
+    Just p <- currentPosM
     return p
 
 --TODO implement in terms of 'peekM'
 peek :: SFM (DgPState tok) tok
 peek = do
-    Just p <- (cursor . psStr) <$> get
+    Just p <- peekM
     return p
 
 peekM :: SFM (DgPState tok) (Maybe tok)
@@ -190,7 +184,7 @@ skip f
          Just x | f x -> step
          _            -> return ()
 
-option :: (SFM st a) -> SFM st (Maybe a)
+option :: SFM st a -> SFM st (Maybe a)
 option p = (Just <$> p) <|> pure Nothing
 
 --------------------------------------------------------------------------------
@@ -331,69 +325,43 @@ moveToLine ln = move2 (compare ln . fst)
 
 --------------------------------------------------------------------------------
 
--- test p pp = do
---     current <- currentPos
---     x       <- p
---     next    <- currentPos
---     y       <- pp current x
---     setPos next
---     return (x, y)
-
--- test1 mapPos p pp = do
---     begin <- currentPos
---     x     <- p
---     next  <- currentPos
---     setPos (mapPos begin)
---     y     <- pp x
---     setPos next
---     return (x, y)
-
 colocated
-    :: (DgExt -> (Int, (Int, b)))
+    :: (DgExt -> DgExt)
     -> SFM (DgPState tok) t
     -> (t -> SFM (DgPState tok) b1)
     -> SFM (DgPState tok) b1
 colocated mapPos p pp = do
     begin <- currentPos
---     traceShowM (here, lbl, "--->>", begin)
     x     <- p
---     traceShowM (here, lbl, begin)
     next  <- currentPos
---     traceShowM (here, lbl, "setPos")
-    qq <- setPosOrBlur (mapPos begin)
---     traceShowM (here, lbl, "begin:", begin, "next:", next, "mapped:", mapPos begin, qq)
+    _     <- setPosOrBlur (mapPos begin)
     y     <- pp x
-    setPos next
-    p <- currentPosM
---     traceShowM (here, lbl, "<<---", p)
+    _     <- setPos next
     return y
 
+colocated_
+    :: (DgExt -> DgExt)
+    -> SFM (DgPState tok) a
+    -> SFM (DgPState tok) b
+    -> SFM (DgPState tok) (a, b)
+colocated_ mapPos p pp = colocated mapPos p (\x -> (,) <$> pure x <*> pp)
 
---TODO should be usable also for block labels
--- above0_ p pp = test p $ \(ln, co) _ -> setPos (ln - 1, co) >> pp
--- below0_ p pp = test p $ \(ln, co) _ -> setPos (ln + 1, co) >> pp
-
--- above0 p pp = test p $ \(ln, co) x -> setPos (ln - 1, co) >> pp x
--- below0 p pp = test p $ \(ln, co) x -> setPos (ln + 1, co) >> pp x
-
--- above1_ p pp = test1 (\(ln, co) -> (ln - 1, co)) p (const pp)
--- above1_ p pp = above1 p (const pp)
--- above1 = test1 (\(ln, co) -> (ln - 1, co))
-
-below
+above, below
     :: SFM (DgPState tok) t
     -> (t -> SFM (DgPState tok) b)
     -> SFM (DgPState tok) b
+
+above = colocated (\(ln, co) -> (ln - 1, co))
+
 below = colocated (\(ln, co) -> (ln + 1, co))
 
-above_
+above_, below_
     :: SFM (DgPState tok) a
     -> SFM (DgPState tok) b
     -> SFM (DgPState tok) (a, b)
-above_ p pp = colocated (\(ln, co) -> (ln - 1, co))
-    p
-    (\x -> (,) <$> pure x <*> pp)
 
---TODO above, below_
+above_ = colocated_ (\(ln, co) -> (ln - 1, co))
+
+below_ = colocated_ (\(ln, co) -> (ln + 1, co))
 
 --------------------------------------------------------------------------------

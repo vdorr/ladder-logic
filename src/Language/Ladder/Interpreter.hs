@@ -7,17 +7,14 @@ import Data.Traversable
 import Control.Monad.Writer.Strict
 -- import Data.Function
 import Data.List
-import Data.Int
-import Data.Word
+-- import Data.Int
+-- import Data.Word
+-- import Data.Bifunctor
 
--- import Language.Ladder.Zipper
--- import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Analysis
-
--- import Tooling
 
 --------------------------------------------------------------------------------
 
@@ -34,7 +31,7 @@ data Op n s
     | On    -- ^ set wire state to #on
     | St n
 --     | StN | StOn | StOff
---     | Jmp s
+    | Jmp s
     | Cmp CmpOp n n
     -- | FB String [(String, D)] [(String, D)]
     deriving Show
@@ -47,6 +44,8 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 data ExtendedInstruction ca a w
     = EIJump ca
     | EISimple (Instruction a w)
+--TODO TODO TODO
+    | EIReturn
     deriving Show
 
 data Instruction a w
@@ -92,14 +91,14 @@ class I d m where
     emDup :: m ()
     -}
 
-data Emit ca w d m = Emit
-    { emLdOn :: m ()
-    , emDrop :: m ()
-    , emDevice :: d -> m ()
-    , emBranch :: ca -> m () -- ???
-    , emPick :: Int -> m ()
-    , emDup :: m ()
-    }
+-- data Emit ca w d m = Emit
+--     { emLdOn :: m ()
+--     , emDrop :: m ()
+--     , emDevice :: d -> m ()
+--     , emBranch :: ca -> m () -- ???
+--     , emPick :: Int -> m ()
+--     , emDup :: m ()
+--     }
 
 --get rid of text
 resolveLabels
@@ -117,21 +116,16 @@ resolveLabels l = for (foldMap snd l) g
                        Just a -> Right (EIJump a)
                        Nothing -> Left $ show (here, lbl)
     g (EISimple i) = Right (EISimple i)
+    g  EIReturn    = Right EIReturn
 
--- generate2 ::
---     ( Monad m0
---     , Show b0
---     , Show s1
---     , Show s0
---     , Eq b0
---     , Eq c
---     , Show c)
---     => ([Instruction String w] -> m0 ())
---     -> [Cofree (Diagram c (Op Operand s0) s1) b0]
---                       -> Cofree (Diagram c (Op Operand s0) s1) b0
---                       -> m0 [Cofree (Diagram c (Op Operand s0) s1) b0]
-
--- genStk :: _
+genStk
+    :: Monad m
+    => ([ExtendedInstruction String a w]
+    -> m ())
+    -> (Op Operand String -> [Instruction a w])
+    -> [Cofree (Diagram DgExt (Op Operand String) String) DgExt]
+    -> Cofree (Diagram DgExt (Op Operand String) String) DgExt
+    -> m [Cofree (Diagram DgExt (Op Operand String) String) DgExt]
 genStk emit' emitDevice' stk0 asts = go stk0 asts
 
     where
@@ -180,14 +174,14 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
             return (nd:stk)
         f stk      (Cont stubP b) = do
             case findIndex (isConn stubP) stk of
-                Just i -> bringToTop i
+                Just i  -> bringToTop i
                 Nothing -> error here --should not happen
             go (nd:stk) b --XXX not sure about nd on stack here
 
         f stk n = error $ show (here, stk, n)
 
     isConn p0 (_ :< Conn p1) = p0 == p1
-    isConn _ _ = False
+    isConn _   _             = False
 
     bringToTop 0 = return ()
     bringToTop i = emit [IPick i]
@@ -207,93 +201,23 @@ generateStk2
     -> IO [ExtendedInstruction String String Int]
 generateStk2 ast' = do
     let ast = parseOps $ dropEnd ast'
-
-    print (here, "-----------------------")
-    print (here, "-----------------------")
-    print (here, "-----------------------")
-
     --collapse nodes
     let (nodes, a0) = merge' ast
-
     --chop
-    let Just (a1 ::[Cofree (Diagram () (Op Operand String) String) DgExt])
-            = forest a0
-
-    for_ a1 print
-    print (here, "-----------------------")
-
+    let Just a1 = forest a0
     let a5 = cut1' a1
     let a6 = sortOn position a5
     let a7 = tsort2 nodes a6
+    code <- execWriterT $ foldlM (genStk tell emitBasicDevice) [] a7 --need failure here
 
+    print (here, "-----------------------")
+    for_ a1 print
+    print (here, "-----------------------")
     for_ a7 print
     print (here, "-----------------------")
-
-    code <- execWriterT $ foldlM (genStk tell emitBasicDevice) [] a7
-    for_ code print
+    for_ (code :: [ExtendedInstruction String String Int]) print
     print (here, "-----------------------")
-
     return code
-
---------------------------------------------------------------------------------
-
--- |Return list of annotations (usually positions) of 'Sink' nodes
-stubs
-    :: Cofree (Diagram c d s) p
-    -> [p]
-stubs (p :< a) = f a
-    where
-    f (Source a)   = stubs a --ugh what is ungawa for this?
-    f  Sink        = [p]
-    f  End         = []
-    f (Device d a) = stubs a
-    f (Jump s)     = []
-    f (Node a)     = foldMap stubs a
-    f (Conn c    ) = [] --XXX i am not sure !!!
-    f (Cont c   a) = []
-
---just remove initial Source and tree of Nodes
---quite useless operation, i think
-forest
-    :: Cofree (Diagram c d s) p
-    -> Maybe [Cofree (Diagram c d s) p]
--- forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
-forest (_ :< Source a) = Just $ fmap (\n@(p :< _) -> p :< Source n) $ fst $ succs' a
-forest _               = Nothing
-
-merge'
-    :: Cofree (Diagram c d s) p -- ^input tree
-    -> ([(p, [p])], Cofree (Diagram c d s) p)
--- ^pairs of position of 'Node' still in tree and 'Node' positions merged into it and new tree
-merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
--- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
-    where
-    f ns _ []  = ns
-    f ns p nss = (p, nss) : ns
-
-merge
-    :: Cofree (Diagram c d s) p
-    -> Cofree (Diagram c d s) ([p], p)
-merge = g
-    where
-    g (p :< Node as) = (ns, p) :< Node (fmap merge as')
-        where
-        (as', ns) = foldMap succs' as
-    g (p :< other)   = ([], p) :< fmap merge other
-
--- succs
---     :: Cofree (Diagram d s) p
---     -> [Cofree (Diagram d s) p]
--- succs (_ :< Node xs) = foldMap succs xs
--- succs other          = [other]
-
-succs'
-    :: Cofree (Diagram c d s) p
-    -> ([Cofree (Diagram c d s) p], [p])
-succs' (p :< Node xs) = fmap (++[p]) $ foldMap succs' xs
--- succs' (p :< Node xs) = foldMap succs' xs
-succs' other          = ([other], [])
-
 
 --------------------------------------------------------------------------------
 
@@ -316,23 +240,54 @@ parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
 -- eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
 -- eval2 = undefined
 
-type Program = [ExtendedInstruction String String Int]
+type Program = [ExtendedInstruction Int String Int]
 
-data Trigger = Periodic Int | Memory String
+-- data Trigger = Periodic Int | Memory String
+data Task = Task { nextRun, priority, period :: Int, program :: Program }
 
-type ItpSt3 = (Int, [(Trigger, Program)], Memory)
+type ItpSt3 = (Clock, [Task], Memory)
+type Period = Int
+type Clock = Int
+type Prio = Int
+
+makeItpSt3 :: Memory -> [(Period, Prio, Program)] -> ItpSt3
+makeItpSt3 m tasks = (0, fmap (\(per, pri, pro) -> Task 0 pri per pro) tasks, m)
+
 run
-    :: ItpSt2
-    -> [(String, [ExtendedInstruction String String Int])]
-    -> Either (ItpSt3, String) ItpSt3
-run = undefined
+    :: ItpSt3
+    -> Either (ItpSt, String) ItpSt3 --FIXME error should return also offending task
+run (clk, tasks, st0)
+    = (clk + 1, waiting ++ nextRound,)
+    <$> foldlM execute st0 run''
+    where
+    (runnableNow, waiting) = partition ((clk==).nextRun) tasks
+    run' = sortOn priority runnableNow
+    run'' = fmap program run'
+    nextRound = fmap (\tsk@Task{..} -> tsk { nextRun = clk + period }) run'
 
-type ItpSt2 = (Int, Memory) -- add program counter
+--------------------------------------------------------------------------------
+
+-- execute'
+--     :: ItpSt
+--     -> [(Maybe String, [ExtendedInstruction String String Int])]
+--     -> Either (ItpSt, String) ItpSt
+-- execute' st0 prog = bimap (st0,) id (resolveLabels prog) >>= execute st0
+
 execute
-    :: ItpSt2
-    -> [(String, [ExtendedInstruction String String Int])]
-    -> Either (ItpSt2, String) ItpSt2
-execute = undefined
+    :: Memory
+    -> [ExtendedInstruction Int String Int]
+    -> Either (ItpSt, String) Memory
+execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
+    where
+
+    f []               st = return st
+    f (EIReturn   : _) st = return st
+    f (EIJump lbl : _) st = nextLabel lbl st
+    f (EISimple i : p) st = eval st i >>= f p
+
+    nextLabel lbl = f (drop lbl prog)
+
+--------------------------------------------------------------------------------
 
 type Memory = [(String, V)]
 
@@ -343,22 +298,22 @@ eval :: ItpSt -> Instruction String Int -> Either (ItpSt, String) ItpSt
 eval = f
     where
     f st                 ITrap      = Left (st, "trap")
-    f    (  ws, os, m)   ILdOn      = pure (True:ws, os, m)
-    f    (w:ws, os, m)   IDup       = pure (w:w:ws, os, m)
+    f    (  ws, os, m)   ILdOn      = pure (True : ws, os, m)
+    f    (w:ws, os, m)   IDup       = pure (w : w : ws, os, m)
     f st@(  ws, os, m)  (IPick i)
-        | i >= 0 && i < length ws   = pure (ws!!i:ws, os, m)
+        | i >= 0 && i < length ws   = pure (ws !! i : ws, os, m)
         | otherwise                 = Left (st, "stk idx out of range")
     f    (_:ws, os, m)   IDrop      = pure (ws, os, m)
     f st@(ws,   os, m)  (ILdBit a)
-        | Just (X v) <- lookup a m  = pure (v:ws, os, m)
+        | Just (X v) <- lookup a m  = pure (v : ws, os, m)
         | otherwise                 = Left (st, "invalid memory access")
     f st@(w:ws, os, m)  (IStBit a)
-        | (m0,(_,X _):m1) <- break ((==a).fst) m
-                                    = pure (w:ws, os, (m0 ++ (a, X w) : m1))
+        | (m0,(_,X _):m1) <- break ((==a) . fst) m
+                                    = pure (w : ws, os, (m0 ++ (a, X w) : m1))
         | otherwise                 = Left (st, "invalid memory access")
-    f st@(a:b:ws, os, m) IAnd       = pure ((a&&b):ws, os, m)
-    f st@(a:b:ws, os, m) IOr        = pure ((a||b):ws, os, m)
-    f st@(a:ws,   os, m) INot       = pure (not a:ws,  os, m)
+    f st@(a:b:ws, os, m) IAnd       = pure ((a && b) : ws, os, m)
+    f st@(a:b:ws, os, m) IOr        = pure ((a || b) : ws, os, m)
+    f st@(a:ws,   os, m) INot       = pure (not a : ws,  os, m)
 
     f _                  i          = error $ show (here, i)
 

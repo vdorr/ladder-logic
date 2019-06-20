@@ -32,6 +32,7 @@ library
                      , Language.Ladder.Lexer
                      , Tooling
                      , TestUtils
+                     , OldAstInterpreter
                      , Language.Ladder.Utils
                      , Language.Ladder.Analysis
                      , Language.Ladder.Interpreter
