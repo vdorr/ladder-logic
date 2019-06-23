@@ -8,9 +8,38 @@ import Data.Bifunctor
 import Data.Semigroup
 import Data.List
 
+import Control.Monad.Writer
+import Control.Monad.State
+
+
 import Language.Ladder.LadderParser
-import Language.Ladder.DiagramParser
+import Language.Ladder.DiagramParser hiding (get, put, modify)
 import Language.Ladder.Utils
+
+--------------------------------------------------------------------------------
+
+data N k op pos = N { nPos :: pos, nId :: k, nDeps :: [k], nOp :: op}
+    deriving Show
+
+nSortSpatial :: Ord pos => [N k op pos] -> [N k op pos]
+nSortSpatial = sortOn nPos
+
+test asts = flip runState 0 $ runWriterT $ do
+    forM_ asts g
+    where
+--     sinks = foldMap stubs asts
+    g (p :< a) = f a
+        where
+        f (Source   a ) = undefined
+        f  Sink         = N p <$> name <*> undefined <*> pure a >>= tell1
+        f  End          = undefined
+        f (Device _ a ) = undefined
+        f (Jump _     ) = undefined
+        f (Node     as) = undefined
+        f (Conn c     ) = undefined
+        f (Cont c   a ) = undefined
+    name = lift (get <* modify (+1))
+    tell1 = tell . (:[])
 
 --------------------------------------------------------------------------------
 
@@ -129,7 +158,7 @@ stubs
     -> [p]
 stubs (p :< a) = f a
     where
-    f (Source a)   = stubs a --ugh what is ungawa for this?
+    f (Source a)   = stubs a
     f  Sink        = [p]
     f  End         = []
     f (Device d a) = stubs a

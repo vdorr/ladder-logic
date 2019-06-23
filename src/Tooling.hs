@@ -33,16 +33,6 @@ verbose = False
 
 --------------------------------------------------------------------------------
 
-data D
-    = R Int
---     | DD -- dummy
-    deriving (Show, Eq, Ord)
-
-data E op = Op op [D] -- and, or, ld #on, ...
-    deriving Show
-
---------------------------------------------------------------------------------
-
 --generates one screen, chopping might be done outside
 prettyTrace :: [(String, [V])] -> [String]
 prettyTrace trace = x ++ ticks

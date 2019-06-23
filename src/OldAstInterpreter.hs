@@ -20,6 +20,16 @@ import Tooling
 
 --------------------------------------------------------------------------------
 
+data D
+    = R Int
+--     | DD -- dummy
+    deriving (Show, Eq, Ord)
+
+data E op = Op op [D] -- and, or, ld #on, ...
+    deriving Show
+
+--------------------------------------------------------------------------------
+
 fffff
     :: Eq p
     => Cofree (Diagram () (Op Operand s) s) p

@@ -29,10 +29,10 @@ data LadderTest = T01
 --------------------------------------------------------------------------------
 
 getSignal :: String -> TestVect -> [[V]] -> [[V]]
+getSignal _ []               = const []
 getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))
     where
     Just i = findIndex ((s==) . fst) slice
-getSignal _ [] = const []
 
 getSignals :: [String] -> TestVect -> [[V]] -> [[V]]
 getSignals sg vect trace = 
@@ -42,8 +42,8 @@ runLadderTest :: Bool -> LadderTest -> Cofree (Diagram () Dev String) DgExt -> I
 runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
 
-    prog <- generateStk1 ast
---     prog <- generateStk2 ast
+--     prog <- generateStk1 ast
+    prog <- generateStk2 ast
 
     let allSigs = testVectSignals (testVect test)
 --TODO select signals for display independently from signals for test evaluation

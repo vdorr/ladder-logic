@@ -195,7 +195,7 @@ emitBasicDevice d
 
 --------------------------------------------------------------------------------
 
-verbose1 = False
+verbose1 = True
 
 --FIXME IO
 generateStk2
@@ -214,7 +214,9 @@ generateStk2 ast' = do
     when verbose1 $ do
         print (here, "-----------------------")
         for_ a1 print
-        print (here, "-----------------------")
+        print (here, "after sort on position", "-----------------------")
+        for_ a6 print
+        print (here, "after tsort2", "-----------------------")
         for_ a7 print
         print (here, "-----------------------")
         for_ (code :: [ExtendedInstruction String String Int]) print
