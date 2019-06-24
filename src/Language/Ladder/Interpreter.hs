@@ -195,7 +195,7 @@ emitBasicDevice d
 
 --------------------------------------------------------------------------------
 
-verbose1 = True
+verbose1 = False
 
 --FIXME IO
 generateStk2
@@ -204,18 +204,36 @@ generateStk2
 generateStk2 ast' = do
     let ast = parseOps $ dropEnd ast'
     --collapse nodes
-    let (nodes, a0) = merge' ast
+--     let (nodes, a0) = merge' ast
+    let (nodes, a0) = repositionSinks nodes <$> merge' ast
     --chop
     let Just a1 = forest a0
     let a5 = cut1' a1
     let a6 = sortOn position a5
-    let a7 = tsort2 nodes a6
+    
+--     let a6' :: [(Deps DgExt, Cofree (Diagram DgExt (Op Operand String) String) DgExt)]
+--                         = fmap (\n -> (dependencies2 nodes n, n)) a6
+    
+--     let a7 = tsort2 nodes a6
+    let a7 = tsort3 a6
+
     code <- execWriterT $ foldlM (genStk tell emitBasicDevice) [] a7 --need failure here
     when verbose1 $ do
         print (here, "-----------------------")
         for_ a1 print
+
+        print (here, "nodes", "-----------------------")
+        for_ nodes print
+
         print (here, "after sort on position", "-----------------------")
         for_ a6 print
+
+--         print (here, "same, but with deps", "-----------------------")
+--         for_ a6' $ \(dep, ast) -> do
+--             print dep 
+--             print $ dependencies ast
+--             putStr "  "
+--             print ast
         print (here, "after tsort2", "-----------------------")
         for_ a7 print
         print (here, "-----------------------")

@@ -166,7 +166,7 @@ tokenizerTests = testGroup "Tokenizer"
 
 prop_lexeme_trip :: Property
 prop_lexeme_trip =
-    withTests 100 . property $ do
+    withTests 200 . property $ do
         tok <- forAll genToken
         tripping [tok]
             (pack . foldMap (renderLexeme . fmap unpack))

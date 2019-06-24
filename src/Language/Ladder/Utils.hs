@@ -2,8 +2,8 @@
 
 module Language.Ladder.Utils where
 
-import Data.List
-import Control.Applicative
+-- import Data.List
+-- import Control.Applicative
 
 --------------------------------------------------------------------------------
 
@@ -34,45 +34,6 @@ pickFirst p s
         _         -> (Nothing, s)
 
 --------------------------------------------------------------------------------
-
-istopo :: (a -> a -> Bool) -> [a] -> Bool
-istopo dep (x : xs) = all (\y -> not $ dep x y) xs && istopo dep xs
-istopo _   []       = True
-
-istopoM :: (a -> a -> Bool) -> [a] -> Maybe a
-istopoM dep (x : xs) = fst (pickFirst (dep x) xs) <|> istopoM dep xs
-istopoM _   []       = Nothing
-
--- isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
--- isSpatialOrTopo dep spa g = go g
---     where
---     go (x : xs : xss)
---         | spa x xs == LT || any (flip dep x) (xs:xss) = go (xs : xss)
---         | otherwise = Just x
---     go _ = Nothing
-isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe (a, a)
-isSpatialOrTopo dep spa g = (,) <$> istopoM dep g <*> isSorted sources
-    where
-    isSorted (x:xs:xss)
-        | spa x xs == LT = isSorted (xs:xss)
-        | otherwise      = Just x
-    isSorted _          = Nothing
-
---TODO i should check if this fires in hedgehog
---is it true that this list is spatially sorted?
-    sources = filter noPreds g
-    noPreds v = all (\w -> spa v w /= EQ && not (dep v w)) g
-
-
-iscycle :: (a -> a -> Bool) -> (a -> a -> Bool) -> a -> [a] -> Bool
-iscycle eq dep x = go x
-    where
-    go a as = case depend of
-                   [] -> False
-                   d | any (dep x) depend -> True --flip dep?
-                   _ -> any (flip go indep) depend
-        where
-        (depend, indep) = partition (flip dep a) as
 
 --TODO tests
 -- stability - without dependencies order is unchanged

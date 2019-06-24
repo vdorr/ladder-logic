@@ -8,9 +8,8 @@ import Data.Bifunctor
 import Data.Semigroup
 import Data.List
 
-import Control.Monad.Writer
-import Control.Monad.State
-
+-- import Control.Monad.Writer
+-- import Control.Monad.State
 
 import Language.Ladder.LadderParser
 import Language.Ladder.DiagramParser hiding (get, put, modify)
@@ -18,28 +17,28 @@ import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------
 
-data N k op pos = N { nPos :: pos, nId :: k, nDeps :: [k], nOp :: op}
-    deriving Show
-
-nSortSpatial :: Ord pos => [N k op pos] -> [N k op pos]
-nSortSpatial = sortOn nPos
-
-test asts = flip runState 0 $ runWriterT $ do
-    forM_ asts g
-    where
---     sinks = foldMap stubs asts
-    g (p :< a) = f a
-        where
-        f (Source   a ) = undefined
-        f  Sink         = N p <$> name <*> undefined <*> pure a >>= tell1
-        f  End          = undefined
-        f (Device _ a ) = undefined
-        f (Jump _     ) = undefined
-        f (Node     as) = undefined
-        f (Conn c     ) = undefined
-        f (Cont c   a ) = undefined
-    name = lift (get <* modify (+1))
-    tell1 = tell . (:[])
+-- data N k op pos = N { nPos :: pos, nId :: k, nDeps :: [k], nOp :: op}
+--     deriving Show
+-- 
+-- nSortSpatial :: Ord pos => [N k op pos] -> [N k op pos]
+-- nSortSpatial = sortOn nPos
+-- 
+-- test asts = flip runState 0 $ runWriterT $ do
+--     forM_ asts g
+--     where
+-- --     sinks = foldMap stubs asts
+--     g (p :< a) = f a
+--         where
+--         f (Source   a ) = undefined
+--         f  Sink         = N p <$> name <*> undefined <*> pure a >>= tell1
+--         f  End          = undefined
+--         f (Device _ a ) = undefined
+--         f (Jump _     ) = undefined
+--         f (Node     as) = undefined
+--         f (Conn c     ) = undefined
+--         f (Cont c   a ) = undefined
+--     name = lift (get <* modify (+1))
+--     tell1 = tell . (:[])
 
 --------------------------------------------------------------------------------
 
@@ -54,26 +53,38 @@ dropEnd (p :< a) = p :< go a
     notEnd _          = True
 
 --assuming spatially sorted input (by lines then by columns)
-tsort2
-    :: [(DgExt, [DgExt])]
+-- tsort2
+--     :: [(DgExt, [DgExt])]
+--     -> [Cofree (Diagram DgExt d s) DgExt]
+--     -> [Cofree (Diagram DgExt d s) DgExt]
+-- tsort2 mergedNodes asts = fmap snd $ f asts'
+--     where
+--     asts' = fmap (\n -> (dependencies' n, n)) asts
+-- 
+--     dependencies' n = deps { nodes = nodes'}
+--         where
+--         deps = dependencies n
+--         nodes' = foldMap allNodeLocs (nodes deps)
+-- 
+--     --assuming p is in list in mergedNodes
+--     allNodeLocs p = [fromMaybe p $ lookup p oldToNew]
+--     oldToNew = nub $ foldMap (\(k, xs) -> (k, k) : fmap (,k) xs) mergedNodes
+-- 
+--     f = sttsort (dependsOn `on` fst)
+
+--assuming spatially sorted input (by lines then by columns)
+tsort3
+    :: [Cofree (Diagram DgExt d s) DgExt]
     -> [Cofree (Diagram DgExt d s) DgExt]
-    -> [Cofree (Diagram DgExt d s) DgExt]
-tsort2 mergedNodes asts = fmap snd $ f asts'
+tsort3 asts = fmap snd $ f asts'
     where
-    asts' = fmap (\n -> (dependencies' n, n)) asts
-
-    dependencies' n = deps { nodes = nodes'}
-        where
-        deps = dependencies n
-        nodes' = foldMap allNodeLocs (nodes deps)
-
-    --assuming p is in list in mergedNodes
-    allNodeLocs p = fromMaybe [p] $ lookup p mergedNodes
+    asts' = fmap (\n -> (dependencies n, n)) asts
 
     f = sttsort (dependsOn `on` fst)
 
 --------------------------------------------------------------------------------
 
+-- a `dependsOn` b means b has to be evaluated before a
 dependsOn :: Deps DgExt -> Deps DgExt -> Bool
 a `dependsOn` b = sinks b `someIsIn` nodes a
                     || conns b `someIsIn` conts a
@@ -95,7 +106,7 @@ instance Semigroup (Deps p) where
 instance Monoid (Deps p) where
     mempty = Deps [] [] [] []
 
-dependencies :: Cofree (Diagram DgExt d s) DgExt -> Deps DgExt
+dependencies :: Cofree (Diagram pos d s) pos -> Deps pos
 dependencies = cata' go
     where
     go (p, n) = f n
@@ -136,7 +147,11 @@ cut1 (p :< a) = f a
     f (Device d a) = h (Device d) (cut1 a)
     f (Jump s    ) = (p :< Jump s, [])
 
-    f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
+--     f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
+--         where
+--         (x, y) = unzip $ fmap cut1 a
+--         x' = (fmap (\n@(pp:<_) -> pp :< Cont p n) x)
+    f (Node     a) = (p:< Sink, [p :< Node [p :< Conn p]] ++ x' ++ concat y)
         where
         (x, y) = unzip $ fmap cut1 a
         x' = (fmap (\n@(pp:<_) -> pp :< Cont p n) x)
@@ -175,6 +190,31 @@ forest
 -- forest (p :< Source a) = Just $ fmap ((p :<) . Source) $ fst $ succs' a
 forest (_ :< Source a) = Just $ fmap (\n@(p :< _) -> p :< Source n) $ fst $ succs' a
 forest _               = Nothing
+
+-- follow :: _
+follow g = f
+    where
+    f (Source a)   = Source (g a)
+    f  Sink        = Sink
+    f  End         = End
+    f (Device d a) = Device d (g a)
+    f (Jump s)     = Jump s
+    f (Node a)     = Node (fmap g a)
+    f (Conn c    ) = Conn c
+    f (Cont c   a) = Cont c (g a)
+
+repositionSinks
+    :: Eq p
+    => [(p, [p])]
+    -> Cofree (Diagram c d s) p
+    -> Cofree (Diagram c d s) p
+repositionSinks nodes = go
+    where
+    oldToNew = nub $ foldMap (\(k, xs) -> (k, k) : fmap (,k) xs) nodes
+    go (p :< Sink) = case lookup p oldToNew of
+                          Just p' -> p' :< Sink
+                          Nothing -> p :< Sink
+    go (p :< other) = p :< follow go other
 
 merge'
     :: Cofree (Diagram c d s) p -- ^input tree

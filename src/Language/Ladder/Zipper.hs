@@ -46,7 +46,7 @@ zpLookup _ haystack = haystack
 -- zpAppend :: a -> Zp a -> Zp a
 -- zpAppend x (Zp l r) = Zp (reverse r ++ l) [x]
 
-pattern ZpR' x <- Zp _ (x : _)
+-- pattern ZpR' x <- Zp _ (x : _)
 pattern ZpR l f r = Zp l (f : r)
 pattern ZpL l f r = Zp (f : l) r
 

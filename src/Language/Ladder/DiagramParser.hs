@@ -108,8 +108,8 @@ applyDgp p dg = sfm p (DgPSt goRight dg Nothing True)
 setDir :: MoveToNext tok -> SFM (DgPState tok) ()
 setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc
 
-getDir :: SFM (DgPState tok) (MoveToNext tok)
-getDir = psNext <$> get
+-- getDir :: SFM (DgPState tok) (MoveToNext tok)
+-- getDir = psNext <$> get
 
 step :: SFM (DgPState tok) ()
 step = do
