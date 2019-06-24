@@ -8,6 +8,8 @@ import Data.Bifunctor
 import Data.Semigroup
 import Data.List
 
+import Data.Functor.Identity
+
 -- import Control.Monad.Writer
 -- import Control.Monad.State
 
@@ -191,17 +193,18 @@ forest
 forest (_ :< Source a) = Just $ fmap (\n@(p :< _) -> p :< Source n) $ fst $ succs' a
 forest _               = Nothing
 
--- follow :: _
-follow g = f
-    where
-    f (Source a)   = Source (g a)
-    f  Sink        = Sink
-    f  End         = End
-    f (Device d a) = Device d (g a)
-    f (Jump s)     = Jump s
-    f (Node a)     = Node (fmap g a)
-    f (Conn c    ) = Conn c
-    f (Cont c   a) = Cont c (g a)
+follow :: (t -> a) -> Diagram c d s t -> Diagram c d s a
+follow g = runIdentity . traverse (Identity . g)
+-- follow g = f
+--     where
+--     f (Source a)   = Source (g a)
+--     f  Sink        = Sink
+--     f  End         = End
+--     f (Device d a) = Device d (g a)
+--     f (Jump s)     = Jump s
+--     f (Node a)     = Node (fmap g a)
+--     f (Conn c    ) = Conn c
+--     f (Cont c   a) = Cont c (g a)
 
 repositionSinks
     :: Eq p

@@ -30,7 +30,7 @@ data Op n s
     | Ld    -- ^ set wire state same as argument
     | On    -- ^ set wire state to #on
     | St n
---     | StN | StOn | StOff
+    | StN n -- | StOn | StOff
     | Jmp s
     | Cmp CmpOp n n
     -- | FB String [(String, D)] [(String, D)]
@@ -114,7 +114,9 @@ resolveLabels l = for (foldMap snd l) g
 
     g (EIJump lbl) = case lookup (Just lbl) l'' of
                        Just a -> Right (EIJump a)
-                       Nothing -> Left $ show (here, lbl)
+                       Nothing -> 
+                            Left $ show (here, lbl)
+--                             error $ show (here, fmap fst l)
     g (EISimple i) = Right (EISimple i)
     g  EIReturn    = Right EIReturn
 
@@ -188,10 +190,11 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
 
 emitBasicDevice d
     = case d of
-        And  (Var addr) -> [ILdBit addr, IAnd]
-        AndN (Var addr) -> [ILdBit addr, INot, IAnd]
-        St   (Var addr) -> [IStBit addr]
-        _               -> error $ show (here, d)
+        And  (Var addr)  -> [ILdBit addr, IAnd]
+        AndN (Var addr)  -> [ILdBit addr, INot, IAnd]
+        St   (Var addr)  -> [IStBit addr]
+        StN   (Var addr) -> [INot, IStBit addr]
+        _                -> error $ show (here, d)
 
 --------------------------------------------------------------------------------
 
@@ -252,6 +255,7 @@ parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
     f (Dev "[/]" [n]   ) = AndN  n
     f (Dev "[>]" [a, b]) = Cmp Gt a b
     f (Dev "( )" [n]   ) = St n
+    f (Dev "(/)" [n]   ) = StN n
     f _                  = error here
 
 --------------------------------------------------------------------------------

@@ -341,7 +341,9 @@ evalTestVect''' prog watch vect
 
     vect' = flattenTestVect vect
 
-    Right prog' = resolveLabels prog --FIXME fail properly
+    prog' = case resolveLabels prog of --FIXME fail properly
+                Right p -> p
+                Left err -> error err
 
     p = makeItpSt3 [] [(1, 0, prog')]
 

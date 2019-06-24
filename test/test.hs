@@ -598,15 +598,18 @@ fileTests path = do
         return $ testCase fn $ do
             (tst, lxs) <- fmap dropWhitespace <$> loadLadderTest (path </> fn)
             let blocks = basicBlocks' lxs
-            for_ blocks $ \(_, lxs') -> do
-                case tst of
-                    Nothing -> do
-                        Right remaining <- return $ getDg <$> dgParse lxs'
-                        remaining @?= Zp [] []
-                    Just t -> do
-                        ast <- parseOrDie lxs'
-                        passed <- runLadderTest False t ast
-                        passed @?= True
+            case tst of
+                Nothing -> do
+                    for_ blocks $ \(_, lxs') -> do
+                        case getDg <$> dgParse lxs' of
+                            Right remaining -> remaining @?= Zp [] []
+                            Left err -> fail err
+                Just t -> do
+                    ast <- parseOrDie2 lxs
+--                     ast <- for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
+--                     ast <- parseOrDie lxs
+                    passed <- runLadderTest False t ast
+                    passed @?= True
 
     return $ testGroup "File tests - positive" tests
 

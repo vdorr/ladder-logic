@@ -9,6 +9,7 @@ import Data.Text (Text, unpack)
 -- import qualified Data.Text as T
 import Control.Monad
 import Control.Applicative
+import Data.Traversable
 
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
@@ -39,12 +40,16 @@ getSignals :: [String] -> TestVect -> [[V]] -> [[V]]
 getSignals sg vect trace = 
     foldMap (\s -> getSignal s vect trace) sg
 
-runLadderTest :: Bool -> LadderTest -> Cofree (Diagram () Dev String) DgExt -> IO Bool
+runLadderTest
+    :: Bool
+    -> LadderTest
+    -> [(Maybe String, Cofree (Diagram () Dev String) DgExt)]
+    -> IO Bool
 runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
 
 --     prog <- generateStk1 ast
-    prog <- generateStk2 ast
+    blocks <- for ast (\(lbl, p) -> (lbl,) <$> generateStk2 p)
 
     let allSigs = testVectSignals (testVect test)
 --TODO select signals for display independently from signals for test evaluation
@@ -52,7 +57,9 @@ runLadderTest verbose test@T01{} ast = do
     when verbose $ print (here, allSigs)
 
 --     let xxy = evalTestVect'' prog allSigs (testVect test)
-    let xxy = evalTestVect''' [(Nothing, prog)] allSigs (testVect test)
+--     let xxy = evalTestVect''' [(Nothing, prog)] allSigs (testVect test)
+    let xxy = evalTestVect''' blocks allSigs (testVect test)
+
 --     let xxy = evalTestVect'' prog (watch test) (testVect test)
     when verbose $ print (here, xxy)
     let Right traces = xxy
@@ -71,6 +78,13 @@ runLadderTest verbose test@T01{} ast = do
     return passed
 
 --------------------------------------------------------------------------------
+
+parseOrDie2
+    :: [(Int, [((Int, Int), Tok Text)])]
+    -> IO [(Maybe String, Cofree (Diagram () Dev String) DgExt)]
+parseOrDie2 lxs = do
+    let blocks = basicBlocks' lxs
+    for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
 
 parseOrDie
     :: [(Int, [((Int, Int), Tok Text)])]

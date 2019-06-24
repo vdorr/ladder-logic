@@ -19,7 +19,7 @@ main = do
         Just test -> do
             print (here, test)
             TIO.putStrLn src
-            ast <- parseOrDie lxs
+            ast <- parseOrDie2 lxs
             runLadderTest True test ast
             return ()
         Nothing -> print (here, "no embedded test found")
