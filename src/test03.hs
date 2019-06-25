@@ -19,6 +19,10 @@ import Numeric
 -- import Data.List
 import Data.Functor.Identity
 
+import Control.Monad.State
+import Control.Monad.Except
+import qualified Data.Map.Lazy as M
+
 -- import Tooling
 import Language.Ladder.Utils
 import Language.Ladder.DiagramParser
@@ -209,7 +213,7 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 --------------------------------------------------------------------------------
 
 data CellType = Bit | BitWithEdge | Word -- | TON | TOF
-    deriving (Show, Read)
+    deriving (Show, Read, Eq)
 
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
@@ -225,7 +229,7 @@ zgh = undefined
 data Address = BitAddr Int | WordAddr Int
     deriving (Show, Eq)
 
-data Operand' = Mem Address | Lit Int
+data Operand' = Mem Address | Lit' Int
     deriving (Show, Eq)
 
 data Dev' = Dev' String [Operand']
@@ -241,9 +245,34 @@ allocateMemory :: MemoryVariables -> MemoryConfiguration
 allocateMemory = undefined
 
 --evil approach
-extractVariables :: Cofree (Diagram () Dev String) DgExt -> MemoryVariables
+extractVariables
+    :: Cofree (Diagram () (Op Operand String) String) DgExt
+    -> MemoryVariables
 extractVariables = undefined
 -- data Dev = Dev String [Operand]
+
+xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA id f id ast
+    where
+    f (And    a  ) = And <$> doOperand Bit a
+    f (AndN   a  ) = undefined
+    f (St     a  ) = undefined
+    f (StN    a  ) = undefined
+    f (Cmp op a b) = Cmp op <$> doOperand Word a <*> doOperand Word b
+    f other        = pure other
+
+    doOperand _t (Lit _) = throwError "TODO"
+    doOperand t (Var n) = doVariable t n
+
+    doVariable t n
+        = throwError "TODO"
+--         = do
+--             st <- get
+--             runStateT ( alterF (alterVar t) )
+
+    alterVar t (Just (t', _addr))
+        | t == t'   = undefined
+        | otherwise = throwError "type mismatch"
+    alterVar t Nothing = undefined
 
 --------------------------------------------------------------------------------
 

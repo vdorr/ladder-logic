@@ -11,6 +11,7 @@ import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import Hedgehog.Range
+import System.Environment
 
 import Data.List
 import Data.Ord
@@ -616,4 +617,6 @@ fileTests path = do
 --------------------------------------------------------------------------------
 
 main :: IO ()
-main = getTests >>= defaultMain
+main = do
+    setEnv "TASTY_NUM_THREADS" "1"
+    getTests >>= defaultMain

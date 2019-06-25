@@ -20,21 +20,24 @@ import Language.Ladder.Analysis
 
 -- |Memory cell value, also represents its type and default value
 data V
-    = X Bool 
+    = X Bool
     | I Int
     deriving (Show, Read, Eq)
 
-data Op n s
-    = And n -- wire out <- wire in and memory cell
-    | AndN n
-    | Ld    -- ^ set wire state same as argument
-    | On    -- ^ set wire state to #on
-    | St n
-    | StN n -- | StOn | StOff
+-- data V2 = T | F | I Int
+--     deriving (Show, Read, Eq)
+
+data Op s n
+    = And       n -- wire out <- wire in and memory cell
+    | AndN      n
+    | Ld          -- ^ set wire state same as argument
+    | On          -- ^ set wire state to #on
+    | St        n
+    | StN       n -- | StOn | StOff
     | Jmp s
     | Cmp CmpOp n n
     -- | FB String [(String, D)] [(String, D)]
-    deriving Show
+    deriving (Show) -- , Functor)
 
 data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
     deriving Show
@@ -113,21 +116,19 @@ resolveLabels l = for (foldMap snd l) g
     f (acc, xs) (lbl, blkLen) = (acc + blkLen, (lbl, acc) : xs)
 
     g (EIJump lbl) = case lookup (Just lbl) l'' of
-                       Just a -> Right (EIJump a)
-                       Nothing -> 
-                            Left $ show (here, lbl)
---                             error $ show (here, fmap fst l)
+                       Just a  -> Right (EIJump a)
+                       Nothing -> Left $ show (here, lbl)
     g (EISimple i) = Right (EISimple i)
     g  EIReturn    = Right EIReturn
 
-genStk
-    :: Monad m
-    => ([ExtendedInstruction String a w]
-    -> m ())
-    -> (Op Operand String -> [Instruction a w])
-    -> [Cofree (Diagram DgExt (Op Operand String) String) DgExt]
-    -> Cofree (Diagram DgExt (Op Operand String) String) DgExt
-    -> m [Cofree (Diagram DgExt (Op Operand String) String) DgExt]
+-- genStk
+--     :: Monad m
+--     => ([ExtendedInstruction String a w]
+--     -> m ())
+--     -> (Op Operand String -> [Instruction a w])
+--     -> [Cofree (Diagram DgExt (Op String Operand) String) DgExt]
+--     -> Cofree (Diagram DgExt (Op String Operand) String) DgExt
+--     -> m [Cofree (Diagram DgExt (Op String Operand) String) DgExt]
 genStk emit' emitDevice' stk0 asts = go stk0 asts
 
     where
@@ -193,7 +194,7 @@ emitBasicDevice d
         And  (Var addr)  -> [ILdBit addr, IAnd]
         AndN (Var addr)  -> [ILdBit addr, INot, IAnd]
         St   (Var addr)  -> [IStBit addr]
-        StN   (Var addr) -> [INot, IStBit addr]
+        StN  (Var addr)  -> [INot, IStBit addr, INot]
         _                -> error $ show (here, d)
 
 --------------------------------------------------------------------------------
@@ -246,9 +247,10 @@ generateStk2 ast' = do
 
 --------------------------------------------------------------------------------
 
+--FIXME do this in LadderParser
 parseOps
     :: Cofree (Diagram c Dev s) p
-    -> Cofree (Diagram c (Op Operand s) s) p
+    -> Cofree (Diagram c (Op s Operand) s) p
 parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
     where
     f (Dev "[ ]" [n]   ) = And  n
@@ -293,12 +295,6 @@ run (clk, tasks, st0)
 
 --------------------------------------------------------------------------------
 
--- execute'
---     :: ItpSt
---     -> [(Maybe String, [ExtendedInstruction String String Int])]
---     -> Either (ItpSt, String) ItpSt
--- execute' st0 prog = bimap (st0,) id (resolveLabels prog) >>= execute st0
-
 execute
     :: Memory
     -> [ExtendedInstruction Int String Int]
@@ -308,7 +304,10 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
 
     f []               st = return st
     f (EIReturn   : _) st = return st
-    f (EIJump lbl : _) st = nextLabel lbl st
+    f (EIJump lbl : p) st@(w:ws, os, m)
+        | w         = nextLabel lbl ([], [], m)
+        | otherwise = f p (ws, os, m)
+    f (EIJump _ : _) _ = error here --stack underflow FIXME proper fail
     f (EISimple i : p) st = eval st i >>= f p
 
     nextLabel lbl = f (drop lbl prog)

@@ -2,9 +2,9 @@
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-module Language.Ladder.LadderParser 
+module Language.Ladder.LadderParser
     ( Diagram(..)
-    , mapDg
+    , mapDgA, mapDg
     , Operand(..)
     , Dev(..)
     , parseLadder
@@ -203,6 +203,7 @@ vline2 = do
 hline2 :: DgP () --TODO vline crossing
 hline2 = do
     HLine _ vl <- eat
+--XXX replicateM_ vl ??
     when (vl > 0) $ do
         (ln, (co, _)) <- currentPos
         setPos (ln, (co + vl, ()))

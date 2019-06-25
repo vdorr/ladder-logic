@@ -3,9 +3,8 @@
 module Language.Ladder.Analysis where
 
 import Data.Function
-import Data.Maybe
+-- import Data.Maybe
 import Data.Bifunctor
-import Data.Semigroup
 import Data.List
 
 import Data.Functor.Identity
@@ -130,9 +129,6 @@ cut1'
     :: [Cofree (Diagram () d s) DgExt]
     -> [Cofree (Diagram DgExt d s) DgExt]
 cut1' = foldMap (uncurry (:) . cut1)
-
-sameLine :: Cofree (Diagram c d s) DgExt -> Bool
-sameLine n@((ln, _) :< _) = getAll $ foldMap (All.(ln==).fst) n
 
 --TODO better name
 --TODO ensure cut when line number changes

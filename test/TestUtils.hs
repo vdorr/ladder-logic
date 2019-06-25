@@ -10,6 +10,7 @@ import Data.Text (Text, unpack)
 import Control.Monad
 import Control.Applicative
 import Data.Traversable
+import Data.Semigroup
 
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
@@ -154,3 +155,6 @@ iscycle eq dep x = go x
                    _ -> any (flip go indep) depend
         where
         (depend, indep) = partition (flip dep a) as
+
+sameLine :: Cofree (Diagram c d s) DgExt -> Bool
+sameLine n@((ln, _) :< _) = getAll $ foldMap (All.(ln==).fst) n

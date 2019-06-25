@@ -126,8 +126,8 @@ generate ::
     Show c =>
     ([Instruction String w] -> m0 ())
                       -> [(b0, b0)]
-                      -> [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)]
-                      -> m0 ([b0], [([b0], Cofree (Diagram c (Op Operand s0) s1) b0)])
+                      -> [([b0], Cofree (Diagram c (Op s0 Operand) s1) b0)]
+                      -> m0 ([b0], [([b0], Cofree (Diagram c (Op s0 Operand) s1) b0)])
 
 generate emit nodeToSink asts = go ([], asts)
 
@@ -276,7 +276,7 @@ generateStk ast' = do
     when verbose $ print (here, "-----------------------")
 
     --chop
-    let Just (x1_0 ::[Cofree (Diagram () (Op Operand String) String) DgExt])
+    let Just (x1_0 ) -- ::[Cofree (Diagram () (Op String Operand) String) DgExt])
             = forest ast
 --     let x1_x = ldlines'' [ast]
 --     let x1_xxx = ldlines'' x1_0
