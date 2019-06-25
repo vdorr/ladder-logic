@@ -1,0 +1,15 @@
+(* --- test 14 --- *)
+
+{ T01
+  \{ testVect =
+               [ (1, [("b", X False)])
+               , (3, [])
+               ]
+  , watch    = ["b"]
+  , expected = [[X True], [X False], [X True],[X False]]
+  \}
+}
+
+|  b    b
++--[ ]--(/)-
+|
