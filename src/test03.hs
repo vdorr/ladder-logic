@@ -1,9 +1,8 @@
 {-# OPTIONS_GHC -Wunused-imports #-}
 
-{-# LANGUAGE CPP, TupleSections, TypeSynonymInstances, FlexibleInstances,
-    QuasiQuotes, PatternSynonyms,TypeApplications,DeriveAnyClass,
-    LambdaCase, ScopedTypeVariables, ViewPatterns, BangPatterns
-    , FlexibleContexts #-}
+{-# LANGUAGE CPP, TupleSections, TypeSynonymInstances,
+    FlexibleInstances, PatternSynonyms, LambdaCase,
+    ScopedTypeVariables, FlexibleContexts #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -212,7 +211,7 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 
 --------------------------------------------------------------------------------
 
-data CellType = Bit | BitWithEdge | Word -- | TON | TOF
+data CellType = Bit | TwoBits | Word -- | TON | TOF
     deriving (Show, Read, Eq)
 
 -- possibly fetched from config file or pragma
@@ -251,7 +250,10 @@ extractVariables
 extractVariables = undefined
 -- data Dev = Dev String [Operand]
 
-xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA id f id ast
+--XXX do two passes
+--gather (+allocate) and assign addresses
+--that way is more like usual setting where vars are declared first
+xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA pure f pure ast
     where
     f (And    a  ) = And <$> doOperand Bit a
     f (AndN   a  ) = undefined
@@ -273,6 +275,26 @@ xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA id f id ast
         | t == t'   = undefined
         | otherwise = throwError "type mismatch"
     alterVar t Nothing = undefined
+
+-- xdgcfg :: _
+xdgcfg doOperand st ast = flip runStateT st $ mapDgA pure (cfggjhj doOperand) pure ast
+
+cfggjhj doOperand = f
+    where
+    f (And    a  ) =        And    <$> doOperand Bit a
+    f (AndN   a  ) =        AndN   <$> doOperand Bit a
+    f (St     a  ) =        St     <$> doOperand Bit a
+    f (StN    a  ) =        StN    <$> doOperand Bit a
+    f (Cmp op a b) =        Cmp op <$> doOperand Word a <*> doOperand Word b
+    f  Ld          = pure   Ld
+    f (LdP    a  ) =        LdP    <$> doOperand TwoBits a
+    f (LdN    a  ) =        LdN    <$> doOperand TwoBits a
+    f  On          = pure   On
+    f (Jmp s)      = pure $ Jmp s
+
+
+data MemTrack n = MemTrack { bitsSize, wordsSize :: Int
+    , variables :: M.Map n (Int, CellType) }
 
 --------------------------------------------------------------------------------
 

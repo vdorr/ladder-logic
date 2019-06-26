@@ -7,6 +7,7 @@ import Data.Traversable
 import Control.Monad.Writer.Strict
 -- import Data.Function
 import Data.List
+import Data.Char (toUpper)
 -- import Data.Int
 -- import Data.Word
 -- import Data.Bifunctor
@@ -34,6 +35,8 @@ data Op s n
     | On          -- ^ set wire state to #on
     | St        n
     | StN       n -- | StOn | StOff
+    | LdP       n -- rising edge detect
+    | LdN       n -- falling edge detect
     | Jmp s
     | Cmp CmpOp n n
     -- | FB String [(String, D)] [(String, D)]
@@ -253,12 +256,23 @@ parseOps
     -> Cofree (Diagram c (Op s Operand) s) p
 parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
     where
-    f (Dev "[ ]" [n]   ) = And  n
-    f (Dev "[/]" [n]   ) = AndN  n
-    f (Dev "[>]" [a, b]) = Cmp Gt a b
-    f (Dev "( )" [n]   ) = St n
-    f (Dev "(/)" [n]   ) = StN n
-    f _                  = error here
+--     f (Dev "[ ]" [n]   ) = And  n
+--     f (Dev "[/]" [n]   ) = AndN  n
+--     f (Dev "[>]" [a, b]) = Cmp Gt a b
+--     f (Dev "( )" [n]   ) = St n
+--     f (Dev "(/)" [n]   ) = StN n
+--     f _                  = error here
+    f (Dev op arg) = case (fmap toUpper op, arg) of
+        ("[ ]", [n]   ) -> And  n
+        ("[/]", [n]   ) -> AndN  n
+        ("[>]", [a, b]) -> Cmp Gt a b
+        ("( )", [n]   ) -> St n
+        ("(/)", [n]   ) -> StN n
+        ("[P]", [n]   ) -> LdP n
+        ("[N]", [n]   ) -> LdN n
+        ("(R)", [n]   ) -> undefined
+        ("(S)", [n]   ) -> undefined
+        _               -> error here
 
 --------------------------------------------------------------------------------
 
@@ -289,8 +303,10 @@ run (clk, tasks, st0)
     <$> foldlM execute st0 run''
     where
     (runnableNow, waiting) = partition ((clk==).nextRun) tasks
-    run' = sortOn priority runnableNow
-    run'' = fmap program run'
+
+--FIXME use proper names
+    run'      = sortOn priority runnableNow
+    run''     = fmap program run'
     nextRound = fmap (\tsk@Task{..} -> tsk { nextRun = clk + period }) run'
 
 --------------------------------------------------------------------------------

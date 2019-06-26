@@ -80,6 +80,7 @@ runLadderTest verbose test@T01{} ast = do
 
 --------------------------------------------------------------------------------
 
+-- |like 'parseOrDie' but additionaly can handle labels
 parseOrDie2
     :: [(Int, [((Int, Int), Tok Text)])]
     -> IO [(Maybe String, Cofree (Diagram () Dev String) DgExt)]
@@ -87,6 +88,7 @@ parseOrDie2 lxs = do
     let blocks = basicBlocks' lxs
     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
 
+-- |assuming no comments or pragmas in input
 parseOrDie
     :: [(Int, [((Int, Int), Tok Text)])]
     -> IO (Cofree (Diagram () Dev String) DgExt)

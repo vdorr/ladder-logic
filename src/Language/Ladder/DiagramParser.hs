@@ -23,7 +23,8 @@ dgNull = (>0) . dgLength --FIXME
 -- |Drop empty lines
 dgTrim :: Dg a -> Dg a
 dgTrim (Zp l r) = Zp (trim l) (trim r)
-    where trim = filter (not . zpNull . snd)
+    where
+    trim = filter (not . zpNull . snd)
 
 --------------------------------------------------------------------------------
 
@@ -251,7 +252,7 @@ eol :: SFM (DgPState tok) ()
 eol = do
     psStr <$> get >>= \case
         DgLineEnd -> return ()
-        _ -> fail here
+        _         -> fail here
 
 colRight :: DgExt -> DgExt
 colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
