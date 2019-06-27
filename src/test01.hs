@@ -35,7 +35,7 @@ main = do
         Right lxs -> do
 
             let lxs' = dropWhitespace lxs
-            let blocks = basicBlocks' lxs'
+            let blocks = labeledRungs lxs'
 
             forM_ blocks $ \(lbl, lxs'') -> do
                 print (here, lbl)

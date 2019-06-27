@@ -2,9 +2,11 @@
 
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances,
     FlexibleInstances, PatternSynonyms, LambdaCase,
-    ScopedTypeVariables, FlexibleContexts #-}
+    ScopedTypeVariables, FlexibleContexts, RecordWildCards #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
+
+import System.Environment (getArgs)
 
 import Data.Bytes.Put
 import Data.Bytes.Get
@@ -24,11 +26,13 @@ import qualified Data.Map.Lazy as M
 
 -- import Tooling
 import Language.Ladder.Utils
-import Language.Ladder.DiagramParser
+import Language.Ladder.DiagramParser hiding (get, put)
 import Language.Ladder.LadderParser
 import Language.Ladder.Interpreter
 
 import Data.ByteString.Base16.Lazy as B16
+
+import TestUtils
 
 -- http://hackage.haskell.org/package/bits
 -- http://hackage.haskell.org/package/haskell-modbus
@@ -212,36 +216,36 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 --------------------------------------------------------------------------------
 
 data CellType = Bit | TwoBits | Word -- | TON | TOF
-    deriving (Show, Read, Eq)
+    deriving (Show, Read, Eq, Ord)
 
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
 type MemoryVariables = [(String, CellType)]
 
 --here vars already have their place in memory
-type MemoryConfiguration = [(String, CellType, Address)]
+type MemoryConfiguration = [(String, CellType, Address Int)]
 
 -- data CellAddress a = Bits Int | Word Int
 zgh :: MemoryConfiguration -> [(String, CellType, Int)]
 zgh = undefined
 
-data Address = BitAddr Int | WordAddr Int
+data Address a = BitAddr a | WordAddr a
     deriving (Show, Eq)
 
-data Operand' = Mem Address | Lit' Int
-    deriving (Show, Eq)
+-- data Operand' = Mem Address | Lit' Int
+--     deriving (Show, Eq)
 
-data Dev' = Dev' String [Operand']
-    deriving (Show, Eq)
+-- data Dev' = Dev' String [Operand']
+--     deriving (Show, Eq)
 
-assignAddresses
-    :: Cofree (Diagram () Dev String) DgExt
-    -> MemoryConfiguration
-    -> Either String (Cofree (Diagram () Dev' String) DgExt)
-assignAddresses = undefined
+-- assignAddresses
+--     :: Cofree (Diagram () Dev String) DgExt
+--     -> MemoryConfiguration
+--     -> Either String (Cofree (Diagram () Dev' String) DgExt)
+-- assignAddresses = undefined
 
-allocateMemory :: MemoryVariables -> MemoryConfiguration
-allocateMemory = undefined
+-- allocateMemory :: MemoryVariables -> MemoryConfiguration
+-- allocateMemory = undefined
 
 --evil approach
 extractVariables
@@ -276,6 +280,20 @@ xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA pure f pure ast
         | otherwise = throwError "type mismatch"
     alterVar t Nothing = undefined
 
+
+emptyMemory = MemTrack 0 0 M.empty
+
+-- hjknhjb :: _
+allocateMemory mt ast = xdgcfg doOperand mt ast
+    where
+    doOperand Word (Lit v) = return $ Left v
+    doOperand _    (Lit _) = throwError "type mismatch"
+    doOperand t    (Var n) = do
+        st          <- get
+        (addr, st') <- addCell st t n
+        put st'
+        return $ Right addr
+
 -- xdgcfg :: _
 xdgcfg doOperand st ast = flip runStateT st $ mapDgA pure (cfggjhj doOperand) pure ast
 
@@ -292,9 +310,27 @@ cfggjhj doOperand = f
     f  On          = pure   On
     f (Jmp s)      = pure $ Jmp s
 
+-- addCell :: MemTrack n -> f (MemTrack n)
+addCell mt@MemTrack{..} ty n
+    = case M.lookup n variables of
+        Just (addr, ty')
+            | ty == ty' -> return (addr, mt)
+            | otherwise -> throwError $ show ("type mismatch", ty, ty')
+        Nothing -> return $ new ty
+
+    where
+    updated addr addBits addWords = mt
+        { variables = M.insert n (addr, ty) variables
+        , wordsSize = wordsSize + addWords
+        , bitsSize  = bitsSize + addBits
+        }
+
+    new Bit     = let a = BitAddr  bitsSize  in (a, updated a 1 0)
+    new TwoBits = let a = BitAddr  bitsSize  in (a, updated a 2 0)
+    new Word    = let a = WordAddr wordsSize in (a, updated a 0 1)
 
 data MemTrack n = MemTrack { bitsSize, wordsSize :: Int
-    , variables :: M.Map n (Int, CellType) }
+    , variables :: M.Map n (Address Int, CellType) }
 
 --------------------------------------------------------------------------------
 
@@ -331,3 +367,12 @@ main = do
 --     putStrLn cstub
     putStrLn cstub1
 
+    args <- getArgs
+    print (here, args)
+    case args of
+        [fn] -> do
+            (_pragmas, _blocks) <- parseOrDie4 fn
+--             foldlM ( allocateMemory ) emptyMemory
+            return ()
+        _    -> 
+            return ()

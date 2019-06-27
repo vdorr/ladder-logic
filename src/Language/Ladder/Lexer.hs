@@ -193,27 +193,28 @@ isWsTok _         = False
 --TODO keep source pos for start of block
 -- does not look for labels floating among logic, that is left to parser
 -- produced list of (labeled) networks
-basicBlocks'
+labeledRungs
     :: [(p, [((p, p), Tok a)])]
     -> [(Maybe a, [(p, [((p, p), Tok a)])])]
-basicBlocks' [] = []
-basicBlocks' t = (lbl, this) : basicBlocks' rest
+labeledRungs [] = []
+labeledRungs t = (lbl, this) : labeledRungs rest
     where
     (this, rest) = break isLabel t'
     (lbl, t')
         = case t of
             ((_, [(_, Label x)]) : xs) -> (Just x, xs)
-            xs                -> (Nothing, xs)
+            xs                         -> (Nothing, xs)
+
     isLabel (_, [(_, Label _)]) = True
     isLabel _         = False
 
-basicBlocks
-    :: [[Tok a]]
-    -> [(Maybe a, [[Tok a]])]
-basicBlocks
-    = fmap (fmap (fmap (snd . fmap(fmap snd))))
-    . basicBlocks'
-    . (fmap (((),).fmap (((),()),)))
+-- basicBlocks
+--     :: [[Tok a]]
+--     -> [(Maybe a, [[Tok a]])]
+-- basicBlocks
+--     = fmap (fmap (fmap (snd . fmap(fmap snd))))
+--     . labeledRungs
+--     . (fmap (((),).fmap (((),()),)))
 
 --------------------------------------------------------------------------------
 
@@ -228,9 +229,20 @@ stripPos = fmap (bimap (unPos.sourceLine)
 
 -- |Look for first pragma in list of lexemes
 getPragma :: [Tok a] -> Maybe a
-getPragma (Pragma p : xs) = Just p
-getPragma (_ : xs)        = getPragma xs
-getPragma _               = Nothing
+-- getPragma (Pragma p : xs) = Just p
+-- getPragma (_ : xs)        = getPragma xs
+-- getPragma _               = Nothing
+getPragma xs = case getLeadingPragmas xs of
+    x : _ -> Just x
+    _     -> Nothing
+
+-- |Look for first pragma in list of lexemes
+getLeadingPragmas :: [Tok a] -> [a]
+getLeadingPragmas = go
+    where
+    go (Pragma  p : xs ) = p : go xs
+    go (Comment _ : xs)  =     go xs
+    go _                 =     []
 
 -- should be called "dropPos" or something like that
 -- |Discard position informations from list of lexemes

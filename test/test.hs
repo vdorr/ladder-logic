@@ -65,7 +65,13 @@ preproc5' = preproc . runLexer
 preproc5'' :: Text -> Either String [(Int, [((Int, Int), Tok Text)])]
 preproc5'' = bimap unpack id . preproc5'
 
-testPreproc4 :: Text -> Either Text [[(Tok Text)]]
+--basic blocks
+testPreproc6 :: Text -> Either Text [(Maybe Text, [[Tok Text]])]
+-- testPreproc6 = fmap basicBlocks . fmap (fmap (snd . fmap (fmap snd))) . preproc5'
+testPreproc6 = fmap (fmap (fmap (fmap (snd . fmap (fmap snd))))) . fmap labeledRungs . preproc5'
+
+
+testPreproc4 :: Text -> Either Text [[Tok Text]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 
 testPreproc5 :: Text -> Either Text [Tok Text]
@@ -118,7 +124,7 @@ tokenizerTests = testGroup "Tokenizer"
             |               |]
     , testCase "label/blocks" $
         (Right [(Nothing, [[VLine]]),(Just "LBL", [[VLine]])] @=?)
-            $ fmap basicBlocks $ testPreproc4 $ [text|
+            $ testPreproc6 $ [text|
                 | (* hello *)
                 LBL:
                 |               |]
@@ -598,7 +604,7 @@ fileTests path = do
 --         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
             (tst, lxs) <- fmap dropWhitespace <$> loadLadderTest (path </> fn)
-            let blocks = basicBlocks' lxs
+            let blocks = labeledRungs lxs
             case tst of
                 Nothing -> do
                     for_ blocks $ \(_, lxs') -> do

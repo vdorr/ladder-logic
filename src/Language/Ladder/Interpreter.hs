@@ -208,8 +208,24 @@ verbose1 = False
 generateStk2
     :: Cofree (Diagram () Dev String) DgExt
     -> IO [ExtendedInstruction String String Int]
-generateStk2 ast' = do
-    let ast = parseOps $ dropEnd ast'
+generateStk2 ast = do
+    generateStk2' emitBasicDevice $ parseOps ast
+
+-- generateStk2
+--     :: Cofree (Diagram () Dev String) DgExt
+--     -> IO [ExtendedInstruction String String Int]
+generateStk2'
+    :: (Show lbl, Eq lbl)
+    => Show addr
+    => Show word
+    => Show device --NO
+    => (device -> [Instruction addr word])
+                      -> Cofree
+                           (Diagram () device lbl)
+                           DgExt
+                      -> IO [ExtendedInstruction lbl addr word]
+generateStk2' doDevice ast' = do
+    let ast = dropEnd ast'
     --collapse nodes
 --     let (nodes, a0) = merge' ast
     let (nodes, a0) = repositionSinks nodes <$> merge' ast
@@ -224,7 +240,7 @@ generateStk2 ast' = do
 --     let a7 = tsort2 nodes a6
     let a7 = tsort3 a6
 
-    code <- execWriterT $ foldlM (genStk tell emitBasicDevice) [] a7 --need failure here
+    code <- execWriterT $ foldlM (genStk tell doDevice) [] a7 --need failure here
     when verbose1 $ do
         print (here, "-----------------------")
         for_ a1 print
@@ -244,7 +260,7 @@ generateStk2 ast' = do
         print (here, "after tsort2", "-----------------------")
         for_ a7 print
         print (here, "-----------------------")
-        for_ (code :: [ExtendedInstruction String String Int]) print
+        for_ code print
         print (here, "-----------------------")
     return code
 
@@ -321,7 +337,7 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     f []               st = return st
     f (EIReturn   : _) st = return st
     f (EIJump lbl : p) st@(w:ws, os, m)
-        | w         = nextLabel lbl ([], [], m)
+        | w         = nextLabel lbl ([], [], m) --XXX beware! jump clears stacks!
         | otherwise = f p (ws, os, m)
     f (EIJump _ : _) _ = error here --stack underflow FIXME proper fail
     f (EISimple i : p) st = eval st i >>= f p

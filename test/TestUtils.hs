@@ -80,15 +80,34 @@ runLadderTest verbose test@T01{} ast = do
 
 --------------------------------------------------------------------------------
 
+-- |also return pragmas
+parseOrDie4
+    :: FilePath
+    -> IO ( [String]
+          , [(Maybe String, Cofree (Diagram () Dev String) DgExt)]
+          )
+parseOrDie4 path = do
+    (_, lxs)    <- loadLadderTest path
+    ast         <- parseOrDie2 $ dropWhitespace lxs
+    let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
+    return (pragmas, ast)
+
+parseOrDie3
+    :: FilePath
+    -> IO [(Maybe String, Cofree (Diagram () Dev String) DgExt)]
+parseOrDie3 path = do
+    (_tst, lxs) <- fmap dropWhitespace <$> loadLadderTest path
+    parseOrDie2 lxs
+
 -- |like 'parseOrDie' but additionaly can handle labels
 parseOrDie2
     :: [(Int, [((Int, Int), Tok Text)])]
     -> IO [(Maybe String, Cofree (Diagram () Dev String) DgExt)]
 parseOrDie2 lxs = do
-    let blocks = basicBlocks' lxs
+    let blocks = labeledRungs lxs
     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
 
--- |assuming no comments or pragmas in input
+-- |assuming comments and pragmas were filtered out
 parseOrDie
     :: [(Int, [((Int, Int), Tok Text)])]
     -> IO (Cofree (Diagram () Dev String) DgExt)
