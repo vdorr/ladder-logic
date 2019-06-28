@@ -15,10 +15,12 @@ import Data.Bits.Coding
 import qualified Data.ByteString.Lazy as L
 import Data.Word
 import Data.Foldable
+import Data.Traversable
 import Data.List
 import Numeric
 -- import Data.List
 import Data.Functor.Identity
+import Data.Char (toUpper)
 
 import Control.Monad.State
 import Control.Monad.Except
@@ -283,8 +285,15 @@ xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA pure f pure ast
 
 emptyMemory = MemTrack 0 0 M.empty
 
--- hjknhjb :: _
-allocateMemory mt ast = xdgcfg doOperand mt ast
+allocateMemory
+    :: Cofree (Diagram c' (Op s Operand) s') a
+    -> StateT
+        (MemTrack String)
+        (Either String)
+        (Cofree (Diagram c' (Op s (Either Int (Address Int))) s') a)
+-- allocateMemory mt ast = flip runStateT mt $ hjdtfd doOperand ast
+allocateMemory (p :< n)
+    = (p :<) <$> (hjdtfd doOperand n >>= traverse allocateMemory)
     where
     doOperand Word (Lit v) = return $ Left v
     doOperand _    (Lit _) = throwError "type mismatch"
@@ -296,6 +305,7 @@ allocateMemory mt ast = xdgcfg doOperand mt ast
 
 -- xdgcfg :: _
 xdgcfg doOperand st ast = flip runStateT st $ mapDgA pure (cfggjhj doOperand) pure ast
+hjdtfd doOperand ast = mapDgA pure (cfggjhj doOperand) pure ast
 
 cfggjhj doOperand = f
     where
@@ -311,7 +321,7 @@ cfggjhj doOperand = f
     f (Jmp s)      = pure $ Jmp s
 
 -- addCell :: MemTrack n -> f (MemTrack n)
-addCell mt@MemTrack{..} ty n
+addCell mt@MemTrack{..} ty n0
     = case M.lookup n variables of
         Just (addr, ty')
             | ty == ty' -> return (addr, mt)
@@ -319,6 +329,8 @@ addCell mt@MemTrack{..} ty n
         Nothing -> return $ new ty
 
     where
+    n = fmap toUpper n0
+
     updated addr addBits addWords = mt
         { variables = M.insert n (addr, ty) variables
         , wordsSize = wordsSize + addWords
@@ -331,6 +343,7 @@ addCell mt@MemTrack{..} ty n
 
 data MemTrack n = MemTrack { bitsSize, wordsSize :: Int
     , variables :: M.Map n (Address Int, CellType) }
+    deriving (Show)
 
 --------------------------------------------------------------------------------
 
@@ -371,8 +384,12 @@ main = do
     print (here, args)
     case args of
         [fn] -> do
-            (_pragmas, _blocks) <- parseOrDie4 fn
---             foldlM ( allocateMemory ) emptyMemory
+            (_pragmas, blocks) <- parseOrDie5 fn
+
+            let Right (blocks', st)
+                        = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
+            print (here, st)
+--             x <- for blocks $ generateStk2' emitBasicDevice
             return ()
         _    -> 
             return ()

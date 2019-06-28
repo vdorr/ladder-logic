@@ -12,6 +12,8 @@ import Control.Applicative
 import Data.Traversable
 import Data.Semigroup
 
+-- import Control.Monad.Except
+
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
@@ -50,7 +52,7 @@ runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
 
 --     prog <- generateStk1 ast
-    blocks <- for ast (\(lbl, p) -> (lbl,) <$> generateStk2 p)
+    blocks <- for ast (traverse generateStk2)
 
     let allSigs = testVectSignals (testVect test)
 --TODO select signals for display independently from signals for test evaluation
@@ -79,6 +81,19 @@ runLadderTest verbose test@T01{} ast = do
     return passed
 
 --------------------------------------------------------------------------------
+
+-- |also return pragmas
+parseOrDie5
+    :: FilePath
+    -> IO ( [String]
+          , [(Maybe String, Cofree (Diagram () (Op String Operand) String) DgExt)]
+          )
+parseOrDie5 path = do
+    (_, lxs)    <- loadLadderTest path
+    ast         <- parseOrDie2 $ dropWhitespace lxs
+    let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
+    ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
+    return (pragmas, ast')
 
 -- |also return pragmas
 parseOrDie4

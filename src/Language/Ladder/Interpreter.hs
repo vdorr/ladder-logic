@@ -28,6 +28,7 @@ data V
 -- data V2 = T | F | I Int
 --     deriving (Show, Read, Eq)
 
+-- XXX i increasingly feel like Map String [Instruction]
 data Op s n
     = And       n -- wire out <- wire in and memory cell
     | AndN      n
@@ -192,6 +193,7 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
     bringToTop 0 = return ()
     bringToTop i = emit [IPick i]
 
+emitBasicDevice :: Op String Operand -> [Instruction String w]
 emitBasicDevice d
     = case d of
         And  (Var addr)  -> [ILdBit addr, IAnd]
@@ -270,25 +272,37 @@ generateStk2' doDevice ast' = do
 parseOps
     :: Cofree (Diagram c Dev s) p
     -> Cofree (Diagram c (Op s Operand) s) p
-parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
+-- parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
+--     where
+--     f (Dev op arg) = case (fmap toUpper op, arg) of
+--         ("[ ]", [n]   ) -> And  n
+--         ("[/]", [n]   ) -> AndN  n
+--         ("[>]", [a, b]) -> Cmp Gt a b
+--         ("( )", [n]   ) -> St n
+--         ("(/)", [n]   ) -> StN n
+--         ("[P]", [n]   ) -> LdP n
+--         ("[N]", [n]   ) -> LdN n
+--         ("(R)", [n]   ) -> undefined
+--         ("(S)", [n]   ) -> undefined
+--         _               -> error here
+parseOps = either (error here) id . parseOpsM
+
+parseOpsM
+    :: Cofree (Diagram c Dev s) p
+    -> Either String (Cofree (Diagram c (Op s Operand) s) p)
+parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
     where
---     f (Dev "[ ]" [n]   ) = And  n
---     f (Dev "[/]" [n]   ) = AndN  n
---     f (Dev "[>]" [a, b]) = Cmp Gt a b
---     f (Dev "( )" [n]   ) = St n
---     f (Dev "(/)" [n]   ) = StN n
---     f _                  = error here
     f (Dev op arg) = case (fmap toUpper op, arg) of
-        ("[ ]", [n]   ) -> And  n
-        ("[/]", [n]   ) -> AndN  n
-        ("[>]", [a, b]) -> Cmp Gt a b
-        ("( )", [n]   ) -> St n
-        ("(/)", [n]   ) -> StN n
-        ("[P]", [n]   ) -> LdP n
-        ("[N]", [n]   ) -> LdN n
+        ("[ ]", [n]   ) -> pure $ And  n
+        ("[/]", [n]   ) -> pure $ AndN  n
+        ("[>]", [a, b]) -> pure $ Cmp Gt a b
+        ("( )", [n]   ) -> pure $ St n
+        ("(/)", [n]   ) -> pure $ StN n
+        ("[P]", [n]   ) -> pure $ LdP n
+        ("[N]", [n]   ) -> pure $ LdN n
         ("(R)", [n]   ) -> undefined
         ("(S)", [n]   ) -> undefined
-        _               -> error here
+        _               -> Left "unknown device"
 
 --------------------------------------------------------------------------------
 
