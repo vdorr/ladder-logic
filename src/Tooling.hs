@@ -125,9 +125,9 @@ generate ::
     Eq c =>
     Show c =>
     ([Instruction String w] -> m0 ())
-                      -> [(b0, b0)]
-                      -> [([b0], Cofree (Diagram c (Op s0 Operand) s1) b0)]
-                      -> m0 ([b0], [([b0], Cofree (Diagram c (Op s0 Operand) s1) b0)])
+    -> [(b0, b0)]
+    -> [([b0], Cofree (Diagram c (Op s0 (Operand String)) s1) b0)]
+    -> m0 ([b0], [([b0], Cofree (Diagram c (Op s0 (Operand String)) s1) b0)])
 
 generate emit nodeToSink asts = go ([], asts)
 
@@ -351,7 +351,6 @@ evalTestVect''' prog watch vect
         :: ItpSt3
         -> Either (ItpSt, String) ItpSt3
     evalBlock' = run
---     run
 
 --     step = undefined
     step (tr, st@(x, y, mem)) stim = do

@@ -59,14 +59,10 @@ runLadderTest verbose test@T01{} ast = do
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
 
---     let xxy = evalTestVect'' prog allSigs (testVect test)
---     let xxy = evalTestVect''' [(Nothing, prog)] allSigs (testVect test)
     let xxy = evalTestVect''' blocks allSigs (testVect test)
 
---     let xxy = evalTestVect'' prog (watch test) (testVect test)
     when verbose $ print (here, xxy)
     let Right traces = xxy
---     when verbose $ putStrLn $ unlines $ prettyTrace $ zip (watch test) $ transpose traces
     when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
 
 --     let idxs = fmap (findIndex)
@@ -86,7 +82,7 @@ runLadderTest verbose test@T01{} ast = do
 parseOrDie5
     :: FilePath
     -> IO ( [String]
-          , [(Maybe String, Cofree (Diagram () (Op String Operand) String) DgExt)]
+          , [(Maybe String, Cofree (Diagram () (Op String (Operand String)) String) DgExt)]
           )
 parseOrDie5 path = do
     (_, lxs)    <- loadLadderTest path

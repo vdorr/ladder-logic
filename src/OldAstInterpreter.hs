@@ -32,17 +32,17 @@ data E op = Op op [D] -- and, or, ld #on, ...
 
 fffff
     :: Eq p
-    => Cofree (Diagram () (Op s Operand) s) p
-    -> ([(p, Int)], [(D, E (Op s Operand))], Int)
+    => Cofree (Diagram () (Op s (Operand String)) s) p
+    -> ([(p, Int)], [(D, E (Op s (Operand String)))], Int)
 fffff w@(p :< _a) =  ffff ([], [], 0) 0 p w
 
 ffff
     :: Eq p
-    => ([(p, Int)], [(D, E (Op s Operand))], Int)
+    => ([(p, Int)], [(D, E (Op s (Operand String)))], Int)
     -> Int
     -> p
-    -> Cofree (Diagram () (Op s Operand) s) p
-    -> ([(p, Int)], [(D, E (Op s Operand))], Int)
+    -> Cofree (Diagram () (Op s (Operand String)) s) p
+    -> ([(p, Int)], [(D, E (Op s (Operand String)))], Int)
 ffff (st, op, cnt) r src (p :< x) = f x
     where
     f (Source a) = 
@@ -76,7 +76,7 @@ ffff (st, op, cnt) r src (p :< x) = f x
 --------------------------------------------------------------------------------
 
 evalTestVect
-    :: [(D, [E (Op String Operand)])] -- ^network to evaluate
+    :: [(D, [E (Op String (Operand String))])] -- ^network to evaluate
     -> [VarName]                      -- ^watched memory variables
     -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
     -> [[V]]       -- ^resulting trace, elems are same length as watch list
@@ -103,7 +103,7 @@ evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
 
 --TODO replace lookup by iorefs
 network
-    :: [(D, [E (Op String Operand)])]
+    :: [(D, [E (Op String (Operand String))])]
     -> [(String, V)]
     -> ([(Int, Bool)], [(String, V)])
 network net m0

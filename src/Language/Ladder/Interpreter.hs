@@ -193,7 +193,10 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
     bringToTop 0 = return ()
     bringToTop i = emit [IPick i]
 
-emitBasicDevice :: Op String Operand -> [Instruction String w]
+emitBasicDevice
+    :: (Show address, Show op)
+    => Op op (Operand address)
+    -> [Instruction address w]
 emitBasicDevice d
     = case d of
         And  (Var addr)  -> [ILdBit addr, IAnd]
@@ -210,12 +213,15 @@ verbose1 = False
 generateStk2
     :: Cofree (Diagram () Dev String) DgExt
     -> IO [ExtendedInstruction String String Int]
-generateStk2 ast = do
-    generateStk2' emitBasicDevice $ parseOps ast
+generateStk2 = generateStk2' emitBasicDevice . parseOps
 
--- generateStk2
---     :: Cofree (Diagram () Dev String) DgExt
---     -> IO [ExtendedInstruction String String Int]
+--FIXME IO
+generateStk2x
+    :: Show address
+    => Cofree (Diagram () (Op String (Operand address)) String) DgExt
+    -> IO [ExtendedInstruction String address Int]
+generateStk2x = generateStk2' emitBasicDevice
+
 generateStk2'
     :: (Show lbl, Eq lbl)
     => Show addr
@@ -271,7 +277,7 @@ generateStk2' doDevice ast' = do
 --FIXME do this in LadderParser
 parseOps
     :: Cofree (Diagram c Dev s) p
-    -> Cofree (Diagram c (Op s Operand) s) p
+    -> Cofree (Diagram c (Op s (Operand String)) s) p
 -- parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
 --     where
 --     f (Dev op arg) = case (fmap toUpper op, arg) of
@@ -289,7 +295,7 @@ parseOps = either (error here) id . parseOpsM
 
 parseOpsM
     :: Cofree (Diagram c Dev s) p
-    -> Either String (Cofree (Diagram c (Op s Operand) s) p)
+    -> Either String (Cofree (Diagram c (Op s (Operand String)) s) p)
 parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
     where
     f (Dev op arg) = case (fmap toUpper op, arg) of
@@ -308,9 +314,6 @@ parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
 
 --wire stack count, wire stack, arg stack, memory???
 -- type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
-
--- eval2 :: ItpSt2 -> Instruction Int Int16 -> Either (ItpSt2, String) ItpSt2
--- eval2 = undefined
 
 type Program = [ExtendedInstruction Int String Int]
 

@@ -251,7 +251,7 @@ data Address a = BitAddr a | WordAddr a
 
 --evil approach
 extractVariables
-    :: Cofree (Diagram () (Op Operand String) String) DgExt
+    :: Cofree (Diagram () (Op (Operand String) String) String) DgExt
     -> MemoryVariables
 extractVariables = undefined
 -- data Dev = Dev String [Operand]
@@ -286,22 +286,21 @@ xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA pure f pure ast
 emptyMemory = MemTrack 0 0 M.empty
 
 allocateMemory
-    :: Cofree (Diagram c' (Op s Operand) s') a
+    :: Cofree (Diagram c' (Op s (Operand String)) s') a
     -> StateT
         (MemTrack String)
         (Either String)
-        (Cofree (Diagram c' (Op s (Either Int (Address Int))) s') a)
--- allocateMemory mt ast = flip runStateT mt $ hjdtfd doOperand ast
+        (Cofree (Diagram c' (Op s (Operand (Address Int))) s') a)
 allocateMemory (p :< n)
     = (p :<) <$> (hjdtfd doOperand n >>= traverse allocateMemory)
     where
-    doOperand Word (Lit v) = return $ Left v
+    doOperand Word (Lit v) = return $ Lit v
     doOperand _    (Lit _) = throwError "type mismatch"
     doOperand t    (Var n) = do
         st          <- get
         (addr, st') <- addCell st t n
         put st'
-        return $ Right addr
+        return $ Var addr
 
 -- xdgcfg :: _
 xdgcfg doOperand st ast = flip runStateT st $ mapDgA pure (cfggjhj doOperand) pure ast
@@ -389,7 +388,10 @@ main = do
             let Right (blocks', st)
                         = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
             print (here, st)
---             x <- for blocks $ generateStk2' emitBasicDevice
-            return ()
+            x <- for blocks' (traverse generateStk2x)
+            let prog = case resolveLabels x of --FIXME fail properly
+                            Right p -> p
+                            Left err -> error err
+            print (here, prog)
         _    -> 
             return ()

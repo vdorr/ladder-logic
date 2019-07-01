@@ -64,12 +64,12 @@ mapDgA z x y = f
 --     f  Stub        = Stub
 
 -- |Contact operand, located above or below
-data Operand
-    = Var String -- ^name of memory location
-    | Lit Int -- ^integer literal, usually allowed only below contact
+data Operand address
+    = Var address   -- ^name of memory location
+    | Lit Int       -- ^integer literal, usually allowed only below contact
     deriving (Show, Eq)
 
-data Dev = Dev String [Operand]
+data Dev = Dev String [Operand String]
     deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
@@ -79,22 +79,22 @@ type DgPSt = DgPState (Tok Text)
 
 --------------------------------------------------------------------------------
 
-variable :: DgP Operand
+variable :: DgP (Operand String)
 variable = (Var . unpack) <$> name
 
-number :: DgP Operand
+number :: DgP (Operand String)
 number = do
     Number n <- eat
     return (Lit n)
 
-operand :: DgP Operand
+operand :: DgP (Operand String)
 operand = variable <|> number
 
 --------------------------------------------------------------------------------
 
 withOperands
     :: SFM (DgPState (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
-    -> SFM (DgPState (Tok Text)) (Operand, Maybe Operand, a)
+    -> SFM (DgPState (Tok Text)) ((Operand String), Maybe (Operand String), a)
 withOperands p = below (above_ p variable) optOper
     where
     optOper ((True, a), op) = (op,,a) <$> fmap Just operand
