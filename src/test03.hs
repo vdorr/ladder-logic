@@ -33,6 +33,7 @@ import Language.Ladder.LadderParser
 import Language.Ladder.Interpreter
 
 import Data.ByteString.Base16.Lazy as B16
+import Data.Binary.Get (Get)
 
 import TestUtils
 
@@ -42,12 +43,8 @@ import TestUtils
 
 --------------------------------------------------------------------------------
 
-type LabelIn = Int
-type AddressIn = Int
-type ConstWordIn = Int
-
-xxx :: [ExtendedInstruction Int Word8 Word16] -> [Chunk]
-xxx l = foldMap snd l''
+instructionsToChunks :: [ExtendedInstruction Int Word8 Word16] -> [Chunk]
+instructionsToChunks l = foldMap snd l''
     where
     l' = fmap g l
 
@@ -78,6 +75,8 @@ xxx l = foldMap snd l''
     f  ILt       = [C4 12, C4 5]
     f  IGt       = [C4 12, C4 6]
 
+-- |Return length of chunk in nibbles
+chunkLength :: Chunk -> Integer
 chunkLength = f
     where
     f C4{}  = 1
@@ -85,15 +84,16 @@ chunkLength = f
     f C12{} = 3
     f C16{} = 4
 
+-- |Some bits
 data Chunk
-    = C4 Word8
-    | C8 Word8
-    | C12 Word16
+    = C4  Word8 -- ^lower four bits are used
+    | C8  Word8
+    | C12 Word16 -- ^lower twelwe bits are used
     | C16 Word16
     deriving Show
 
-xxy :: Foldable t => t Chunk -> L.ByteString
-xxy l
+chunksToByteString :: Foldable t => t Chunk -> L.ByteString
+chunksToByteString l
     = runPutL $ runEncode $ do
         for_ l $ \case
             C4  x -> putBitsFrom 3  x
@@ -102,29 +102,31 @@ xxy l
             C16 x -> putBitsFrom 15 x
         flush
 
-xxz :: L.ByteString -> [(Int, ExtendedInstruction Int Word8 Word16)]
-xxz = runGetL $ runDecode f
+byteStringToInstructions :: L.ByteString -> [(Int, ExtendedInstruction Int Word8 Word16)]
+byteStringToInstructions = runGetL $ runDecode f
     where
     f = do
         empty <- isEmpty
         if empty
         then return []
-        else (:) <$> getOne <*> f
+        else (:) <$> getOneInstruction <*> f
 
-    getOne = getBitsFrom 3 (0::Word8) >>= \case
-        0  -> return               (1, EISimple ITrap)
-        1  -> ((1+3,).EIJump)              <$> (fromIntegral <$> getBitsFrom 11 (0::Word16))
-        4  -> ((1+1,).EISimple . IPick)  <$> (fromIntegral <$> getBitsFrom 3 (0::Word8))
-        6  -> ((1+2,).EISimple . ILdBit) <$> (getBitsFrom 7 (0::Word8))
-        12 -> getBitsFrom 3 (0::Word8) >>= \case
-            1 -> ((1+1+4,).EISimple . ILdCnA) <$> getBitsFrom 15 (0::Word16)
-            _ -> error here
-        other -> error $ show (here, other)
+getOneInstruction :: Coding Get (Int, ExtendedInstruction Int Word8 Word16)
+getOneInstruction = getBitsFrom 3 (0::Word8) >>= \case
+    0  -> return (1, EISimple ITrap)
+    1  -> ((1+3,).EIJump)            <$> (fromIntegral <$> getBitsFrom 11 (0::Word16))
+    4  -> ((1+1,).EISimple . IPick)  <$> (fromIntegral <$> getBitsFrom 3 (0::Word8))
+    6  -> ((1+2,).EISimple . ILdBit) <$> (getBitsFrom 7 (0::Word8))
+    12 -> getBitsFrom 3 (0::Word8) >>= \case
+        1 -> ((1+1+4,).EISimple . ILdCnA) <$> getBitsFrom 15 (0::Word16)
+        _ -> error here
+    other -> error $ show (here, other)
 
-xx0
+-- |Translate input nibble-based labels to index of instruction
+findLabels
     :: [(Int, ExtendedInstruction Int Word8 Word16)]
     -> [ExtendedInstruction Int Word8 Word16]
-xx0 l = fmap f l
+findLabels l = fmap f l
     where
     (_, l' ) = Prelude.foldl h (0, []) l
     h (acc, xs) (chnLen, i) = (acc + chnLen, xs ++ [(acc, i)])
@@ -136,40 +138,41 @@ xx0 l = fmap f l
 
 --------------------------------------------------------------------------------
 
-instructions
+-- |List of instruction, for property testing and C stubs generation 
+instructionTable
     :: Applicative f
     => f Int
     -> f ca
     -> f a
     -> f w
     -> [f (ExtendedInstruction ca a w)]
-instructions stk lbl addr lit = 
-    [ EIJump <$> lbl
-    , pure $ EISimple ITrap
-    , pure $ EISimple ILdOn
-    , pure $ EISimple IDup
-    , (EISimple . IPick) <$> stk
-    , pure $ EISimple IDrop
-    , (EISimple . ILdBit) <$> addr
-    , (EISimple . IStBit) <$> addr
-    , pure $ EISimple IAnd
-    , pure $ EISimple IOr
-    , pure $ EISimple INot
-    , (EISimple . ILdCnA) <$> lit
-    , pure $ EISimple ILdM
-    , pure $ EISimple IStM
-    , pure $ EISimple IEq
-    , pure $ EISimple ILt
-    , pure $ EISimple IGt
+instructionTable stk lbl addr lit = 
+    [        EIJump <$> lbl
+    , pure $ EISimple   ITrap
+    , pure $ EISimple   ILdOn
+    , pure $ EISimple   IDup
+    ,       (EISimple . IPick) <$> stk
+    , pure $ EISimple   IDrop
+    ,       (EISimple . ILdBit) <$> addr
+    ,       (EISimple . IStBit) <$> addr
+    , pure $ EISimple   IAnd
+    , pure $ EISimple   IOr
+    , pure $ EISimple   INot
+    ,       (EISimple . ILdCnA) <$> lit
+    , pure $ EISimple   ILdM
+    , pure $ EISimple   IStM
+    , pure $ EISimple   IEq
+    , pure $ EISimple   ILt
+    , pure $ EISimple   IGt
     ]
 
-i0 = instructions (Identity 0) (Identity 0) (Identity 0) (Identity 0)
+i0 = instructionTable (Identity 0) (Identity 0) (Identity 0) (Identity 0)
 
 cstub1 :: String
 cstub1 = unlines (concat (concat q))
     where
 
-    l = fmap (\(Identity i) -> (i, xxx [i])) i0
+    l = fmap (\(Identity i) -> (i, instructionsToChunks [i])) i0
     l' = groupBy (\(_, C4 a : _) (_, C4 b : _) -> a == b) l
     (_stubs, q) = unzip $ fmap f l'
 
@@ -346,6 +349,20 @@ data MemTrack n = MemTrack { bitsSize, wordsSize :: Int
 
 --------------------------------------------------------------------------------
 
+compileOrDie :: FilePath -> IO ((MemTrack String,
+                            [ExtendedInstruction Int (Address Int) Int]))
+compileOrDie fn = do
+    (_pragmas, blocks) <- parseOrDie5 fn
+
+    let Right (blocks', memory)
+                = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
+--     print (here, memory)
+    prog <- generateStk2xx blocks'
+--     print (here, prog)
+    return (memory, prog)
+
+--------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
     print here
@@ -372,10 +389,13 @@ main = do
 --             = [EISimple $ ILdBit 4, EISimple $ ILdBit 5]
             -- , EISimple $ ILdCnA (0::Word16), EIJump (0::Int)]
     print (here, p)
-    print (here, xxx p)
-    print (here, B16.encode $ xxy $ xxx p)
-    print (here, xx0 $ xxz $ xxy $ xxx p)
-    print (here, xxx $ fmap runIdentity i0)
+    print (here, instructionsToChunks p)
+    print (here, B16.encode $ chunksToByteString $ instructionsToChunks p)
+    print (here
+        , findLabels $ byteStringToInstructions
+            $ chunksToByteString $ instructionsToChunks p
+        )
+    print (here, instructionsToChunks $ fmap runIdentity i0)
 --     putStrLn cstub
     putStrLn cstub1
 
@@ -383,12 +403,8 @@ main = do
     print (here, args)
     case args of
         [fn] -> do
-            (_pragmas, blocks) <- parseOrDie5 fn
-
-            let Right (blocks', st)
-                        = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
-            print (here, st)
-            prog <- generateStk2xx blocks'
+            (memory, prog) <- compileOrDie fn
+            print (here, memory)
             print (here, prog)
-        _    -> 
+        _    ->
             return ()

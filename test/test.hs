@@ -581,6 +581,18 @@ box03 =
 
 --------------------------------------------------------------------------------
 
+otherTests :: TestTree
+otherTests = testGroup "Other tests"
+    [ testCase "show ast" $
+        show (() :< Nothing)
+            @=? "(() :< Nothing)"
+    , testCase "fold ast" $
+        fold (() :< Nothing)
+            @=? ()
+    ]
+
+--------------------------------------------------------------------------------
+
 basicTests :: [TestTree]
 basicTests = 
     [ tokenizerTests
@@ -589,6 +601,7 @@ basicTests =
     , ladderTests
     , boxTests
     , analysisTests
+    , otherTests
     ]
 
 getTests :: IO TestTree
