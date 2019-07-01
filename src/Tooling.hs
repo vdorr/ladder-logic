@@ -330,7 +330,7 @@ evalTestVect'''
     :: [(Maybe String, [ExtendedInstruction String String Int])] -- ^program
     -> [VarName] -- ^watched memory variables
     -> [(Int, [(VarName, V)])] -- ^test vector
-    -> Either (Memory, String) [[V]]
+    -> Either (Memory String, String) [[V]]
 evalTestVect''' prog watch vect
 
 --     = fst <$> foldlM step ([], ([],[],[])) vect'
@@ -347,9 +347,7 @@ evalTestVect''' prog watch vect
 
     p = makeItpSt3 [] [(1, 0, prog')]
 
-    evalBlock'
-        :: ItpSt3
-        -> Either (ItpSt, String) ItpSt3
+    evalBlock' :: (Show a, Eq a) => ItpSt3 a -> Either (ItpSt a, String) (ItpSt3 a)
     evalBlock' = run
 
 --     step = undefined
@@ -360,14 +358,16 @@ evalTestVect''' prog watch vect
         where
         mem' = updateMemory mem stim
 
-evalBlock :: [Instruction String Int] -> ItpSt -> Either (ItpSt, String) ItpSt
+evalBlock :: [Instruction String Int]
+          -> ItpSt String
+          -> Either (ItpSt String, String) (ItpSt String)
 evalBlock p st = foldlM eval st p
 
 evalTestVect''
     :: [Instruction String Int] -- ^program
     -> [VarName] -- ^watched memory variables
     -> [(Int, [(VarName, V)])] -- ^test vector
-    -> Either (Memory, String) [[V]]
+    -> Either (Memory String, String) [[V]]
 evalTestVect'' prog watch vect
 --     = bimap (bimap (\((_, _, mem1), _) -> mem1) id) fst
 --         $ 

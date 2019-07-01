@@ -325,22 +325,24 @@ parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
 --wire stack count, wire stack, arg stack, memory???
 -- type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
 
-type Program = [ExtendedInstruction Int String Int]
+type Program a = [ExtendedInstruction Int a Int]
 
 -- data Trigger = Periodic Int | Memory String
-data Task = Task { nextRun, priority, period :: Int, program :: Program }
+data Task a = Task { nextRun, priority, period :: Int, program :: Program a }
 
-type ItpSt3 = (Clock, [Task], Memory)
+-- type ItpSt3 = (Clock, [Task String], Memory String)
+type ItpSt3 a = (Clock, [Task a], Memory a)
 type Period = Int
 type Clock = Int
 type Prio = Int
 
-makeItpSt3 :: Memory -> [(Period, Prio, Program)] -> ItpSt3
+makeItpSt3 :: Memory a -> [(Period, Prio, Program a)] -> ItpSt3 a
 makeItpSt3 m tasks = (0, fmap (\(per, pri, pro) -> Task 0 pri per pro) tasks, m)
 
-run
-    :: ItpSt3
-    -> Either (ItpSt, String) ItpSt3 --FIXME error should return also offending task
+--FIXME error should return also offending task
+run :: (Eq address, Show address)
+    => ItpSt3 address
+    -> Either (ItpSt address, String) (ItpSt3 address)
 run (clk, tasks, st0)
     = (clk + 1, waiting ++ nextRound,)
     <$> foldlM execute st0 run''
@@ -354,10 +356,10 @@ run (clk, tasks, st0)
 
 --------------------------------------------------------------------------------
 
-execute
-    :: Memory
-    -> [ExtendedInstruction Int String Int]
-    -> Either (ItpSt, String) Memory
+execute :: (Eq address, Show address)
+         => Memory address
+        -> [ExtendedInstruction Int address Int]
+        -> Either (ItpSt address, String) (Memory address)
 execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     where
 
@@ -373,12 +375,16 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
 
 --------------------------------------------------------------------------------
 
-type Memory = [(String, V)]
+type Memory a = [(a, V)]
 
--- data ItSt = ItSt [Bool] [V] [(String, V)]
-type ItpSt = ([Bool], [V], Memory)
+type ItpSt a = ([Bool], [V], Memory a)
 
-eval :: ItpSt -> Instruction String Int -> Either (ItpSt, String) ItpSt
+eval :: (Eq address, Show address)
+     => ItpSt address
+     -> Instruction address Int
+     -> Either
+         (ItpSt address, String)
+         (ItpSt address)
 eval = f
     where
     f st                 ITrap      = Left (st, "trap")
