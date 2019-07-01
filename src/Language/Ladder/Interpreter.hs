@@ -216,11 +216,21 @@ generateStk2
 generateStk2 = generateStk2' emitBasicDevice . parseOps
 
 --FIXME IO
-generateStk2x
+-- generateStk2x
+--     :: Show address
+--     => Cofree (Diagram () (Op String (Operand address)) String) DgExt
+--     -> IO [ExtendedInstruction String address Int]
+-- generateStk2x = generateStk2' emitBasicDevice
+
+--FIXME IO
+generateStk2xx
     :: Show address
-    => Cofree (Diagram () (Op String (Operand address)) String) DgExt
-    -> IO [ExtendedInstruction String address Int]
-generateStk2x = generateStk2' emitBasicDevice
+    => [(Maybe String, Cofree (Diagram () (Op String (Operand address)) String) DgExt)]
+    -> IO [ExtendedInstruction Int address Int]
+generateStk2xx ast = do
+    ast' <- for ast (traverse (generateStk2' emitBasicDevice))
+    Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
+    return ast''
 
 generateStk2'
     :: (Show lbl, Eq lbl)

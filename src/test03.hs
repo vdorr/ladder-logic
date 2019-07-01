@@ -388,10 +388,7 @@ main = do
             let Right (blocks', st)
                         = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
             print (here, st)
-            x <- for blocks' (traverse generateStk2x)
-            let prog = case resolveLabels x of --FIXME fail properly
-                            Right p -> p
-                            Left err -> error err
+            prog <- generateStk2xx blocks'
             print (here, prog)
         _    -> 
             return ()
