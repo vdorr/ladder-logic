@@ -221,19 +221,38 @@ genToken =
 zipperTests :: TestTree
 zipperTests = testGroup "Zipper"
     [ testCase "from/to list" $
-        zpToList <$> (stepRight $ zpFromList [1,2,3,4]) @=? Just [1,2,3,4]
-    ,  testCase "length" $
-        zpLength <$> (stepRight $ zpFromList [0,1,2,3]) @=? Just 4
-    ,  testCase "bad move" $
-        stepLeft (zpFromList [1::Int,2]) @=? Nothing
-    ,  testCase "okay move" $
-        (stepRight (zpFromList [1,2]) >>= tip) @=? Just 2
-    ,  testCase "move there and back" $
-        (stepRight (zpFromList [1,2]) >>= stepLeft >>= tip) @=? Just 1
-    ,  testCase "okay focus" $
-        tip (focus (Zp [2,1] [])) @=? Just 2
-    ,  testCase "nothing to focus to" $
-        tip (focus (zpFromList [])) @=? (Nothing @())
+        zpToList <$> (stepRight $ zpFromList [1,2,3,4])
+            @=? Just [1,2,3,4]
+    , testCase "length" $
+        zpLength <$> (stepRight $ zpFromList [0,1,2,3])
+            @=? Just 4
+    , testCase "bad move left" $
+        stepLeft (zpFromList [1::Int,2])
+            @=? Nothing
+    , testCase "bad move right" $
+        (stepRight >=> stepRight) (zpFromList [1::Int])
+            @=? Nothing
+    , testCase "okay move" $
+        (stepRight (zpFromList [1,2]) >>= tip)
+            @=? Just 2
+    , testCase "move there and back" $
+        (stepRight (zpFromList [1,2]) >>= stepLeft >>= tip)
+            @=? Just 1
+    , testCase "okay focus" $
+        tip (focus (Zp [2,1] []))
+            @=? Just 2
+    , testCase "nothing to focus to" $
+        tip (focus (zpFromList []))
+            @=? Nothing @()
+    , testCase "zpLookup, found" $
+        zpLookup 2 (zpFromList [(1, ()), (2, ()), (3, ())])
+            @=? Zp [(1, ())] [(2, ()), (3, ())]
+    , testCase "zpLookup, not found" $
+        zpLookup 4 (zpFromList [(1, ()), (2, ()), (3, ())])
+            @=? Zp [(3, ()), (2, ()), (1, ())] []
+    , testCase "fmap + show" $
+        show (fmap not $ zpFromList [True])
+            @=? "Zp [] [False]"
     ]
 
 --------------------------------------------------------------------------------
