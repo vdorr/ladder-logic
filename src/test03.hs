@@ -288,9 +288,14 @@ main = do
     args <- getArgs
     print (here, args)
     case args of
-        [fn] -> do
+        fn : fns -> do
             (memory, prog) <- compileOrDie fn
             print (here, memory)
             print (here, prog)
+--             putStrLn $ asCArray $ programToByteString prog
+            case fns of
+                outf : _ -> do
+                    print (here, outf)
+                _ -> return ()
         _    ->
             return ()

@@ -19,6 +19,9 @@ import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
+programToByteString :: [ExtendedInstruction Int Word8 Word16] -> L.ByteString
+programToByteString = chunksToByteString . instructionsToChunks
+
 instructionsToChunks :: [ExtendedInstruction Int Word8 Word16] -> [Chunk]
 instructionsToChunks l = foldMap snd l''
     where

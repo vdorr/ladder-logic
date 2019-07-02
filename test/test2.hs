@@ -33,7 +33,7 @@ prop_prog_trip =
     withTests 1000 . property $ do
         prog <- forAll genInstructions
         tripping prog
-            (chunksToByteString . instructionsToChunks)
+            programToByteString
             (Just . findLabels . byteStringToInstructions)
 
 --------------------------------------------------------------------------------
@@ -43,4 +43,5 @@ tests = testGroup "Tests"
     [ serializeTests
     ]
 
+main :: IO ()
 main = defaultMain tests
