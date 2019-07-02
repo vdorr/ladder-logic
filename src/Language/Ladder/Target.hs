@@ -19,10 +19,10 @@ import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
-programToByteString :: [ExtendedInstruction Int Word8 Word16] -> L.ByteString
+programToByteString :: [ExtendedInstruction Int Word16 Word8] -> L.ByteString
 programToByteString = chunksToByteString . instructionsToChunks
 
-instructionsToChunks :: [ExtendedInstruction Int Word8 Word16] -> [Chunk]
+instructionsToChunks :: [ExtendedInstruction Int Word16 Word8] -> [Chunk]
 instructionsToChunks l = foldMap snd l''
     where
     l' = fmap g l
@@ -35,7 +35,7 @@ instructionsToChunks l = foldMap snd l''
 
     jmpChunkLen = sum (fmap chunkLength [C4 1, C12 0])
 
-instructionToChunks :: Instruction Word8 Word16 -> [Chunk]
+instructionToChunks :: Instruction Word16 Word8 -> [Chunk]
 instructionToChunks = f
     where
     f  ITrap     = [C4 0]
@@ -84,7 +84,7 @@ chunksToByteString l
             C16 x -> putBitsFrom 15 x
         flush
 
-byteStringToInstructions :: L.ByteString -> [(Int, ExtendedInstruction Int Word8 Word16)]
+byteStringToInstructions :: L.ByteString -> [(Int, ExtendedInstruction Int Word16 Word8)]
 byteStringToInstructions = runGetL $ runDecode go
     where
     go = do
@@ -93,7 +93,7 @@ byteStringToInstructions = runGetL $ runDecode go
         then return []
         else (:) <$> getOneInstruction <*> go
 
-getOneInstruction :: Coding Get (Int, ExtendedInstruction Int Word8 Word16)
+getOneInstruction :: Coding Get (Int, ExtendedInstruction Int Word16 Word8)
 getOneInstruction = getBitsFrom 3 (0::Word8) >>= \case
     0  -> return (1, EISimple ITrap)
     1  -> ((1+3,).EIJump)            <$> (fromIntegral <$> getBitsFrom 11 (0::Word16))
@@ -106,8 +106,8 @@ getOneInstruction = getBitsFrom 3 (0::Word8) >>= \case
 
 -- |Translate input nibble-based labels to index of instruction
 findLabels
-    :: [(Int, ExtendedInstruction Int Word8 Word16)]
-    -> [ExtendedInstruction Int Word8 Word16]
+    :: [(Int, ExtendedInstruction Int Word16 Word8)]
+    -> [ExtendedInstruction Int Word16 Word8]
 findLabels l = fmap f l
     where
     (_, l' ) = Prelude.foldl h (0, []) l
@@ -124,10 +124,10 @@ findLabels l = fmap f l
 instructionTable
     :: Applicative f
     => f Int
-    -> f ca
+    -> f lbl
     -> f a
     -> f w
-    -> [f (ExtendedInstruction ca a w)]
+    -> [f (ExtendedInstruction lbl w a)]
 instructionTable stk lbl addr lit = 
     [        EIJump <$> lbl
     , pure $ EISimple   ITrap

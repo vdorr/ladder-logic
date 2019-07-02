@@ -228,15 +228,21 @@ data MemTrack n = MemTrack { bitsSize, wordsSize :: Int
 
 --------------------------------------------------------------------------------
 
-compileOrDie :: FilePath -> IO ((MemTrack String,
-                            [ExtendedInstruction Int (Address Int) Int]))
+literalFromInt :: (Bounded a, Integral a) => Int -> IO a
+literalFromInt i = return $ fromIntegral i --TODO check range
+
+compileOrDie
+    :: FilePath
+    -> IO ( MemTrack String
+          , [ExtendedInstruction Int Int (Address Int)]
+          )
 compileOrDie fn = do
     (_pragmas, blocks) <- parseOrDie5 fn
 
     let Right (blocks', memory)
                 = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
 --     print (here, memory)
-    prog <- generateStk2xx blocks'
+    prog <- generateStk2xx literalFromInt blocks'
 --     print (here, prog)
     return (memory, prog)
 

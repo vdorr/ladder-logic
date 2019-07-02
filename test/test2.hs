@@ -20,11 +20,13 @@ serializeTests :: TestTree
 serializeTests = testGroup "Serialize"
     [ testProperty "Roundtrip" prop_prog_trip
     ]
-
-genInstructions :: Gen [ExtendedInstruction Int Word8 Word16]
+-- word address
+-- genInstructions :: Gen [ExtendedInstruction Int Word8 Word16]
+genInstructions :: (Num word, Num address) => Gen [ExtendedInstruction Int word address]
 genInstructions = Gen.list (Range.linear 0 100) genInstruction
 
-genInstruction :: Gen (ExtendedInstruction Int Word8 Word16)
+genInstruction :: (Num word, Num address) => Gen (ExtendedInstruction Int word address)
+-- genInstruction :: Gen (ExtendedInstruction Int Word16 Word8)
 genInstruction
     = Gen.choice $ instructionTable (pure 0) (pure 0) (pure 0) (pure 0)
 

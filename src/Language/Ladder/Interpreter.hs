@@ -48,14 +48,14 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --------------------------------------------------------------------------------
 
-data ExtendedInstruction ca a w
-    = EIJump ca
-    | EISimple (Instruction a w)
+data ExtendedInstruction label word address
+    = EIJump    label
+    | EISimple (Instruction word address)
 --TODO TODO TODO
     | EIReturn
     deriving (Show, Eq)
 
-data Instruction a w
+data Instruction w a
     = ITrap --invoke debugger
 --     | ISysRq
     | ILdOn -- push #1 onto wire stack {- w: -- #1 -}
@@ -110,8 +110,8 @@ class I d m where
 --get rid of text
 resolveLabels
     :: (Show lbl, Eq lbl)
-    => [(Maybe lbl, [ExtendedInstruction lbl a w])]
-    -> Either String [ExtendedInstruction Int a w]
+    => [(Maybe lbl, [ExtendedInstruction lbl w a])]
+    -> Either String [ExtendedInstruction Int w a]
 resolveLabels l = for (foldMap snd l) g
     where
     l' = fmap (fmap length) l
@@ -196,7 +196,7 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
 emitBasicDevice
     :: (Show address, Show op)
     => Op op (Operand address)
-    -> [Instruction address w]
+    -> [Instruction word address]
 emitBasicDevice d
     = case d of
         And  (Var addr)  -> [ILdBit addr, IAnd]
@@ -212,8 +212,8 @@ verbose1 = False
 --FIXME IO
 generateStk2
     :: Cofree (Diagram () Dev String) DgExt
-    -> IO [ExtendedInstruction String String Int]
-generateStk2 = generateStk2' emitBasicDevice . parseOps
+    -> IO [ExtendedInstruction String Int String]
+generateStk2 = generateStk2' pure emitBasicDevice . parseOps
 
 --FIXME IO
 -- generateStk2x
@@ -224,11 +224,12 @@ generateStk2 = generateStk2' emitBasicDevice . parseOps
 
 --FIXME IO
 generateStk2xx
-    :: Show address
-    => [(Maybe String, Cofree (Diagram () (Op String (Operand address)) String) DgExt)]
-    -> IO [ExtendedInstruction Int address Int]
-generateStk2xx ast = do
-    ast' <- for ast (traverse (generateStk2' emitBasicDevice))
+    :: (Show address, Show word)
+    => (Int -> IO word) --XXX fix that IO thing already !!! OMG
+    -> [(Maybe String, Cofree (Diagram () (Op String (Operand address)) String) DgExt)]
+    -> IO [ExtendedInstruction Int word address]
+generateStk2xx literalFromInt ast = do
+    ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
     Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
     return ast''
 
@@ -237,12 +238,11 @@ generateStk2'
     => Show addr
     => Show word
     => Show device --NO
-    => (device -> [Instruction addr word])
-                      -> Cofree
-                           (Diagram () device lbl)
-                           DgExt
-                      -> IO [ExtendedInstruction lbl addr word]
-generateStk2' doDevice ast' = do
+    => (Int -> IO word)
+    -> (device -> [Instruction word addr])
+    -> Cofree (Diagram () device lbl) DgExt
+    -> IO [ExtendedInstruction lbl word addr]
+generateStk2' literalFromInt doDevice ast' = do
     let ast = dropEnd ast'
     --collapse nodes
 --     let (nodes, a0) = merge' ast
@@ -311,7 +311,7 @@ parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
 
 --------------------------------------------------------------------------------
 
-type Program a = [ExtendedInstruction Int a Int]
+type Program a = [ExtendedInstruction Int Int a]
 
 -- data Trigger = Periodic Int | Memory String
 data Task a = Task { nextRun, priority, period :: Int, program :: Program a }
@@ -344,7 +344,7 @@ run (clk, tasks, st0)
 
 execute :: (Eq address, Show address)
          => Memory address
-        -> [ExtendedInstruction Int address Int]
+        -> [ExtendedInstruction Int Int address]
         -> Either (ItpSt address, String) (Memory address)
 execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     where
@@ -367,7 +367,7 @@ type ItpSt a = ([Bool], [V], Memory a)
 
 eval :: (Eq address, Show address)
      => ItpSt address
-     -> Instruction address Int
+     -> Instruction Int address
      -> Either
          (ItpSt address, String)
          (ItpSt address)

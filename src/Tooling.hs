@@ -124,7 +124,7 @@ generate ::
     Eq b0 =>
     Eq c =>
     Show c =>
-    ([Instruction String w] -> m0 ())
+    ([Instruction w String] -> m0 ())
     -> [(b0, b0)]
     -> [([b0], Cofree (Diagram c (Op s0 (Operand String)) s1) b0)]
     -> m0 ([b0], [([b0], Cofree (Diagram c (Op s0 (Operand String)) s1) b0)])
@@ -266,10 +266,10 @@ nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
 generateStk1
     :: Cofree (Diagram () Dev String) DgExt
-    -> IO [ExtendedInstruction String String Int]
+    -> IO [ExtendedInstruction String Int String]
 generateStk1 ast = (EISimple <$>) <$> generateStk ast
 
-generateStk :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction String Int]
+generateStk :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction Int String]
 generateStk ast' = do
     let ast = parseOps ast'
 
@@ -327,7 +327,7 @@ generateStk ast' = do
 --------------------------------------------------------------------------------
 
 evalTestVect'''
-    :: [(Maybe String, [ExtendedInstruction String String Int])] -- ^program
+    :: [(Maybe String, [ExtendedInstruction String Int String])] -- ^program
     -> [VarName] -- ^watched memory variables
     -> [(Int, [(VarName, V)])] -- ^test vector
     -> Either (Memory String, String) [[V]]
@@ -358,13 +358,13 @@ evalTestVect''' prog watch vect
         where
         mem' = updateMemory mem stim
 
-evalBlock :: [Instruction String Int]
+evalBlock :: [Instruction Int String]
           -> ItpSt String
           -> Either (ItpSt String, String) (ItpSt String)
 evalBlock p st = foldlM eval st p
 
 evalTestVect''
-    :: [Instruction String Int] -- ^program
+    :: [Instruction Int String] -- ^program
     -> [VarName] -- ^watched memory variables
     -> [(Int, [(VarName, V)])] -- ^test vector
     -> Either (Memory String, String) [[V]]
