@@ -7,6 +7,7 @@ module Language.Ladder.LadderParser
     , mapDgA, mapDg
     , Operand(..)
     , Dev(..)
+    , DevType(..)
     , parseLadder
     , parseLadderLiberal
 -- *for testing only
@@ -69,7 +70,12 @@ data Operand address
     | Lit Int       -- ^integer literal, usually allowed only below contact
     deriving (Show, Eq)
 
-data Dev = Dev String [Operand String]
+data DevType
+    = Coil_    String
+    | Contact_ String
+    deriving (Show, Eq)
+
+data Dev = Dev DevType [Operand String]
     deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
@@ -209,7 +215,7 @@ hline2 = do
         setPos (ln, (co + vl, ()))
 --TODO TEST move to same location is noop
 
-device :: DgP (Bool, String) -> DgP (Cofree (Diagram c Dev String) DgExt)
+device :: DgP (Bool, DevType) -> DgP (Cofree (Diagram c Dev String) DgExt)
 device p = do
     pos <- currentPos
     (op, op2, f) <- withOperands p
@@ -218,12 +224,12 @@ device p = do
 coil2 :: DgP (Cofree (Diagram c Dev String) DgExt)
 coil2 = device $ do
     Coil f <- eat
-    return (False, "(" <> unpack f <> ")")
+    return (False, Coil_ (unpack f))
 
 contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-contact2 =  device $ do
+contact2 = device $ do
     Contact f <- eat
-    return (elem f cmp, "[" <> unpack f <> "]")
+    return (elem f cmp, Contact_ (unpack f))
     where
     cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
 

@@ -295,17 +295,19 @@ parseOpsM
     -> Either String (Cofree (Diagram c (Op s (Operand String)) s) p)
 parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
     where
-    f (Dev op arg) = case (fmap toUpper op, arg) of
-        ("[ ]", [n]   ) -> pure $ And  n
-        ("[/]", [n]   ) -> pure $ AndN  n
-        ("[>]", [a, b]) -> pure $ Cmp Gt a b
-        ("( )", [n]   ) -> pure $ St n
-        ("(/)", [n]   ) -> pure $ StN n
-        ("[P]", [n]   ) -> pure $ LdP n
-        ("[N]", [n]   ) -> pure $ LdN n
-        ("(R)", [n]   ) -> undefined
-        ("(S)", [n]   ) -> undefined
-        _               -> Left "unknown device"
+    f (Dev (Coil_ op) arg) = case (fmap toUpper op, arg) of
+        (" ", [n]   ) -> pure $ St n
+        ("/", [n]   ) -> pure $ StN n
+        ("R", [n]   ) -> undefined
+        ("S", [n]   ) -> undefined
+        _               -> Left "unknown coil type"
+    f (Dev (Contact_ op) arg) = case (fmap toUpper op, arg) of
+        (" ", [n]   ) -> pure $ And  n
+        ("/", [n]   ) -> pure $ AndN  n
+        (">", [a, b]) -> pure $ Cmp Gt a b
+        ("P", [n]   ) -> pure $ LdP n
+        ("N", [n]   ) -> pure $ LdN n
+        _               -> Left "unknown contact type"
 
 --------------------------------------------------------------------------------
 
