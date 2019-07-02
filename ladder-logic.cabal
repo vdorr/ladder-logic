@@ -4,13 +4,13 @@
 name:                ladder-logic
 version:             0.1.0.0
 synopsis:            Ladder logic compiler
--- description:         
+-- description:
 homepage:            https://github.com/vdorr/ladder-logic
 license:             MIT
 license-file:        LICENSE
 author:              vd
 maintainer:          vdorr.package@gmail.com
--- copyright:           
+-- copyright:
 category:            Development
 build-type:          Simple
 --extra-source-files:  ChangeLog.md
@@ -36,6 +36,7 @@ library
                      , Language.Ladder.Interpreter
                      , Language.Ladder.Analysis
                      , Language.Ladder.Utils
+                     , Language.Ladder.Target
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
@@ -50,7 +51,7 @@ library
                      , containers
                      , text
                      , warp, wai, http-types, aeson, bytestring
-                     , bits, bytes, base16-bytestring
+                     , bits, bytes, base16-bytestring, binary
 
   hs-source-dirs:      src
                        .
@@ -79,5 +80,26 @@ test-suite             1
                      , ladder-logic
                      , text
                      , neat-interpolation
+                     , directory
+                     , filepath
+
+test-suite             2
+  default-language:    Haskell2010
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             test2.hs
+  other-modules:       TestUtils
+  default-extensions:  CPP, TupleSections, ScopedTypeVariables
+                     , LambdaCase, RecordWildCards, FlexibleContexts
+                     , PatternSynonyms, DeriveFunctor, TypeApplications
+                     , DeriveFoldable, DeriveTraversable
+  build-depends:
+                       base
+                     , tasty
+                     , tasty-hunit
+                     , tasty-hedgehog >= 1.0.0.0
+                     , hedgehog
+                     , ladder-logic
+                     , text
                      , directory
                      , filepath

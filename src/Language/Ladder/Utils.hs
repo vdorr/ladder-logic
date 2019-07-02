@@ -2,9 +2,6 @@
 
 module Language.Ladder.Utils where
 
--- import Data.List
--- import Control.Applicative
-
 --------------------------------------------------------------------------------
 
 --FIXME i don't like this any more

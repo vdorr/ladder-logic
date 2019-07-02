@@ -288,19 +288,6 @@ generateStk2' doDevice ast' = do
 parseOps
     :: Cofree (Diagram c Dev s) p
     -> Cofree (Diagram c (Op s (Operand String)) s) p
--- parseOps (a :< n) = a :< fmap parseOps (mapDg id f id n)
---     where
---     f (Dev op arg) = case (fmap toUpper op, arg) of
---         ("[ ]", [n]   ) -> And  n
---         ("[/]", [n]   ) -> AndN  n
---         ("[>]", [a, b]) -> Cmp Gt a b
---         ("( )", [n]   ) -> St n
---         ("(/)", [n]   ) -> StN n
---         ("[P]", [n]   ) -> LdP n
---         ("[N]", [n]   ) -> LdN n
---         ("(R)", [n]   ) -> undefined
---         ("(S)", [n]   ) -> undefined
---         _               -> error here
 parseOps = either (error here) id . parseOpsM
 
 parseOpsM
@@ -321,9 +308,6 @@ parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
         _               -> Left "unknown device"
 
 --------------------------------------------------------------------------------
-
---wire stack count, wire stack, arg stack, memory???
--- type ItpSt2 = (Word8, Word16, [Int16], ([Word8], [Int16]))
 
 type Program a = [ExtendedInstruction Int a Int]
 

@@ -633,7 +633,6 @@ fileTests path = do
 --     print (here, files)
 
     tests <- for files $ \fn -> do
---         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
             (tst, lxs) <- fmap dropWhitespace <$> loadLadderTest (path </> fn)
             let blocks = labeledRungs lxs
@@ -645,8 +644,6 @@ fileTests path = do
                             Left err -> fail err
                 Just t -> do
                     ast <- parseOrDie2 lxs
---                     ast <- for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
---                     ast <- parseOrDie lxs
                     passed <- runLadderTest False t ast
                     passed @?= True
 
