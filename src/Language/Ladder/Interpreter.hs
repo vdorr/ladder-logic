@@ -53,7 +53,7 @@ data ExtendedInstruction ca a w
     | EISimple (Instruction a w)
 --TODO TODO TODO
     | EIReturn
-    deriving Show
+    deriving (Show, Eq)
 
 data Instruction a w
     = ITrap --invoke debugger
@@ -80,7 +80,7 @@ data Instruction a w
     | IEq -- compare two value on arg stack and push result onto wire stack
     | ILt
     | IGt
-    deriving Show
+    deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 

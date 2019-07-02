@@ -3,8 +3,6 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import Test.Tasty
--- import Test.Tasty.SmallCheck as SC
--- import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 import Test.Tasty.Hedgehog
 import           Hedgehog
@@ -20,7 +18,6 @@ import NeatInterpolation
 import Data.Text (Text, pack, unpack)
 -- import qualified Data.Text
 import Data.Bifunctor
--- import GHC.Exts --hiding (toList)
 import Data.Function
 import Data.Traversable
 import Data.Foldable hiding (toList)
@@ -45,20 +42,10 @@ import TestUtils
 --discards whitespace tokens
 preproc5'
     :: Text
-    -> Either Text [ (Int, [((Int, Int), Tok Text)]) ]
+    -> Either Text [(Int, [((Int, Int), Tok Text)])]
 preproc5' = preproc . runLexer
     where
     preproc = fmap (stripPos . dropWhitespace)
-
--- test7 :: Parsec ParseErr Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
--- test7 = (breakLines . filter (not.isWsTok.snd)) <$> lexerP
--- 
--- preproc5'
---     :: Text
---     -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
--- preproc5'
---     = bimap (T.pack . errorBundlePretty) id
---     . parse test7 "(file)"
 
 --------------------------------------------------------------------------------
 
@@ -67,9 +54,8 @@ preproc5'' = bimap unpack id . preproc5'
 
 --basic blocks
 testPreproc6 :: Text -> Either Text [(Maybe Text, [[Tok Text]])]
--- testPreproc6 = fmap basicBlocks . fmap (fmap (snd . fmap (fmap snd))) . preproc5'
-testPreproc6 = fmap (fmap (fmap (fmap (snd . fmap (fmap snd))))) . fmap labeledRungs . preproc5'
-
+testPreproc6
+    = fmap (fmap (fmap (fmap (snd . fmap (fmap snd))))) . fmap labeledRungs . preproc5'
 
 testPreproc4 :: Text -> Either Text [[Tok Text]]
 testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
@@ -77,16 +63,9 @@ testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
 testPreproc5 :: Text -> Either Text [Tok Text]
 testPreproc5 = fmap concat . testPreproc4
 
---keep comments and pragmas, drop position info
--- runLexer1 :: Text -> Either Text [[(Tok Text)]]
--- runLexer1 = fmap (fmap (snd . fmap (fmap snd))) . runLexer
-
 --keep comments and pragmas, drop position info, concat lines
 testLexer :: Text -> Either Text [Tok Text]
 testLexer = fmap dropPos . runLexer
-
--- simpleResult :: (Bifunctor f, IsList e) => f e a -> f Bool a
--- simpleResult = bimap ((>0).length.toList) id
 
 simpleResult :: (Bifunctor f, Eq e, Monoid e) => f e a -> f Bool a
 simpleResult = bimap (/=mempty) id
