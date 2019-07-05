@@ -228,8 +228,10 @@ addCell mt@MemTrack{..} ty n0
     new TwoBits = let a = BitAddr  bitsSize  in (a, updated a 2 0)
     new Word    = let a = WordAddr wordsSize in (a, updated a 0 1)
 
-data MemTrack n = MemTrack { bitsSize, wordsSize :: Int
-    , variables :: M.Map n (Address Int, CellType) }
+data MemTrack n = MemTrack
+    { bitsSize, wordsSize :: Int
+    , variables :: M.Map n (Address Int, CellType)
+    }
     deriving (Show)
 
 --------------------------------------------------------------------------------
@@ -254,7 +256,7 @@ compileOrDie fn = do
 
 writeBlob
     :: FilePath
-    -> [ExtendedInstruction Int (Address Int) Int]
+    -> [ExtendedInstruction Int Word16 Word8]
     -> IO ()
 writeBlob = do
     undefined
@@ -315,10 +317,12 @@ main = do
             (memory, prog) <- compileOrDie fn
             print (here, memory)
             print (here, prog)
-            putStrLn $ asCArray $ programToByteString $ fmap aaaargh prog
+            let prog' = fmap aaaargh prog
+            putStrLn $ asCArray $ programToByteString prog'
             case fns of
-                outf : _ -> do
-                    print (here, outf)
+                outputFile : _ -> do
+                    print (here, outputFile)
+                    writeBlob outputFile prog'
                 _ -> return ()
         _    ->
             return ()

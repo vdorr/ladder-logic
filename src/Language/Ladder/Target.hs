@@ -88,20 +88,37 @@ byteStringToInstructions :: L.ByteString -> [(Int, ExtendedInstruction Int Word1
 byteStringToInstructions = runGetL $ runDecode go
     where
     go = do
-        empty <- isEmpty
+        empty <- noMoreBits
         if empty
         then return []
         else (:) <$> getOneInstruction <*> go
+
+noMoreBits :: Coding Get Bool
+noMoreBits = Coding $ \k i b -> do
+    empty <- isEmpty
+    k (empty && i == 0) i b
 
 getOneInstruction :: Coding Get (Int, ExtendedInstruction Int Word16 Word8)
 getOneInstruction = getBitsFrom 3 (0::Word8) >>= \case
     0  -> return (1, EISimple ITrap)
     1  -> ((1+3,).EIJump)            <$> (fromIntegral <$> getBitsFrom 11 (0::Word16))
+    2 -> return (1, EISimple ILdOn)
+    3  -> return (1, EISimple IDup)
     4  -> ((1+1,).EISimple . IPick)  <$> (fromIntegral <$> getBitsFrom 3 (0::Word8))
+    5 -> return (1, EISimple IDrop)
     6  -> ((1+2,).EISimple . ILdBit) <$> (getBitsFrom 7 (0::Word8))
+    7  -> ((1+2,).EISimple . IStBit) <$> (getBitsFrom 7 (0::Word8))
+    8 -> return (1, EISimple IAnd)
+    10 -> return (1, EISimple IOr)
+    11 -> return (1, EISimple INot)
     12 -> getBitsFrom 3 (0::Word8) >>= \case
         1 -> ((1+1+4,).EISimple . ILdCnA) <$> getBitsFrom 15 (0::Word16)
-        _ -> error here
+        2 -> return (1+1, EISimple ILdM)
+        3 -> return (1+1, EISimple IStM)
+        4 -> return (1+1, EISimple IEq)
+        5 -> return (1+1, EISimple ILt)
+        6 -> return (1+1, EISimple IGt)
+        other -> error $ show (here, other)
     other -> error $ show (here, other)
 
 -- |Translate input nibble-based labels to index of instruction
