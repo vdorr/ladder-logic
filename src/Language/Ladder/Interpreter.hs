@@ -66,7 +66,6 @@ data Instruction w a
     | ILdBit a -- push bit from address onto wire stack
     | IStBit a -- dtto for store
 
---     | IJump  String
     | IAnd -- and two values on wire stack, push result back
     | IOr -- dtto, or
     | INot -- negate value on top of wire stack
@@ -81,6 +80,30 @@ data Instruction w a
     | ILt
     | IGt
     deriving (Show, Eq)
+
+mapInstruction g h = f
+    where
+    f ITrap = pure ITrap
+
+    f ILdOn = pure ILdOn
+    f IDup = pure IDup
+    f (IPick lbl) = pure $ IPick lbl
+    f IDrop = pure IDrop
+
+    f (ILdBit a) = ILdBit <$> g a
+    f (IStBit a) = IStBit <$> g a
+
+    f IAnd = pure IAnd
+    f IOr = pure IOr
+    f INot = pure INot
+
+    f (ILdCnA w) = ILdCnA <$> h w
+    f ILdM = pure ILdM
+    f IStM = pure IStM
+
+    f IEq = pure IEq
+    f ILt = pure ILt
+    f IGt = pure IGt
 
 --------------------------------------------------------------------------------
 

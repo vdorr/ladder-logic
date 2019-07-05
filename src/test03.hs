@@ -178,9 +178,9 @@ allocateMemory (p :< n)
     where
     doOperand Word (Lit v) = return $ Lit v
     doOperand _    (Lit _) = throwError "type mismatch"
-    doOperand t    (Var n) = do
+    doOperand ty   (Var n) = do
         st          <- get
-        (addr, st') <- addCell st t n
+        (addr, st') <- addCell st ty n
         put st'
         return $ Var addr
 
@@ -201,7 +201,13 @@ cfggjhj doOperand = f
     f  On          = pure   On
     f (Jmp s)      = pure $ Jmp s
 
--- addCell :: MemTrack n -> f (MemTrack n)
+addCell :: MemTrack String
+                      -> CellType
+                      -> String
+                      -> StateT
+                           (MemTrack String)
+                           (Either String)
+                           (Address Int, MemTrack String)
 addCell mt@MemTrack{..} ty n0
     = case M.lookup n variables of
         Just (addr, ty')
@@ -255,6 +261,17 @@ writeBlob = do
 
 --------------------------------------------------------------------------------
 
+aaaargh :: ExtendedInstruction Int Int    (Address Int)
+        -> ExtendedInstruction Int Word16  Word8
+aaaargh = runIdentity . go
+    where
+    go (EIJump lbl) = pure $ EIJump lbl
+    go (EISimple i) = EISimple <$> mapInstruction unAddr fromIntegral i
+    go  EIReturn    = pure EIReturn
+
+    unAddr (WordAddr a) = pure $ fromIntegral a
+    unAddr (BitAddr  a) = pure $ fromIntegral a
+
 main :: IO ()
 main = do
     print here
@@ -298,7 +315,7 @@ main = do
             (memory, prog) <- compileOrDie fn
             print (here, memory)
             print (here, prog)
---             putStrLn $ asCArray $ programToByteString prog
+            putStrLn $ asCArray $ programToByteString $ fmap aaaargh prog
             case fns of
                 outf : _ -> do
                     print (here, outf)
