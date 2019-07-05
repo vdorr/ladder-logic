@@ -22,7 +22,6 @@ newtype Prog word address = Prog { unProg :: [ExtendedInstruction Int word addre
 instance (Eq word, Eq address) => Eq (Prog word address) where
     Prog a == Prog b
         | la == lb + 1, (a', [EISimple ITrap]) <- splitAt lb a = a' == b
---         | la == lb + 1, drop lb a == [EISimple ITrap] = undefined
         | lb == la + 1, (b', [EISimple ITrap]) <- splitAt la b = b' == a
         | otherwise = a == b
         where
@@ -34,13 +33,11 @@ serializeTests = testGroup "Serialize"
     [ testProperty "Single instruction roundtrip" prop_instr_trip
     , testProperty "Instruction list roundtrip" prop_prog_trip
     ]
--- word address
--- genInstructions :: Gen [ExtendedInstruction Int Word8 Word16]
+
 genInstructions :: (Num word, Num address) => Gen [ExtendedInstruction Int word address]
 genInstructions = Gen.list (Range.linear 0 100) genInstruction
 
 genInstruction :: (Num word, Num address) => Gen (ExtendedInstruction Int word address)
--- genInstruction :: Gen (ExtendedInstruction Int Word16 Word8)
 genInstruction
     = Gen.choice $ instructionTable (pure 0) (pure 0) (pure 0) (pure 0)
 
