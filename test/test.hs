@@ -500,7 +500,7 @@ prop_sttsort =
 
 --------------------------------------------------------------------------------
 
-testBox :: Int -> Text -> Either String ((), DgPState (Tok Text))
+testBox :: Int -> Text -> Either String ((), DgPState () (Tok Text))
 testBox ln input
     = mkDgZp <$> (preproc5'' input)
     >>= applyDgp (box001 ln)

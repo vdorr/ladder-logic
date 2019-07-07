@@ -80,7 +80,7 @@ data Dev = Dev DevType [Operand String]
 
 --------------------------------------------------------------------------------
 
-type DgP = SFM (DgPState (Tok Text))
+type DgP = SFM (DgPState () (Tok Text))
 -- type DgPSt = DgPState (Tok Text)
 
 --------------------------------------------------------------------------------
@@ -99,8 +99,8 @@ operand = variable <|> number
 --------------------------------------------------------------------------------
 
 withOperands
-    :: SFM (DgPState (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
-    -> SFM (DgPState (Tok Text)) ((Operand String), Maybe (Operand String), a)
+    :: SFM (DgPState () (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
+    -> SFM (DgPState () (Tok Text)) ((Operand String), Maybe (Operand String), a)
 withOperands p = below (above_ p variable) optOper
     where
     optOper ((True, a), op) = (op,,a) <$> fmap Just operand

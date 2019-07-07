@@ -77,7 +77,7 @@ type MoveToNext tok = DgExt -> Dg tok -> Either String (Dg tok)
 --TODO TODO make some tests for psFocused behaviour (e.g. gap test)
 
 -- |Parser state
-data DgPState lx = DgPSt
+data DgPState st lx = DgPSt
     { psNext     :: MoveToNext lx -- ^select next token
     , psStr      :: Dg lx         -- ^input
     , psLastBite :: Maybe DgExt   -- ^position of last token eaten
@@ -100,19 +100,19 @@ goLeft  (ln, (co, _)) = move_ ln     (co-1)
 
 --------------------------------------------------------------------------------
 
-lastPos :: SFM (DgPState tok) DgExt
+lastPos :: SFM (DgPState st tok) DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
 
-applyDgp :: SFM (DgPState tok) a -> Dg tok -> Either String (a, DgPState tok)
+applyDgp :: SFM (DgPState st tok) a -> Dg tok -> Either String (a, DgPState st tok)
 applyDgp p dg = sfm p (DgPSt goRight dg Nothing True)
 
-setDir :: MoveToNext tok -> SFM (DgPState tok) ()
+setDir :: MoveToNext tok -> SFM (DgPState st tok) ()
 setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc
 
--- getDir :: SFM (DgPState tok) (MoveToNext tok)
+-- getDir :: SFM (DgPState st tok) (MoveToNext tok)
 -- getDir = psNext <$> get
 
-step :: SFM (DgPState tok) ()
+step :: SFM (DgPState st tok) ()
 step = do
     origin             <- currentPos
     DgPSt f zp ps True <- get --if nothing is focused, currentPos makes no sense
@@ -120,7 +120,7 @@ step = do
         Right zp' -> put (DgPSt f zp' ps True)
         Left err -> fail here --or not?
 
-setPos :: (Int, (Int, b)) -> SFM (DgPState tok) ()
+setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPos (ln, (co, _)) = do
     DgPSt b zp ps _ <- get
     Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
@@ -128,7 +128,7 @@ setPos (ln, (co, _)) = do
 
 -- |Clear 'psFocused' flag if there is not lexeme at desired position
 -- used by vertical diagram combinators
-setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState tok) ()
+setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPosOrBlur (ln, (co, _)) = do
     DgPSt b zp ps _ <- get
     let zp' = move ln co zp --FIXME can only move to direct neighbour!!!!!!!
@@ -139,12 +139,12 @@ setPosOrBlur (ln, (co, _)) = do
 --------------------------------------------------------------------------------
 
 -- |Succeeds FIXME FIXME i am not sure when
-end :: SFM (DgPState tok) ()
+end :: SFM (DgPState st tok) ()
 end = do
     Nothing <- (cursor . psStr) <$> get
     return ()
 
-eat :: SFM (DgPState tok) tok
+eat :: SFM (DgPState st tok) tok
 eat = do
     DgPSt nx dg ps True <- get
     case dgPop dg of
@@ -155,31 +155,31 @@ eat = do
             return v
         Nothing -> fail $ show (here, ps)
 
-currentPosM :: SFM (DgPState tok) (Maybe DgExt)
+currentPosM :: SFM (DgPState st tok) (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
 
-currentPos :: SFM (DgPState tok) DgExt
+currentPos :: SFM (DgPState st tok) DgExt
 currentPos = do
     Just p <- currentPosM
     return p
 
 --TODO implement in terms of 'peekM'
-peek :: SFM (DgPState tok) tok
+peek :: SFM (DgPState st tok) tok
 peek = do
     Just p <- peekM
     return p
 
-peekM :: SFM (DgPState tok) (Maybe tok)
+peekM :: SFM (DgPState st tok) (Maybe tok)
 peekM = (cursor . psStr) <$> get
 
 --for VLine crossing impl
-skipSome :: (tok -> Bool) -> SFM (DgPState tok) ()
+skipSome :: (tok -> Bool) -> SFM (DgPState st tok) ()
 skipSome f
     = peekM >>= \case
          Just x | f x -> step >> skipSome f
          _            -> return ()
 
-skip :: (tok -> Bool) -> SFM (DgPState tok) ()
+skip :: (tok -> Bool) -> SFM (DgPState st tok) ()
 skip f
     = peekM >>= \case
          Just x | f x -> step
@@ -191,8 +191,8 @@ option p = (Just <$> p) <|> pure Nothing
 --------------------------------------------------------------------------------
 
 -- |Fail if input stream is not empty
-dgIsEmpty :: SFM (DgPState tok) ()
--- dgIsEmpty :: Show tok => SFM (DgPState tok) ()
+dgIsEmpty :: SFM (DgPState st tok) ()
+-- dgIsEmpty :: Show tok => SFM (DgPState st tok) ()
 dgIsEmpty
     =   (dgNull . psStr) <$> get
     >>= flip when (fail $ here ++ "not empty")
@@ -212,8 +212,8 @@ dgIsEmpty
 
 branch
     :: (tok -> Bool)
-    -> [(MoveToNext tok, SFM (DgPState tok) a)]
-    ->  SFM (DgPState tok) [a]
+    -> [(MoveToNext tok, SFM (DgPState st tok) a)]
+    ->  SFM (DgPState st tok) [a]
 branch isFork branches = do
     origin <- currentPos
     True   <- isFork <$> peek
@@ -248,7 +248,7 @@ branch isFork branches = do
 pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
 
 -- |Succeeds only when positioned on end of line
-eol :: SFM (DgPState tok) ()
+eol :: SFM (DgPState st tok) ()
 eol = do
     psStr <$> get >>= \case
         DgLineEnd -> return ()
@@ -328,9 +328,9 @@ moveToLine ln = move2 (compare ln . fst)
 
 colocated
     :: (DgExt -> DgExt)
-    -> SFM (DgPState tok) t
-    -> (t -> SFM (DgPState tok) b1)
-    -> SFM (DgPState tok) b1
+    -> SFM (DgPState st tok) t
+    -> (t -> SFM (DgPState st tok) b1)
+    -> SFM (DgPState st tok) b1
 colocated mapPos p pp = do
     begin <- currentPos
     x     <- p
@@ -342,24 +342,24 @@ colocated mapPos p pp = do
 
 colocated_
     :: (DgExt -> DgExt)
-    -> SFM (DgPState tok) a
-    -> SFM (DgPState tok) b
-    -> SFM (DgPState tok) (a, b)
+    -> SFM (DgPState st tok) a
+    -> SFM (DgPState st tok) b
+    -> SFM (DgPState st tok) (a, b)
 colocated_ mapPos p pp = colocated mapPos p (\x -> (,) <$> pure x <*> pp)
 
 above, below
-    :: SFM (DgPState tok) t
-    -> (t -> SFM (DgPState tok) b)
-    -> SFM (DgPState tok) b
+    :: SFM (DgPState st tok) t
+    -> (t -> SFM (DgPState st tok) b)
+    -> SFM (DgPState st tok) b
 
 above = colocated (\(ln, co) -> (ln - 1, co))
 
 below = colocated (\(ln, co) -> (ln + 1, co))
 
 above_, below_
-    :: SFM (DgPState tok) a
-    -> SFM (DgPState tok) b
-    -> SFM (DgPState tok) (a, b)
+    :: SFM (DgPState st tok) a
+    -> SFM (DgPState st tok) b
+    -> SFM (DgPState st tok) (a, b)
 
 above_ = colocated_ (\(ln, co) -> (ln - 1, co))
 
