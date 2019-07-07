@@ -127,8 +127,8 @@ parseOrDie lxs = do
 #if 0
     forM_ (zpToList zp) (print . (here,))
 #endif
-    case applyDgp parseLadder zp of
-        Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
+    case applyDgp parseLadder zp () of
+        Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _ _)) -> do
 --             print (here, "--------------------------------------------------")
             return ast
         Left err -> fail $ show (here, err)

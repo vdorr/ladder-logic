@@ -241,11 +241,11 @@ dgpTests = testGroup "Diagram parser"
     [ testCase "length" $
         dgLength (mkDgZp []) @=? 0
     , testCase "trivial" $
-        fst <$> applyDgp (pure ()) (mkDgZp []) @=? Right ()
+        fst <$> applyDgp (pure ()) (mkDgZp []) () @=? Right ()
     , testCase "dgIsEmpty positive case" $
-        simpleResult (fst <$> applyDgp dgIsEmpty (mkDgZp [])) @=? Right ()
+        simpleResult (fst <$> applyDgp dgIsEmpty (mkDgZp []) ()) @=? Right ()
     , testCase "dgIsEmpty negative case" $
-        simpleResult (fst <$> applyDgp dgIsEmpty someDg) @=? Left True
+        simpleResult (fst <$> applyDgp dgIsEmpty someDg ()) @=? Left True
     , testCase "trim 1" $
         dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp @(Tok Text) []
     , testCase "trim 2" $
@@ -311,7 +311,7 @@ ladderTests = testGroup "Ladder parser"
 
 assertFullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
 getDg = dgTrim.psStr.snd
-dgParse = applyDgp parseLadder . mkDgZp
+dgParse = flip (applyDgp parseLadder) () . mkDgZp
 
 test00_tokenized = preproc5' test00
 
@@ -503,12 +503,12 @@ prop_sttsort =
 testBox :: Int -> Text -> Either String ((), DgPState () (Tok Text))
 testBox ln input
     = mkDgZp <$> (preproc5'' input)
-    >>= applyDgp (box001 ln)
+    >>= flip (applyDgp (box001 ln)) ()
 
 boxTests :: TestTree
 boxTests = testGroup "Box parser"
     [ testCase "1" $
-        fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized))
+        fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized) ())
             @?= Right (Zp [] [])
 --     , testCase "1b" $
 --         box01b_tokenized

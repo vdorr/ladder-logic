@@ -41,9 +41,9 @@ main = do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 forM_ (zpToList zp) (print . (here,))
-                case applyDgp parseLadderLiberal zp of
+                case applyDgp parseLadderLiberal zp () of
                     Left err -> print (here, err)
-                    Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _)) -> do
+                    Right (ast, DgPSt _ c@(Zp zpl zpr) _ _ _) -> do
                         print (here, "--------------------------------------------------")
                         for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 --                     for_ zpr $ \q -> print (here, q)

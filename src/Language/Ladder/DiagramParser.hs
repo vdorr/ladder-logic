@@ -82,6 +82,7 @@ data DgPState st lx = DgPSt
     , psStr      :: Dg lx         -- ^input
     , psLastBite :: Maybe DgExt   -- ^position of last token eaten
     , psFocused  :: Bool          -- ^current focus of zp is actual parser current token
+    , psUser     :: !st 
     }
 
 --------------------------------------------------------------------------------
@@ -103,11 +104,11 @@ goLeft  (ln, (co, _)) = move_ ln     (co-1)
 lastPos :: SFM (DgPState st tok) DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
 
-applyDgp :: SFM (DgPState st tok) a -> Dg tok -> Either String (a, DgPState st tok)
-applyDgp p dg = sfm p (DgPSt goRight dg Nothing True)
+applyDgp :: SFM (DgPState st tok) a -> Dg tok -> st -> Either String (a, DgPState st tok)
+applyDgp p dg st = sfm p (DgPSt goRight dg Nothing True st)
 
 setDir :: MoveToNext tok -> SFM (DgPState st tok) ()
-setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc
+setDir f = modify $ \(DgPSt _ zp ps fc st) -> DgPSt f zp ps fc st
 
 -- getDir :: SFM (DgPState st tok) (MoveToNext tok)
 -- getDir = psNext <$> get
@@ -115,26 +116,26 @@ setDir f = modify $ \(DgPSt _ zp ps fc) -> DgPSt f zp ps fc
 step :: SFM (DgPState st tok) ()
 step = do
     origin             <- currentPos
-    DgPSt f zp ps True <- get --if nothing is focused, currentPos makes no sense
+    DgPSt f zp ps True st <- get --if nothing is focused, currentPos makes no sense
     case f origin zp of
-        Right zp' -> put (DgPSt f zp' ps True)
+        Right zp' -> put (DgPSt f zp' ps True st)
         Left err -> fail here --or not?
 
 setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPos (ln, (co, _)) = do
-    DgPSt b zp ps _ <- get
+    DgPSt b zp ps _  st <- get
     Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
-    put (DgPSt b zp' ps True)
+    put (DgPSt b zp' ps True st)
 
 -- |Clear 'psFocused' flag if there is not lexeme at desired position
 -- used by vertical diagram combinators
 setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPosOrBlur (ln, (co, _)) = do
-    DgPSt b zp ps _ <- get
+    DgPSt b zp ps _ st <- get
     let zp' = move ln co zp --FIXME can only move to direct neighbour!!!!!!!
     put $ case zp' of
-        Just zp' -> DgPSt b zp' ps True
-        Nothing  -> DgPSt b zp  ps False
+        Just zp' -> DgPSt b zp' ps True  st
+        Nothing  -> DgPSt b zp  ps False st
 
 --------------------------------------------------------------------------------
 
@@ -146,12 +147,12 @@ end = do
 
 eat :: SFM (DgPState st tok) tok
 eat = do
-    DgPSt nx dg ps True <- get
+    DgPSt nx dg ps True st <- get
     case dgPop dg of
         Just (v, pos, dg') -> do
             put $ case nx pos dg' of
-                Right q -> DgPSt nx q   (Just pos) True
-                Left  _ -> DgPSt nx dg' (Just pos) False --nowhere to move
+                Right q -> DgPSt nx q   (Just pos) True  st
+                Left  _ -> DgPSt nx dg' (Just pos) False st --nowhere to move
             return v
         Nothing -> fail $ show (here, ps)
 
