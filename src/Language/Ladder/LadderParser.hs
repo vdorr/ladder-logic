@@ -66,13 +66,13 @@ mapDgA z x y = f
 
 -- |Contact operand, located above or below
 data Operand address
-    = Var address   -- ^name of memory location
-    | Lit Int       -- ^integer literal, usually allowed only below contact
+    = Var !address   -- ^name of memory location
+    | Lit !Int       -- ^integer literal, usually allowed only below contact
     deriving (Show, Eq)
 
 data DevType
-    = Coil_    String
-    | Contact_ String
+    = Coil_    !String
+    | Contact_ !String
     deriving (Show, Eq)
 
 data Dev = Dev DevType [Operand String]
@@ -80,8 +80,8 @@ data Dev = Dev DevType [Operand String]
 
 --------------------------------------------------------------------------------
 
-type DgP = SFM DgPSt
-type DgPSt = DgPState (Tok Text)
+type DgP = SFM (DgPState (Tok Text))
+-- type DgPSt = DgPState (Tok Text)
 
 --------------------------------------------------------------------------------
 

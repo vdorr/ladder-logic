@@ -30,10 +30,12 @@ instructionsToChunks l = foldMap snd l''
     (_, l'') = Prelude.foldl h (0, []) l'
     h (acc, xs) (chnLen, i) = (acc + chnLen, xs ++ [(acc, i)])
 
-    g (EIJump lbl) = (jmpChunkLen, [C4 1, C12 (fromIntegral (fst (l'' !! lbl)))])
+    g (EIJump lbl) = (jumpInstructionLength, [C4 1, C12 (fromIntegral (fst (l'' !! lbl)))])
+    g  EIReturn = (1, [C4 13])
     g (EISimple i) = let s = instructionToChunks i in (sum (fmap chunkLength s), s)
 
-    jmpChunkLen = sum (fmap chunkLength [C4 1, C12 0])
+    jumpInstructionLength = sum (fmap chunkLength [C4 1, C12 0])
+
 
 instructionToChunks :: Instruction Word16 Word8 -> [Chunk]
 instructionToChunks = f
@@ -99,27 +101,36 @@ noMoreBits = Coding $ \k i b -> do
     k (empty && i == 0) i b
 
 getOneInstruction :: Coding Get (Int, ExtendedInstruction Int Word16 Word8)
-getOneInstruction = getBitsFrom 3 (0::Word8) >>= \case
-    0  -> return (1, EISimple ITrap)
-    1  -> ((1+3,).EIJump)            <$> (fromIntegral <$> getBitsFrom 11 (0::Word16))
-    2 -> return (1, EISimple ILdOn)
-    3  -> return (1, EISimple IDup)
-    4  -> ((1+1,).EISimple . IPick)  <$> (fromIntegral <$> getBitsFrom 3 (0::Word8))
-    5 -> return (1, EISimple IDrop)
-    6  -> ((1+2,).EISimple . ILdBit) <$> (getBitsFrom 7 (0::Word8))
-    7  -> ((1+2,).EISimple . IStBit) <$> (getBitsFrom 7 (0::Word8))
-    8 -> return (1, EISimple IAnd)
-    10 -> return (1, EISimple IOr)
-    11 -> return (1, EISimple INot)
-    12 -> getBitsFrom 3 (0::Word8) >>= \case
-        1 -> ((1+1+4,).EISimple . ILdCnA) <$> getBitsFrom 15 (0::Word16)
-        2 -> return (1+1, EISimple ILdM)
-        3 -> return (1+1, EISimple IStM)
-        4 -> return (1+1, EISimple IEq)
-        5 -> return (1+1, EISimple ILt)
-        6 -> return (1+1, EISimple IGt)
+getOneInstruction = get4 >>= \case
+    0  -> return (1,        EISimple   ITrap)
+    1  ->       ((1 + 3,) . EIJump   . fromIntegral)            <$> get12
+    2  -> return (1,        EISimple   ILdOn)
+    3  -> return (1,        EISimple   IDup)
+    4  ->       ((1 + 1,) . EISimple . IPick . fromIntegral)  <$> get4
+    5  -> return (1,        EISimple   IDrop)
+    6  ->       ((1 + 2,) . EISimple . ILdBit) <$> get8
+    7  ->       ((1 + 2,) . EISimple . IStBit) <$> get8
+    8  -> return (1,        EISimple   IAnd)
+    10 -> return (1,        EISimple   IOr)
+    11 -> return (1,        EISimple   INot)
+    12 -> get4 >>= \case
+        1 ->       ((1 + 1 + 4,) .  EISimple . ILdCnA) <$> get16
+        2 -> return (1 + 1,         EISimple   ILdM)
+        3 -> return (1 + 1,         EISimple   IStM)
+        4 -> return (1 + 1,         EISimple   IEq)
+        5 -> return (1 + 1,         EISimple   ILt)
+        6 -> return (1 + 1,         EISimple   IGt)
         other -> error $ show (here, other)
+    13 -> return (1,        EIReturn)
     other -> error $ show (here, other)
+
+    where
+
+    get4 = getBitsFrom 3 (0::Word8)
+    get8 = getBitsFrom 7 (0::Word8)
+    get12 = getBitsFrom 11 (0::Word16)
+    get16 = getBitsFrom 15 (0::Word16)
+
 
 -- |Translate input nibble-based labels to index of instruction
 findLabels
@@ -133,6 +144,7 @@ findLabels l = fmap f l
     f (_, EIJump lbl) = case findIndex ((lbl==).fst) l' of
                              Nothing -> error here
                              Just idx -> EIJump idx
+    f (_, EIReturn)   = EIReturn
     f (_, EISimple i) = EISimple i
 
 --------------------------------------------------------------------------------
@@ -147,6 +159,7 @@ instructionTable
     -> [f (ExtendedInstruction lbl w a)]
 instructionTable stk lbl addr lit = 
     [        EIJump <$> lbl
+    , pure   EIReturn
     , pure $ EISimple   ITrap
     , pure $ EISimple   ILdOn
     , pure $ EISimple   IDup

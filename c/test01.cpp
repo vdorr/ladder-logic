@@ -34,6 +34,13 @@ void get8(const uint8_t* const blob, unsigned& nibbleAddr, uint8_t& dst) {
     nibbleAddr += 2;
 }
 
+void get12(const uint8_t* const blob, unsigned& nibbleAddr, uint16_t& dst) {
+    uint8_t l, h;
+    get8(blob, nibbleAddr, l);
+    get4(blob, nibbleAddr, h);
+    dst = (uint16_t)h << 4 | l;
+}
+
 void get16(const uint8_t* const blob, unsigned& nibbleAddr, uint16_t& dst) {
     uint8_t l, h;
     get8(blob, nibbleAddr, l);

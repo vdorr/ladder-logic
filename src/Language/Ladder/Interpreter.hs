@@ -19,6 +19,9 @@ import Language.Ladder.Analysis
 
 --------------------------------------------------------------------------------
 
+data CellType = Bit | TwoBits | Word -- | TON | TOF
+    deriving (Show, Read, Eq, Ord)
+
 -- |Memory cell value, also represents its type and default value
 data V
     = X Bool
@@ -79,6 +82,7 @@ data Instruction w a
     | IEq -- compare two value on arg stack and push result onto wire stack
     | ILt
     | IGt
+--     | IMov a a
     deriving (Show, Eq)
 
 mapInstruction g h = f
@@ -304,6 +308,30 @@ generateStk2' literalFromInt doDevice ast' = do
         for_ code print
         print (here, "-----------------------")
     return code
+
+--------------------------------------------------------------------------------
+
+data RW = Rd | Wr
+    deriving (Show)
+
+data DeviceDescription n impl = DDesc n [(RW, CellType)] impl
+
+devices =
+    [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
+    , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
+    , (Contact_ ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
+        (\[a, b] -> do
+            a' <- case a of
+                 Lit i -> pure [ILdCnA (fromIntegral i)]
+                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
+            b' <- case b of
+                 Lit i -> pure [ILdCnA (fromIntegral i)]
+                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
+            Right $ a' ++ b' ++ [IGt]))
+
+    , (Coil_    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
+    , (Coil_    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
+    ]
 
 --------------------------------------------------------------------------------
 

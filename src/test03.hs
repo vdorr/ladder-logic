@@ -45,13 +45,14 @@ import TestUtils
 
 --------------------------------------------------------------------------------
 
-i0 = instructionTable (Identity 0) (Identity 0) (Identity 0) (Identity 0)
+i0 :: [ExtendedInstruction Int Word16 Word8]
+i0 = runIdentity <$> instructionTable (pure 0) (pure 0) (pure 0) (pure 0)
 
 cstub1 :: String
 cstub1 = unlines (concat (concat q))
     where
 
-    l = fmap (\(Identity i) -> (i, instructionsToChunks [i])) i0
+    l = fmap (\i -> (i, instructionsToChunks [i])) i0
     l' = groupBy (\(_, C4 a : _) (_, C4 b : _) -> a == b) l
     (_stubs, q) = unzip $ fmap f l'
 
@@ -60,15 +61,15 @@ cstub1 = unlines (concat (concat q))
     f is         = ([], [ subop is ])
 
     subop is@((op, ops@(C4 ic : _)) : _) = swcase (show ic) (show op)
-            [ mkget "subop" (C4 0)
-            , unlines $ indentBlock $ switch "subop"
+            (mkget "subop" (C4 0) ++
+            [ unlines $ indentBlock $ switch "subop"
                 (fmap (uncurry opcase) (fmap (fmap (drop 1)) is))
-            ]
+            ])
 
     opcase op (C4 ic : ops) = swcase (show ic) (show op) (argLoads ++ [opCall])
         where
         argNames = zipWith (\i _ -> "f" ++ show i) [0..] ops
-        argLoads = zipWith (\an op -> mkget an op) argNames ops
+        argLoads = concat $ zipWith (\an op -> mkget an op) argNames ops
         opCall = mkopstub op ++ "(" ++ intercalate ", " argNames ++ ");"
     opcase _ _ = error here
 
@@ -84,23 +85,26 @@ cstub1 = unlines (concat (concat q))
 
     indentBlock = fmap ("    "++)
 
-    mkget n C4 {} = "const uint8_t " ++ n ++ " = get4(blob, addr);";
-    mkget n C8 {} = "const uint8_t " ++ n ++ " = get8(blob, addr);";
-    mkget n C12{} = "const uint16_t " ++ n ++ " = get12(blob, addr);";
-    mkget n C16{} = "const uint16_t " ++ n ++ " = get12(blob, addr);";
+--     mkget n C4 {} = ["const uint8_t " ++ n ++ " = get4(blob, addr);"];
+--     mkget n C8 {} = ["const uint8_t " ++ n ++ " = get8(blob, addr);"];
+--     mkget n C12{} = ["const uint16_t " ++ n ++ " = get12(blob, addr);"];
+--     mkget n C16{} = ["const uint16_t " ++ n ++ " = get12(blob, addr);"];
+
+    mkget n C4 {} = ["uint8_t " ++ n ++ ";", "get4(blob, addr, " ++ n ++ ");"];
+    mkget n C8 {} = ["uint8_t " ++ n ++ ";", "get8(blob, addr, " ++ n ++ ");"];
+    mkget n C12{} = ["uint16_t " ++ n ++ ";", "get12(blob, addr, " ++ n ++ ");"];
+    mkget n C16{} = ["uint16_t " ++ n ++ ";", "get12(blob, addr, " ++ n ++ ");"];
 
     mkopstub (EISimple op) = "op_" ++ name
         where
         name = head $ words $ show op
     mkopstub (EIJump _) = "op_jump"
+    mkopstub  EIReturn = "op_return"
 
 asCArray :: L.ByteString -> String
 asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 
 --------------------------------------------------------------------------------
-
-data CellType = Bit | TwoBits | Word -- | TON | TOF
-    deriving (Show, Read, Eq, Ord)
 
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
@@ -306,7 +310,7 @@ main = do
         , findLabels $ byteStringToInstructions
             $ chunksToByteString $ instructionsToChunks p
         )
-    print (here, instructionsToChunks $ fmap runIdentity i0)
+    print (here, instructionsToChunks i0)
 --     putStrLn cstub
     putStrLn cstub1
 

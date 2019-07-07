@@ -77,11 +77,11 @@ type MoveToNext tok = DgExt -> Dg tok -> Either String (Dg tok)
 --TODO TODO make some tests for psFocused behaviour (e.g. gap test)
 
 -- |Parser state
-data DgPState tok = DgPSt
-    { psNext     :: MoveToNext tok -- ^select next token
-    , psStr      :: Dg tok         -- ^input
-    , psLastBite :: Maybe DgExt    -- ^position of last token eaten
-    , psFocused  :: Bool           -- ^current focus of zp is actual parser current token
+data DgPState lx = DgPSt
+    { psNext     :: MoveToNext lx -- ^select next token
+    , psStr      :: Dg lx         -- ^input
+    , psLastBite :: Maybe DgExt   -- ^position of last token eaten
+    , psFocused  :: Bool          -- ^current focus of zp is actual parser current token
     }
 
 --------------------------------------------------------------------------------
