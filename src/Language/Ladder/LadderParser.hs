@@ -99,8 +99,8 @@ operand = variable <|> number
 --------------------------------------------------------------------------------
 
 withOperands
-    :: SFM (DgPState () (Tok Text)) (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
-    -> SFM (DgPState () (Tok Text)) ((Operand String), Maybe (Operand String), a)
+    :: DgP (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
+    -> DgP ((Operand String), Maybe (Operand String), a)
 withOperands p = below (above_ p variable) optOper
     where
     optOper ((True, a), op) = (op,,a) <$> fmap Just operand
