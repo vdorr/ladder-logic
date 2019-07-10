@@ -11,6 +11,7 @@ import Data.Char (toUpper)
 -- import Data.Int
 -- import Data.Word
 -- import Data.Bifunctor
+import Data.Void
 
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
@@ -238,7 +239,7 @@ verbose1 = False
 
 --FIXME IO
 generateStk2
-    :: Cofree (Diagram () Dev String) DgExt
+    :: Cofree (Diagram (Void) Dev String) DgExt
     -> IO [ExtendedInstruction String Int String]
 generateStk2 = generateStk2' pure emitBasicDevice . parseOps
 
@@ -253,7 +254,7 @@ generateStk2 = generateStk2' pure emitBasicDevice . parseOps
 generateStk2xx
     :: (Show address, Show word)
     => (Int -> IO word) --XXX fix that IO thing already !!! OMG
-    -> [(Maybe String, Cofree (Diagram () (Op String (Operand address)) String) DgExt)]
+    -> [(Maybe String, Cofree (Diagram (Void) (Op String (Operand address)) String) DgExt)]
     -> IO [ExtendedInstruction Int word address]
 generateStk2xx literalFromInt ast = do
     ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
@@ -267,7 +268,7 @@ generateStk2'
     => Show device --NO
     => (Int -> IO word)
     -> (device -> [Instruction word addr])
-    -> Cofree (Diagram () device lbl) DgExt
+    -> Cofree (Diagram (Void) device lbl) DgExt
     -> IO [ExtendedInstruction lbl word addr]
 generateStk2' literalFromInt doDevice ast' = do
     let ast = dropEnd ast'
@@ -337,7 +338,7 @@ devices =
 
 --FIXME do this in LadderParser
 parseOps
-    :: Cofree (Diagram c Dev s) p
+    :: Cofree (Diagram c Dev                     s) p
     -> Cofree (Diagram c (Op s (Operand String)) s) p
 parseOps = either (error here) id . parseOpsM
 

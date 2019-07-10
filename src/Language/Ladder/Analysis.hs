@@ -6,7 +6,7 @@ import Data.Function
 -- import Data.Maybe
 import Data.Bifunctor
 import Data.List
-
+import Data.Void
 import Data.Functor.Identity
 
 -- import Control.Monad.Writer
@@ -126,14 +126,14 @@ dependencies = cata' go
 --TODO TEST every list elemen has all nodes on same line, 'sameLine'
 --XXX it don't give element spatially sorted, right?
 cut1'
-    :: [Cofree (Diagram () d s) DgExt]
+    :: [Cofree (Diagram (Void) d s) DgExt]
     -> [Cofree (Diagram DgExt d s) DgExt]
 cut1' = foldMap (uncurry (:) . cut1)
 
 --TODO better name
 --TODO ensure cut when line number changes
 cut1
-    :: Cofree (Diagram () d s) DgExt
+    :: Cofree (Diagram (Void) d s) DgExt
     -> ( Cofree (Diagram DgExt d s) DgExt
        , [Cofree (Diagram DgExt d s) DgExt])
 cut1 (p :< a) = f a

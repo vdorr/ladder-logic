@@ -260,8 +260,7 @@ dgpTests = testGroup "Diagram parser"
 ladderTests :: TestTree
 ladderTests = testGroup "Ladder parser"
     [ testCase "test00" $
-        (fmap (const ()) . fst) <$> dgParse t00
---             @?= Right ( Pos (-1,-1) :< LadderParser.End )
+        (fmap (const ())) <$> runLadderParser_ ladder t00
             @?= Right (() :< Source (() :< End))
     , testCase "test00" $ assertFullyConsumed t00
     , testCase "test01" $ fullyConsumed' test01
@@ -274,33 +273,29 @@ ladderTests = testGroup "Ladder parser"
 --         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
 --             @?= Right (Zp [] [])
     , testCase "unexpected"
-        $ bimap null id (fmap getDg
-            $ dgParse [ (1, [((1, 1), Return)]) ])
-        @?= Left False
+        $ simpleResult (runLadderParser_ ladder [ (1, [((1, 1), Return)]) ])
+            @?= Left True
     , testCase "gap"
-        $ simpleResult (fmap getDg $ dgParse
+        $ simpleResult (runLadderParser_ ladder
             [ (1, [((1, 1), VLine)])
             , (2, [((1, 1), Cross), ((2, 2), HLine 2 0), ((4, 4), HLine 2 0)])
             ])
         @?= Left True
     , testCase "testN01"
-        $ simpleResult (parse testN01)
-        @?= Left True
+        $ simpleResult (checkSyntax testN01)
+            @?= Left True
     , testCase "test10"
-        $ simpleResult (() <$ parse test10)
-        @?= Right ()
+        $ simpleResult (checkSyntax test10)
+            @?= Right ()
     ]
     where
 
+    fullyConsumed' tk = checkSyntax tk @?= Right ()
 
---     fullyConsumed' tk
---         = getDg <$> (either (id) (dgParse) (preproc5' tk))
---         @?= Right (Zp [] [])
+--     parse :: Text -> Either String (Dg (Tok Text))
+--     parse = preproc5'' >=> dgParse >=> return.getDg
 
-    fullyConsumed' tk = parse tk @?= Right (Zp [] [])
 
-    parse :: Text -> Either String (Dg (Tok Text))
-    parse = preproc5'' >=> dgParse >=> return.getDg
 
     Right t00 = test00_tokenized
 --     Right t01 = test01_tokenized
@@ -309,9 +304,13 @@ ladderTests = testGroup "Ladder parser"
     Right t07 = test07_tokenized
     Right t07a = test07a_tokenized
 
-assertFullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
-getDg = dgTrim.psStr.snd
-dgParse = flip (applyDgp parseLadder) () . mkDgZp
+checkSyntax :: Text -> Either String ()
+checkSyntax s = () <$ (preproc5'' s >>= runLadderParser_ ladder)
+
+assertFullyConsumed tk = (() <$ runLadderParser ladder tk) @?= Right ()
+-- assertFullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
+-- getDg = dgTrim.psStr.snd
+-- dgParse = flip (applyDgp ladder) () . mkDgZp
 
 test00_tokenized = preproc5' test00
 
@@ -500,15 +499,18 @@ prop_sttsort =
 
 --------------------------------------------------------------------------------
 
-testBox :: Int -> Text -> Either String ((), DgPState () (Tok Text))
+-- testBox :: Int -> Text -> Either String ((), DgPState () (Tok Text))
+testBox :: Int -> Text -> Either String (Dg (Tok Text))
 testBox ln input
-    = mkDgZp <$> (preproc5'' input)
-    >>= flip (applyDgp (box001 ln)) ()
+--     = mkDgZp <$> (preproc5'' input)
+--     >>= flip (applyDgp (box001 ln)) ()
+    = preproc5'' input >>= runLadderParser (box001 ln) >>= (return . snd)
 
 boxTests :: TestTree
 boxTests = testGroup "Box parser"
     [ testCase "1" $
-        fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized) ())
+        fmap (dgTrim.snd) (runLadderParser (box001 2) box01_tokenized)
+--         fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized) ())
             @?= Right (Zp [] [])
 --     , testCase "1b" $
 --         box01b_tokenized
@@ -517,13 +519,13 @@ boxTests = testGroup "Box parser"
 --         fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01b_tokenized))
 --             @?= Right (Zp [] [])
     , testCase "2" $
-        fmap (dgTrim.psStr.snd) (testBox 2 box02)
+        fmap dgTrim (testBox 2 box02)
             @?= Right (Zp [] [])
     , testCase "2a" $
-        fmap (dgTrim.psStr.snd) (testBox 3 box02)
+        fmap dgTrim (testBox 3 box02)
             @?= Right (Zp [] [])
     , testCase "2b" $
-        fmap (dgTrim.psStr.snd) (testBox 4 box02)
+        fmap dgTrim (testBox 4 box02)
             @?= Right (Zp [] [])
     ]
     where
@@ -600,11 +602,16 @@ fileTestsNeg path = do
             case preproc5' src of
                  Left _ -> return () --preproc failed -> test succeeeded
                  Right lxs ->
-                    case getDg <$> dgParse lxs of
+                    case snd <$> runLadderParser ladder lxs of
+--                     case getDg <$> dgParse lxs of
                         Right (Zp [] []) -> assertFailure here
                         Left _ -> return ()
                         _ -> return ()
     return $ testGroup "File tests - negative" tests
+
+--     where
+--     dgParse = flip (applyDgp ladder) () . mkDgZp
+
 
 fileTests :: FilePath -> IO TestTree
 fileTests path = do
@@ -618,8 +625,8 @@ fileTests path = do
             case tst of
                 Nothing -> do
                     for_ blocks $ \(_, lxs') -> do
-                        case getDg <$> dgParse lxs' of
-                            Right remaining -> remaining @?= Zp [] []
+                        case runLadderParser ladder lxs' of
+                            Right _ -> return ()
                             Left err -> fail err
                 Just t -> do
                     ast <- parseOrDie2 lxs
@@ -632,5 +639,5 @@ fileTests path = do
 
 main :: IO ()
 main = do
-    setEnv "TASTY_NUM_THREADS" "1"
+    setEnv "TASTY_NUM_THREADS" "4"
     getTests >>= defaultMain

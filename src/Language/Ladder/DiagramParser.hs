@@ -87,6 +87,11 @@ data DgPState st lx = DgPSt
 
 --------------------------------------------------------------------------------
 
+applyDgp :: SFM (DgPState st tok) a -> Dg tok -> st -> Either String (a, DgPState st tok)
+applyDgp p dg st = sfm p (DgPSt goRight dg Nothing True st)
+
+--------------------------------------------------------------------------------
+
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
 move_ ln co dg = maybe (Left here) return (move ln co dg)
 -- move_ ln co dg = maybe (Left here) return (moveNotCursed ln co dg)
@@ -103,9 +108,6 @@ goLeft  (ln, (co, _)) = move_ ln     (co-1)
 
 lastPos :: SFM (DgPState st tok) DgExt
 lastPos = psLastBite <$> get >>= maybe (fail here) return
-
-applyDgp :: SFM (DgPState st tok) a -> Dg tok -> st -> Either String (a, DgPState st tok)
-applyDgp p dg st = sfm p (DgPSt goRight dg Nothing True st)
 
 setDir :: MoveToNext tok -> SFM (DgPState st tok) ()
 setDir f = modify $ \(DgPSt _ zp ps fc st) -> DgPSt f zp ps fc st

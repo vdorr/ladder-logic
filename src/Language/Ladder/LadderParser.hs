@@ -8,8 +8,9 @@ module Language.Ladder.LadderParser
     , Operand(..)
     , Dev(..)
     , DevType(..)
-    , parseLadder
+    , ladder
     , parseLadderLiberal
+    , runLadderParser, runLadderParser_
 -- *for testing only
     , box001
     ) where
@@ -21,6 +22,7 @@ import Control.Applicative --hiding (fail)
 import Control.Monad hiding (fail)
 import Data.Foldable
 import Data.Functor.Identity
+import Data.Void
 
 import Language.Ladder.Utils
 import Language.Ladder.Lexer
@@ -29,17 +31,16 @@ import Language.Ladder.DiagramParser
 --------------------------------------------------------------------------------
 
 -- |Ladder AST type
-data Diagram c d s a
+data Diagram continuation device label a
     = Source a   -- ^start of power rail
     | Sink       -- ^where wire connects to (implied) right rail
     | End        -- ^where vertical left rail ends at the bottom
 --     | Stub       -- ^intersection of hline and node
-    | Device d a --
-    | Jump   s
+    | Device device a --
+    | Jump   label
     | Node   [a] --order matters here
---     | Label s --i dislike it, but would need it if vline can cross line with label
-    | Cont c a
-    | Conn c
+    | Cont   continuation a
+    | Conn   continuation
     deriving (Show, Functor, Eq, Foldable, Traversable)
 
 mapDg :: (c -> c') -> (d -> d') -> (s -> s') -> Diagram c d s a -> Diagram c' d' s' a
@@ -80,8 +81,62 @@ data Dev = Dev DevType [Operand String]
 
 --------------------------------------------------------------------------------
 
-type DgP = SFM (DgPState () (Tok Text))
+data LdPCtx text device = LdPCtx (text -> Maybe (Bool, device))
+-- data LdPCtx text device = LdPCtx (text -> Maybe (Bool, [Operand text] -> device))
+
+type DgP = SFM (DgPState (LdPCtx Text Dev) (Tok Text))
+-- type DgP = SFM (DgPState (LdPCtx Text ) (Tok Text))
 -- type DgPSt = DgPState (Tok Text)
+
+type Ladder' device text = Cofree (Diagram Void device text) DgExt
+type LdP device text a = SFM (DgPState (LdPCtx text device) (Tok text)) a
+type Result1 device text = LdP device text (Ladder' device text)
+
+--------------------------------------------------------------------------------
+
+{-
+hlink   : '-'+ ('|'+ '-'+)?
+hline   : (hlink | contact | coil | node)+
+node    : '+'
+name    : <cf tokenizer>
+
+--interpret as 2D syntax
+contact : name
+          '[' contactType ']'
+          name?
+
+coil    : name
+          '[' coilType ']'
+
+contactType : ...
+coilType    : ...
+
+-}
+
+ladder :: DgP (Cofree (Diagram Void Dev String) DgExt)
+ladder
+    = setDir goDown
+    *> ((:<) <$> currentPos <*> fmap Source vline'2)
+    <* dgIsEmpty
+
+-- like 'ladder' but do not check if all lexemes consumed
+parseLadderLiberal :: DgP (Cofree (Diagram (Void) Dev String) DgExt)
+parseLadderLiberal
+    = setDir goDown
+    *> ((:<) <$> currentPos <*> fmap Source vline'2)
+
+type Ladder = Cofree (Diagram Void Dev String) DgExt
+
+-- applyDgp :: SFM (DgPState st tok) a -> Dg tok -> st -> Either String (a, DgPState st tok)
+runLadderParser_ :: DgP a -> [(Int, [((Int, Int), Tok Text)])] -> Either String a
+-- runLadderParser_ p s = fst <$> applyDgp p (mkDgZp (dropWhitespace s)) ()
+runLadderParser_ p s = fst <$> runLadderParser p s
+
+runLadderParser
+    :: DgP a
+    -> [(Int, [((Int, Int), Tok Text)])]
+    -> Either String (a, Dg (Tok Text))
+runLadderParser p s = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s)) (LdPCtx undefined)
 
 --------------------------------------------------------------------------------
 
@@ -134,41 +189,8 @@ vline = do
 
 --------------------------------------------------------------------------------
 
-{-
-hlink   : '-'+ ('|'+ '-'+)?
-hline   : (hlink | contact | coil | node)+
-node    : '+'
-name    : <cf tokenizer>
-
---interpret as 2D syntax
-contact : name
-          '[' contactType ']'
-          name?
-
-coil    : name
-          '[' coilType ']'
-
-contactType : ...
-coilType    : ...
-
--}
-
-parseLadder :: DgP (Cofree (Diagram () Dev String) DgExt)
-parseLadder
-    = setDir goDown
-    *> ((:<) <$> currentPos <*> fmap Source vline'2)
-    <* dgIsEmpty
-
--- like 'parseLadder' but do not check if all lexemes consumed
-parseLadderLiberal :: DgP (Cofree (Diagram () Dev String) DgExt)
-parseLadderLiberal
-    = setDir goDown
-    *> ((:<) <$> currentPos <*> fmap Source vline'2)
-
---------------------------------------------------------------------------------
-
 node2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-node2 = (:<) <$> currentPos <*> (Language.Ladder.LadderParser.Node <$> node2')
+node2 = (:<) <$> currentPos <*> (Node <$> node2')
 
 node2' :: DgP [Cofree (Diagram c Dev String) DgExt]
 node2'
