@@ -4,8 +4,9 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO
-import Data.Foldable
 import System.Environment (getArgs)
+import Data.Foldable
+import Data.Void
 
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
@@ -19,7 +20,7 @@ import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
-testAst :: Cofree (Diagram () Dev String) DgExt -> IO ()
+testAst :: Cofree (Diagram Void Dev String) DgExt -> IO ()
 testAst ast' = do
     generateStk2 ast'
     return ()
@@ -41,9 +42,9 @@ main = do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 forM_ (zpToList zp) (print . (here,))
-                case applyDgp parseLadderLiberal zp () of
+                case runLadderParser parseLadderLiberal lxs'' of
                     Left err -> print (here, err)
-                    Right (ast, DgPSt _ c@(Zp zpl zpr) _ _ _) -> do
+                    Right (ast, c@(Zp zpl zpr)) -> do
                         print (here, "--------------------------------------------------")
                         for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 --                     for_ zpr $ \q -> print (here, q)

@@ -69,19 +69,21 @@ mapDgA z x y = f
 data Operand address
     = Var !address   -- ^name of memory location
     | Lit !Int       -- ^integer literal, usually allowed only below contact
+    deriving (Show, Eq, Functor)
+
+data DevType t
+    = Coil_    !t
+    | Contact_ !t
     deriving (Show, Eq)
 
-data DevType
-    = Coil_    !String
-    | Contact_ !String
-    deriving (Show, Eq)
-
-data Dev = Dev DevType [Operand String]
+data Dev = Dev (DevType String) [Operand String]
     deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 
-data LdPCtx text device = LdPCtx (text -> Maybe (Bool, device))
+data DevOpFlag = None | Optional | Mandatory
+
+data LdPCtx text device = LdPCtx (DevType text -> Maybe (Bool, device)) -- '+' node positions
 -- data LdPCtx text device = LdPCtx (text -> Maybe (Bool, [Operand text] -> device))
 
 type DgP = SFM (DgPState (LdPCtx Text Dev) (Tok Text))
@@ -140,25 +142,43 @@ runLadderParser p s = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s)) (Ld
 
 --------------------------------------------------------------------------------
 
-variable :: DgP (Operand String)
-variable = (Var . unpack) <$> name
+variable :: LdP d t (Operand t)
+variable = Var <$> name
 
-number :: DgP (Operand String)
+number :: LdP d t (Operand t)
 number = do
     Number n <- eat
     return (Lit n)
 
-operand :: DgP (Operand String)
+operand :: LdP d t (Operand t)
 operand = variable <|> number
 
 --------------------------------------------------------------------------------
 
+withOperands2 :: LdP d t (DevOpFlag, a)
+              -> LdP d t (Operand t, Maybe (Operand t), a)
+withOperands2 p = below (above_ p operand) optOper
+    where
+    optOper ((Mandatory, a), op) = (op,,a) <$> fmap Just operand
+    optOper ((Optional , a), op) = (op,,a) <$> option operand
+    optOper ((None     , a), op) = return (op, Nothing, a)
+
+
+withOperands3 :: LdP d t (DevOpFlag, a)
+              -> LdP d t ([Operand t], a)
+withOperands3 p = below (above_ p operand) optOper
+    where
+    optOper ((Mandatory, a), op) = ((,a).(op:)) <$> (pure <$> operand)
+    optOper ((Optional , a), op) = ((,a).(op:)) <$> (toList <$> option operand)
+    optOper ((None     , a), op) = ((,a).(op:)) <$> pure [op]
+
+
 withOperands
     :: DgP (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
-    -> DgP ((Operand String), Maybe (Operand String), a)
-withOperands p = below (above_ p variable) optOper
+    -> DgP (Operand String, Maybe (Operand String), a)
+withOperands p = below (above_ p ((unpack <$>) <$> variable)) optOper
     where
-    optOper ((True, a), op) = (op,,a) <$> fmap Just operand
+    optOper ((True, a), op) = (op,,a) <$> fmap (Just . fmap unpack) operand
     optOper ((_   , a), op) = return (op, Nothing, a)
 -- withOperands p = do
 --     (ln, co) <- currentPos
@@ -223,21 +243,23 @@ jump = do
     Jump' name <- eat
     return $ pos :< Jump (unpack name)
 
-vline2 :: DgP ()
+-- vline2 :: DgP ()
+vline2 :: SFM (DgPState (LdPCtx text device) (Tok text)) ()
 vline2 = do
     VLine <- eat
     return ()
 
-hline2 :: DgP () --TODO vline crossing
+-- "-||`EOL`" is not allowed
+hline2 :: DgP ()
 hline2 = do
     HLine _ vl <- eat
---XXX replicateM_ vl ??
+--XXX replicateM_ vl (skip' (==VLine)) ?? fail if VLine already eaten
     when (vl > 0) $ do
         (ln, (co, _)) <- currentPos
         setPos (ln, (co + vl, ()))
 --TODO TEST move to same location is noop
 
-device :: DgP (Bool, DevType) -> DgP (Cofree (Diagram c Dev String) DgExt)
+device :: DgP (Bool, DevType String) -> DgP (Cofree (Diagram c Dev String) DgExt)
 device p = do
     pos <- currentPos
     (op, op2, f) <- withOperands p
@@ -248,7 +270,8 @@ coil2 = device $ do
     Coil f <- eat
     return (False, Coil_ (unpack f))
 
-contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+-- contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+contact2 :: SFM (DgPState (LdPCtx Text Dev) (Tok Text)) (Cofree (Diagram c Dev String) DgExt)
 contact2 = device $ do
     Contact f <- eat
     return (elem f cmp, Contact_ (unpack f))

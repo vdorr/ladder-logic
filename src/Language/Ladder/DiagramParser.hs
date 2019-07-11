@@ -117,11 +117,11 @@ setDir f = modify $ \(DgPSt _ zp ps fc st) -> DgPSt f zp ps fc st
 
 step :: SFM (DgPState st tok) ()
 step = do
-    origin             <- currentPos
+    origin                <- currentPos
     DgPSt f zp ps True st <- get --if nothing is focused, currentPos makes no sense
     case f origin zp of
         Right zp' -> put (DgPSt f zp' ps True st)
-        Left err -> fail here --or not?
+        Left  err -> fail here --or not?
 
 setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPos (ln, (co, _)) = do
@@ -182,12 +182,20 @@ skipSome f
          Just x | f x -> step >> skipSome f
          _            -> return ()
 
+-- |Step over lexeme or do nothing
 skip :: (tok -> Bool) -> SFM (DgPState st tok) ()
 skip f
     = peekM >>= \case
          Just x | f x -> step
          _            -> return ()
 
+-- -- |Step over lexeme or fail
+-- skip' :: (tok -> Bool) -> SFM (DgPState st tok) ()
+-- skip' f
+--     = peekM >>= \case
+--          Just x | f x -> step
+--          _            -> fail here
+-- 
 option :: SFM st a -> SFM st (Maybe a)
 option p = (Just <$> p) <|> pure Nothing
 
