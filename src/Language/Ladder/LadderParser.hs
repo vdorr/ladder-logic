@@ -140,6 +140,10 @@ runLadderParser
     -> Either String (a, Dg (Tok Text))
 runLadderParser p s = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s)) (LdPCtx undefined)
 
+ldUnpack :: Cofree (Diagram c d Text) a
+         -> Cofree (Diagram c d String) a
+ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id id unpack n)
+
 --------------------------------------------------------------------------------
 
 variable :: LdP d t (Operand t)
@@ -197,22 +201,22 @@ withOperands p = below (above_ p ((unpack <$>) <$> variable)) optOper
 
 --------------------------------------------------------------------------------
 
-hline :: DgP ()
+hline :: LdP d t ()
 hline = do
     HLine _ _ <- eat
     return ()
 
-vline :: DgP ()
+vline :: LdP d t ()
 vline = do
     VLine <- eat
     return ()
 
 --------------------------------------------------------------------------------
 
-node2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+node2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
 node2 = (:<) <$> currentPos <*> (Node <$> node2')
 
-node2' :: DgP [Cofree (Diagram c Dev String) DgExt]
+node2' :: LdP Dev Text [Cofree (Diagram c Dev String) DgExt]
 node2'
     = branch
         (==Cross)
@@ -221,36 +225,36 @@ node2'
         ]
 
 --FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
-vline'2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+vline'2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
 vline'2 = many vline2 *> (end2 <|> node2)
 
-end2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+end2 :: LdP d Text (Cofree (Diagram c d String) DgExt)
 end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 
-eol2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+eol2 :: LdP d Text (Cofree (Diagram c d String) DgExt)
 eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
-hline'2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+hline'2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
 hline'2
     = some (hline2 <* option crossing)
     *> (coil2 <|> contact2 <|> node2 <|> jump <|> eol2)
     where
     crossing = skipSome (==VLine) *> hline2
 
-jump :: DgP (Cofree (Diagram c Dev String) DgExt)
+jump :: LdP d Text (Cofree (Diagram c d String) DgExt)
 jump = do
     pos <- currentPos
     Jump' name <- eat
     return $ pos :< Jump (unpack name)
 
 -- vline2 :: DgP ()
-vline2 :: SFM (DgPState (LdPCtx text device) (Tok text)) ()
+vline2 :: LdP d t ()
 vline2 = do
     VLine <- eat
     return ()
 
 -- "-||`EOL`" is not allowed
-hline2 :: DgP ()
+hline2 :: LdP d t ()
 hline2 = do
     HLine _ vl <- eat
 --XXX replicateM_ vl (skip' (==VLine)) ?? fail if VLine already eaten
@@ -259,19 +263,20 @@ hline2 = do
         setPos (ln, (co + vl, ()))
 --TODO TEST move to same location is noop
 
-device :: DgP (Bool, DevType String) -> DgP (Cofree (Diagram c Dev String) DgExt)
+device :: LdP Dev Text (Bool, DevType String)
+       -> LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
 device p = do
     pos <- currentPos
     (op, op2, f) <- withOperands p
     (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline'2)
 
-coil2 :: DgP (Cofree (Diagram c Dev String) DgExt)
+coil2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
 coil2 = device $ do
     Coil f <- eat
     return (False, Coil_ (unpack f))
 
 -- contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-contact2 :: SFM (DgPState (LdPCtx Text Dev) (Tok Text)) (Cofree (Diagram c Dev String) DgExt)
+contact2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
 contact2 = device $ do
     Contact f <- eat
     return (elem f cmp, Contact_ (unpack f))
