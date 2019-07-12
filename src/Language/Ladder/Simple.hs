@@ -11,6 +11,9 @@ import Language.Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
+data Dev t = Dev !(DevType t) ![Operand t]
+    deriving (Show, Eq, Functor)
+
 runLadderParser_
     :: LdP (Dev Text) Text a
     -> [(Int, [((Int, Int), Tok Text)])]

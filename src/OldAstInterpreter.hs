@@ -13,6 +13,7 @@ import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Interpreter hiding (RW(..))
+import Language.Ladder.Simple --FIXME should not be imported here
 
 import Tooling
 

@@ -5,7 +5,6 @@ module Language.Ladder.LadderParser
     ( Diagram(..)
     , mapDgA, mapDg
     , Operand(..)
-    , Dev(..)
     , DevType(..)
     , DevOpFlag(..)
     , LdPCtx(..) --FIXME should not be exported
@@ -79,16 +78,10 @@ data DevType t
     | Contact_ !t
     deriving (Show, Eq, Functor)
 
-data Dev t = Dev !(DevType t) ![Operand t]
-    deriving (Show, Eq, Functor)
-
 --------------------------------------------------------------------------------
 
 data DevOpFlag = None | Optional | Mandatory
 --     deriving (Show, Eq)
-
--- data LdPCtx text device = LdPCtx (DevType text -> Maybe (DevOpFlag, device)) -- '+' node positions
--- data LdPCtx text device = LdPCtx (text -> Maybe (Bool, [Operand text] -> device))
 
 data LdPCtx m text device = LdPCtx
     {
@@ -97,19 +90,12 @@ data LdPCtx m text device = LdPCtx
     }
     -- '+' node positions, maybe
 
--- type DgP = SFM (DgPState (LdPCtx Text (Dev Text)) (Tok Text))
--- type DgP = SFM (DgPState (LdPCtx Text ) (Tok Text))
--- type DgPSt = DgPState (Tok Text)
-
--- type Ladder' device text = Cofree (Diagram Void device text) DgExt
 type LdP device text
     = SFM
         (DgPState
             (LdPCtx (Either String) text device)
             (Tok text)
         )
--- type LdP2 device text a = forall st. SFM (DgPState (LdPCtx (SFM st) text device) (Tok text)) a
--- type Result1 device text = LdP device text (Ladder' device text)
 
 --------------------------------------------------------------------------------
 
@@ -132,19 +118,17 @@ coilType    : ...
 
 -}
 
-ladder :: LdP (Dev t) t (Cofree (Diagram Void (Dev t) t) DgExt)
+ladder :: LdP d t (Cofree (Diagram Void d t) DgExt)
 ladder
     = setDir goDown
     *> ((:<) <$> currentPos <*> fmap Source vline')
     <* dgIsEmpty
 
 -- like 'ladder' but do not check if all lexemes consumed
-parseLadderLiberal :: LdP (Dev t) t (Cofree (Diagram Void (Dev t) t) DgExt)
+parseLadderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
 parseLadderLiberal
     = setDir goDown
     *> ((:<) <$> currentPos <*> fmap Source vline')
-
--- type Ladder = Cofree (Diagram Void (Dev t) String) DgExt
 
 --------------------------------------------------------------------------------
 
