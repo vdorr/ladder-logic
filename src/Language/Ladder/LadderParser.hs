@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -8,15 +7,16 @@ module Language.Ladder.LadderParser
     , Operand(..)
     , Dev(..)
     , DevType(..)
+    , DevOpFlag(..)
+    , LdPCtx(..) --FIXME should not be exported
+    , LdP
     , ladder
     , parseLadderLiberal
-    , runLadderParser, runLadderParser_
+--     , runLadderParser, runLadderParser_
 -- *for testing only
     , box001
-    , ldUnpack
     ) where
 
-import Data.Text (Text, unpack)
 import Prelude hiding (fail)
 import Control.Monad.Fail
 import Control.Applicative --hiding (fail)
@@ -91,9 +91,9 @@ data DevOpFlag = None | Optional | Mandatory
 -- data LdPCtx text device = LdPCtx (text -> Maybe (Bool, [Operand text] -> device))
 
 data LdPCtx m text device = LdPCtx
-    { ctxHasSndOp :: DevType text -> m DevOpFlag
---     , ctxMkDev   :: DevType text -> [Operand text] -> m device
-    , ctxMkDev    :: DevType text -> m (DevOpFlag, [Operand text] -> m device)
+    {
+--         ctxHasSndOp :: DevType text -> m DevOpFlag
+      ctxMkDev    :: DevType text -> m (DevOpFlag, [Operand text] -> m device)
     }
     -- '+' node positions, maybe
 
@@ -110,32 +110,6 @@ type LdP device text
         )
 -- type LdP2 device text a = forall st. SFM (DgPState (LdPCtx (SFM st) text device) (Tok text)) a
 -- type Result1 device text = LdP device text (Ladder' device text)
-
---------------------------------------------------------------------------------
-
-runLadderParser_
-    :: LdP (Dev Text) Text a
-    -> [(Int, [((Int, Int), Tok Text)])]
-    -> Either String a
-runLadderParser_ p s = fst <$> runLadderParser p s
-
-runLadderParser
-    :: LdP (Dev Text) Text a
-    -> [(Int, [((Int, Int), Tok Text)])]
-    -> Either String (a, Dg (Tok Text))
-runLadderParser p s
-    = ((psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s))
-            (LdPCtx has2Ops mkDev))
-    where
-    cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
-    has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
-    has2Ops _ = Right None
-
-    mkDev d = (, pure . Dev d) <$> has2Ops d
-
-ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
-         -> Cofree (Diagram c (Dev String) String) a
-ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
 
 --------------------------------------------------------------------------------
 
@@ -187,13 +161,13 @@ operand = variable <|> number
 
 --------------------------------------------------------------------------------
 
-withOperands2 :: LdP d t (DevOpFlag, a)
-              -> LdP d t (Operand t, Maybe (Operand t), a)
-withOperands2 p = below (above_ p operand) optOper
-    where
-    optOper ((Mandatory, a), op) = (op,,a) <$> fmap Just operand
-    optOper ((Optional , a), op) = (op,,a) <$> option operand
-    optOper ((None     , a), op) = return (op, Nothing, a)
+-- withOperands2 :: LdP d t (DevOpFlag, a)
+--               -> LdP d t (Operand t, Maybe (Operand t), a)
+-- withOperands2 p = below (above_ p operand) optOper
+--     where
+--     optOper ((Mandatory, a), op) = (op,,a) <$> fmap Just operand
+--     optOper ((Optional , a), op) = (op,,a) <$> option operand
+--     optOper ((None     , a), op) = return (op, Nothing, a)
 
 
 withOperands3 :: LdP d t (DevOpFlag, a)
@@ -202,7 +176,7 @@ withOperands3 p = below (above_ p operand) optOper
     where
     optOper ((Mandatory, a), op) = ((,a).(op:)) <$> (pure <$> operand)
     optOper ((Optional , a), op) = ((,a).(op:)) <$> (toList <$> option operand)
-    optOper ((None     , a), op) = ((,a).(op:)) <$> pure [op]
+    optOper ((None     , a), op) = ((,a).(op:)) <$> pure []
 
 -- withOperands
 --     :: LdP d t (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
@@ -229,10 +203,10 @@ vline = do
 isTok :: (Functor f, Eq (f ())) => f a -> f a -> Bool
 isTok = on (==) (fmap (const ()))
 
-node :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+node :: LdP d t (Cofree (Diagram c d t) DgExt)
 node = (:<) <$> currentPos <*> (Node <$> node')
 
-node' :: LdP (Dev t) t [Cofree (Diagram c (Dev t) t) DgExt]
+node' :: LdP d t [Cofree (Diagram c d t) DgExt]
 node'
     = branch
         (isTok Cross)
@@ -241,7 +215,7 @@ node'
         ]
 
 --FIXME with 'node' may end only left rail, vline stemming from node must lead to another node
-vline' :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+vline' :: LdP d t (Cofree (Diagram c d t) DgExt)
 vline' = many vline *> (end2 <|> node)
 
 end2 :: LdP d t (Cofree (Diagram c d t) DgExt)
@@ -250,10 +224,11 @@ end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 eol2 :: LdP d t (Cofree (Diagram c d t) DgExt)
 eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
-hline' :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+hline' :: LdP d t (Cofree (Diagram c d t) DgExt)
 hline'
     = some (hline2 <* option crossing)
-    *> (coil <|> contact <|> node <|> jump <|> eol2)
+--     *> (coil <|> contact <|> node <|> jump <|> eol2)
+    *> (device <|> node <|> jump <|> eol2)
     where
     crossing = skipSome (isTok VLine) *> hline2
 
@@ -272,46 +247,46 @@ hline2 = do
         (ln, (co, _)) <- currentPos
         setPos (ln, (co + vl, ()))--TODO TEST move to same location is noop
 
--- device' :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
--- device' = do
---     pos <- currentPos
---     LdPCtx{..} <- psUser <$> get
---     (ops, f) <-
---         withOperands3 $ do
---             dev <- coil' <|> contact'
---             Right (flag, mkDev) <- pure $ ctxMkDev dev
---             return (flag, mkDev)
---     Right dev' <- pure $ f ops
---     (pos :<) <$> (Device dev' <$> hline')
--- 
--- coil' :: LdP d t (DevType t)
--- coil' = do
---     Coil f <- eat
---     return (Coil_ f)
--- 
--- contact' :: LdP d t (DevType t)
--- contact' = do
---     Contact f <- eat
---     return (Contact_ f)
-
-device :: LdP (Dev t) t (DevOpFlag, DevType t)
-       -> LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
-device p = do
+device :: LdP d t (Cofree (Diagram c d t) DgExt)
+device = do
     pos <- currentPos
-    (op, op2, f) <- withOperands2 p
-    (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline')
-
-coil :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
-coil = device $ do
-    Coil f <- eat
-    return (None, Coil_ f)
-
-contact :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
-contact = device $ do
-    Contact f <- eat
     LdPCtx{..} <- psUser <$> get
-    Right flag <- return $ ctxHasSndOp (Contact_ f)
-    return (flag, Contact_ f)
+    (ops, f) <-
+        withOperands3 $ do
+            dev <- coil' <|> contact'
+            Right (flag, mkDev) <- pure $ ctxMkDev dev
+            return (flag, mkDev)
+    Right dev' <- pure $ f ops
+    (pos :<) <$> (Device dev' <$> hline')
+
+coil' :: LdP d t (DevType t)
+coil' = do
+    Coil f <- eat
+    return (Coil_ f)
+
+contact' :: LdP d t (DevType t)
+contact' = do
+    Contact f <- eat
+    return (Contact_ f)
+
+-- device :: LdP (Dev t) t (DevOpFlag, DevType t)
+--        -> LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+-- device p = do
+--     pos <- currentPos
+--     (op, op2, f) <- withOperands2 p
+--     (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline')
+-- 
+-- coil :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+-- coil = device $ do
+--     Coil f <- eat
+--     return (None, Coil_ f)
+-- 
+-- contact :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+-- contact = device $ do
+--     Contact f <- eat
+--     LdPCtx{..} <- psUser <$> get
+--     Right flag <- return $ ctxHasSndOp (Contact_ f)
+--     return (flag, Contact_ f)
 
 --------------------------------------------------------------------------------
 

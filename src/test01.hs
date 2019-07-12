@@ -14,6 +14,7 @@ import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Interpreter
+import Language.Ladder.Simple
 
 -- import Tooling
 -- import TestUtils

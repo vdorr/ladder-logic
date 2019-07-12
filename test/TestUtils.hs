@@ -21,6 +21,7 @@ import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Interpreter
+import Language.Ladder.Simple
 
 import Tooling
 
@@ -78,6 +79,10 @@ runLadderTest verbose test@T01{} ast = do
     return passed
 
 --------------------------------------------------------------------------------
+
+ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
+         -> Cofree (Diagram c (Dev String) String) a
+ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
 
 -- |also return pragmas
 parseOrDie5
