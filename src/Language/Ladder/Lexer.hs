@@ -138,7 +138,7 @@ lexeme
 
     where
     labelName = T.pack <$> some alphaNumChar
-    name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '%')
+    name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '_' <|> char '%')
     between' a b = between (chunk a) (chunk b)
     between'' :: Text -> Text -> Parsec ParseErr Text Text
     between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))

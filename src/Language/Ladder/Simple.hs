@@ -24,12 +24,23 @@ runLadderParser
     :: LdP (Dev Text) Text a
     -> [(Int, [((Int, Int), Tok Text)])]
     -> Either String (a, Dg (Tok Text))
-runLadderParser p s
-    = ((psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s))
-            (LdPCtx mkDev))
+runLadderParser = runParser wrapDevice
+--     where
+--     cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
+--     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
+--     has2Ops _ = Right None
+-- 
+--     mkDev d = (, pure . Dev d) <$> has2Ops d
+
+wrapDevice
+    :: DevType Text
+    -> Either String
+        ( DevOpFlag
+        , [Operand Text] -> Either String (Dev Text)
+        )
+wrapDevice d = (, pure . Dev d) <$> has2Ops d
     where
     cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
     has2Ops _ = Right None
 
-    mkDev d = (, pure . Dev d) <$> has2Ops d

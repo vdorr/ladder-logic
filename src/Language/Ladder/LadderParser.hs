@@ -7,8 +7,9 @@ module Language.Ladder.LadderParser
     , Operand(..)
     , DevType(..)
     , DevOpFlag(..)
-    , LdPCtx(..) --FIXME should not be exported
+--     , LdPCtx(..) --FIXME should not be exported
     , LdP
+    , runParser
     , ladder
     , parseLadderLiberal
 --     , runLadderParser, runLadderParser_
@@ -80,15 +81,17 @@ data DevType t
 
 --------------------------------------------------------------------------------
 
-data DevOpFlag = None | Optional | Mandatory
---     deriving (Show, Eq)
-
 data LdPCtx m text device = LdPCtx
     {
 --         ctxHasSndOp :: DevType text -> m DevOpFlag
-      ctxMkDev    :: DevType text -> m (DevOpFlag, [Operand text] -> m device)
+      ctxMkDev :: DevType text -> m (DevOpFlag, [Operand text] -> m device)
     }
     -- '+' node positions, maybe
+
+--------------------------------------------------------------------------------
+
+data DevOpFlag = None | Optional | Mandatory
+--     deriving (Show, Eq)
 
 type LdP device text
     = SFM
@@ -96,6 +99,17 @@ type LdP device text
             (LdPCtx (Either String) text device)
             (Tok text)
         )
+
+runParser
+    :: (DevType t
+        -> Either
+                String
+                (DevOpFlag, [Operand t] -> Either String d))
+    -> LdP d t a
+    -> [(Int, [((Int, Int), Tok t)])]
+    -> Either String (a, Dg (Tok t))
+runParser mkDev p s
+    = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s)) (LdPCtx mkDev)
 
 --------------------------------------------------------------------------------
 
