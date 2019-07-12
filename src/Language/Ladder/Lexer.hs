@@ -65,30 +65,30 @@ data Tok a
     = Cross            -- ^ "+"
     | VLine            -- ^ "|"
 --sole thing that occupy whole line
-    | Label        a   -- ^ network label "LABEL:"
+    | Label        !a   -- ^ network label "LABEL:"
 --horizontal things
-    | HLine        Int Int --number of '-' consumed, number of following '|' seen
+    | HLine        !Int !Int --number of '-' consumed, number of following '|' seen
     | REdge            -- ^ as block input "--->"
     | FEdge            -- ^ as block input "---<"
 
 --     | Negated        -- on block i/o "---0|" or "|0---"
-    | Number       Int --should probably be of type 'a'
-    | Contact      a   -- ^ "---[OP]---"
-    | Coil         a   -- ^ "---(OP)---"
+    | Number       !Int --should probably be of type 'a'
+    | Contact      !a   -- ^ "---[OP]---"
+    | Coil         !a   -- ^ "---(OP)---"
 
 --as above, but could be mistaken for other things
 --     | Connector a        -- "--->NAME>"
-    | Continuation a   -- ^ ">NAME>---" -- same as Connector
+    | Continuation !a   -- ^ ">NAME>---" -- same as Connector
     | Return           -- ^ "---\<RETURN>"
 --Jump additionaly is followed by end of line
-    | Jump'        a   -- ^ "--->>LABEL"
+    | Jump'        !a   -- ^ "--->>LABEL"
 
 --others
 --     | Store a            -- FBD only "---VARIABLE"
-    | Name         a   -- ^inside of block
+    | Name         !a   -- ^inside of block
 --whitespace
-    | Comment      a   -- ^ (* ... *)
-    | Pragma       a   -- ^ { ... }
+    | Comment      !a   -- ^ (* ... *)
+    | Pragma       !a   -- ^ { ... }
     deriving (Show, Eq, Functor)
 
 --------------------------------------------------------------------------------
@@ -97,19 +97,19 @@ renderLexeme :: Tok String -> String
 renderLexeme t = case t of
     Cross            -> "+"
     VLine            -> "|"
-    Label        a   -> a ++ ":"
+    Label        a   -> a <> ":"
     HLine        n _ -> replicate (n+1) '-'
     REdge            -> ">"
     FEdge            -> "<"
     Number       n   -> show n
-    Contact      a   -> "[" ++ a ++ "]"
-    Coil         a   -> "(" ++ a ++ ")"
-    Continuation a   -> ">" ++ a ++ ">"
+    Contact      a   -> "[" <> a <> "]"
+    Coil         a   -> "(" <> a <> ")"
+    Continuation a   -> ">" <> a <> ">"
     Return           -> "<RETURN>"
-    Jump'        a   -> ">>" ++ a
+    Jump'        a   -> ">>" <> a
     Name         a   -> a
-    Comment      a   -> "(*" ++ a ++ "*)"
-    Pragma       a   -> "{" ++ a ++ "}"
+    Comment      a   -> "(*" <> a <> "*)"
+    Pragma       a   -> "{" <> a <> "}"
 
 --------------------------------------------------------------------------------
 

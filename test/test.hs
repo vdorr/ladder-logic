@@ -499,6 +499,10 @@ prop_sttsort =
 
 --------------------------------------------------------------------------------
 
+boxTests :: TestTree
+boxTests = testGroup "Box parser" []
+
+#if 0
 -- testBox :: Int -> Text -> Either String ((), DgPState () (Tok Text))
 testBox :: Int -> Text -> Either String (Dg (Tok Text))
 testBox ln input
@@ -531,7 +535,7 @@ boxTests = testGroup "Box parser"
     where
     Right box01_tokenized = preproc5' box01
 --     Right box01b_tokenized = preproc5' box01b
-
+#endif
 box01 =
     [text|
     +-+

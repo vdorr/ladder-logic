@@ -239,7 +239,7 @@ verbose1 = False
 
 --FIXME IO
 generateStk2
-    :: Cofree (Diagram (Void) Dev String) DgExt
+    :: Cofree (Diagram Void (Dev String) String) DgExt
     -> IO [ExtendedInstruction String Int String]
 generateStk2 = generateStk2' pure emitBasicDevice . parseOps
 
@@ -338,12 +338,12 @@ devices =
 
 --FIXME do this in LadderParser
 parseOps
-    :: Cofree (Diagram c Dev                     s) p
+    :: Cofree (Diagram c (Dev String)            s) p
     -> Cofree (Diagram c (Op s (Operand String)) s) p
 parseOps = either (error here) id . parseOpsM
 
 parseOpsM
-    :: Cofree (Diagram c Dev s) p
+    :: Cofree (Diagram c (Dev String) s) p
     -> Either String (Cofree (Diagram c (Op s (Operand String)) s) p)
 parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
     where

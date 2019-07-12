@@ -13,6 +13,7 @@ module Language.Ladder.LadderParser
     , runLadderParser, runLadderParser_
 -- *for testing only
     , box001
+    , ldUnpack
     ) where
 
 import Data.Text (Text, unpack)
@@ -23,6 +24,8 @@ import Control.Monad hiding (fail)
 import Data.Foldable
 import Data.Functor.Identity
 import Data.Void
+-- import Data.Bifunctor
+import Data.Function
 
 import Language.Ladder.Utils
 import Language.Ladder.Lexer
@@ -74,25 +77,65 @@ data Operand address
 data DevType t
     = Coil_    !t
     | Contact_ !t
-    deriving (Show, Eq)
+    deriving (Show, Eq, Functor)
 
-data Dev = Dev (DevType String) [Operand String]
-    deriving (Show, Eq)
+data Dev t = Dev !(DevType t) ![Operand t]
+    deriving (Show, Eq, Functor)
 
 --------------------------------------------------------------------------------
 
 data DevOpFlag = None | Optional | Mandatory
+--     deriving (Show, Eq)
 
-data LdPCtx text device = LdPCtx (DevType text -> Maybe (Bool, device)) -- '+' node positions
+-- data LdPCtx text device = LdPCtx (DevType text -> Maybe (DevOpFlag, device)) -- '+' node positions
 -- data LdPCtx text device = LdPCtx (text -> Maybe (Bool, [Operand text] -> device))
 
-type DgP = SFM (DgPState (LdPCtx Text Dev) (Tok Text))
+data LdPCtx m text device = LdPCtx
+    { ctxHasSndOp :: DevType text -> m DevOpFlag
+--     , ctxMkDev   :: DevType text -> [Operand text] -> m device
+    , ctxMkDev    :: DevType text -> m (DevOpFlag, [Operand text] -> m device)
+    }
+    -- '+' node positions, maybe
+
+-- type DgP = SFM (DgPState (LdPCtx Text (Dev Text)) (Tok Text))
 -- type DgP = SFM (DgPState (LdPCtx Text ) (Tok Text))
 -- type DgPSt = DgPState (Tok Text)
 
-type Ladder' device text = Cofree (Diagram Void device text) DgExt
-type LdP device text a = SFM (DgPState (LdPCtx text device) (Tok text)) a
-type Result1 device text = LdP device text (Ladder' device text)
+-- type Ladder' device text = Cofree (Diagram Void device text) DgExt
+type LdP device text
+    = SFM
+        (DgPState
+            (LdPCtx (Either String) text device)
+            (Tok text)
+        )
+-- type LdP2 device text a = forall st. SFM (DgPState (LdPCtx (SFM st) text device) (Tok text)) a
+-- type Result1 device text = LdP device text (Ladder' device text)
+
+--------------------------------------------------------------------------------
+
+runLadderParser_
+    :: LdP (Dev Text) Text a
+    -> [(Int, [((Int, Int), Tok Text)])]
+    -> Either String a
+runLadderParser_ p s = fst <$> runLadderParser p s
+
+runLadderParser
+    :: LdP (Dev Text) Text a
+    -> [(Int, [((Int, Int), Tok Text)])]
+    -> Either String (a, Dg (Tok Text))
+runLadderParser p s
+    = ((psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s))
+            (LdPCtx has2Ops mkDev))
+    where
+    cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
+    has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
+    has2Ops _ = Right None
+
+    mkDev d = (, pure . Dev d) <$> has2Ops d
+
+ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
+         -> Cofree (Diagram c (Dev String) String) a
+ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
 
 --------------------------------------------------------------------------------
 
@@ -115,34 +158,19 @@ coilType    : ...
 
 -}
 
-ladder :: DgP (Cofree (Diagram Void Dev String) DgExt)
+ladder :: LdP (Dev t) t (Cofree (Diagram Void (Dev t) t) DgExt)
 ladder
     = setDir goDown
-    *> ((:<) <$> currentPos <*> fmap Source vline'2)
+    *> ((:<) <$> currentPos <*> fmap Source vline')
     <* dgIsEmpty
 
 -- like 'ladder' but do not check if all lexemes consumed
-parseLadderLiberal :: DgP (Cofree (Diagram (Void) Dev String) DgExt)
+parseLadderLiberal :: LdP (Dev t) t (Cofree (Diagram Void (Dev t) t) DgExt)
 parseLadderLiberal
     = setDir goDown
-    *> ((:<) <$> currentPos <*> fmap Source vline'2)
+    *> ((:<) <$> currentPos <*> fmap Source vline')
 
-type Ladder = Cofree (Diagram Void Dev String) DgExt
-
--- applyDgp :: SFM (DgPState st tok) a -> Dg tok -> st -> Either String (a, DgPState st tok)
-runLadderParser_ :: DgP a -> [(Int, [((Int, Int), Tok Text)])] -> Either String a
--- runLadderParser_ p s = fst <$> applyDgp p (mkDgZp (dropWhitespace s)) ()
-runLadderParser_ p s = fst <$> runLadderParser p s
-
-runLadderParser
-    :: DgP a
-    -> [(Int, [((Int, Int), Tok Text)])]
-    -> Either String (a, Dg (Tok Text))
-runLadderParser p s = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace s)) (LdPCtx undefined)
-
-ldUnpack :: Cofree (Diagram c d Text) a
-         -> Cofree (Diagram c d String) a
-ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id id unpack n)
+-- type Ladder = Cofree (Diagram Void (Dev t) String) DgExt
 
 --------------------------------------------------------------------------------
 
@@ -176,28 +204,13 @@ withOperands3 p = below (above_ p operand) optOper
     optOper ((Optional , a), op) = ((,a).(op:)) <$> (toList <$> option operand)
     optOper ((None     , a), op) = ((,a).(op:)) <$> pure [op]
 
-
-withOperands
-    :: DgP (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
-    -> DgP (Operand String, Maybe (Operand String), a)
-withOperands p = below (above_ p ((unpack <$>) <$> variable)) optOper
-    where
-    optOper ((True, a), op) = (op,,a) <$> fmap (Just . fmap unpack) operand
-    optOper ((_   , a), op) = return (op, Nothing, a)
--- withOperands p = do
---     (ln, co) <- currentPos
---     (b, x)   <- p
---     next     <- currentPos
---     setPos (ln - 1, co)
---     op       <- variable
---     op2 <- if b
---         then do
---             setPos (ln + 1, co)
---             Just <$> operand
---         else
---             return Nothing
---     setPos next
---     return (op, op2, x)
+-- withOperands
+--     :: LdP d t (Bool, a) -- ^Device parser e.g. "(S)", flag indicates presence of second operand
+--     -> LdP d t (Operand t, Maybe (Operand t), a)
+-- withOperands p = below (above_ p (variable)) optOper
+--     where
+--     optOper ((True, a), op) = (op,,a) <$> fmap (Just . fmap id) operand
+--     optOper ((_   , a), op) = return (op, Nothing, a)
 
 --------------------------------------------------------------------------------
 
@@ -213,45 +226,42 @@ vline = do
 
 --------------------------------------------------------------------------------
 
-node2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
-node2 = (:<) <$> currentPos <*> (Node <$> node2')
+isTok :: (Functor f, Eq (f ())) => f a -> f a -> Bool
+isTok = on (==) (fmap (const ()))
 
-node2' :: LdP Dev Text [Cofree (Diagram c Dev String) DgExt]
-node2'
+node :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+node = (:<) <$> currentPos <*> (Node <$> node')
+
+node' :: LdP (Dev t) t [Cofree (Diagram c (Dev t) t) DgExt]
+node'
     = branch
-        (==Cross)
-        [ (goRight, hline'2) --currentPosM>>=traceShowM>>
-        , (goDown , vline'2)
+        (isTok Cross)
+        [ (goRight, hline') --currentPosM>>=traceShowM>>
+        , (goDown , vline')
         ]
 
---FIXME with 'node2' may end only left rail, vline stemming from node must lead to another node
-vline'2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
-vline'2 = many vline2 *> (end2 <|> node2)
+--FIXME with 'node' may end only left rail, vline stemming from node must lead to another node
+vline' :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+vline' = many vline *> (end2 <|> node)
 
-end2 :: LdP d Text (Cofree (Diagram c d String) DgExt)
+end2 :: LdP d t (Cofree (Diagram c d t) DgExt)
 end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 
-eol2 :: LdP d Text (Cofree (Diagram c d String) DgExt)
+eol2 :: LdP d t (Cofree (Diagram c d t) DgExt)
 eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
-hline'2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
-hline'2
+hline' :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+hline'
     = some (hline2 <* option crossing)
-    *> (coil2 <|> contact2 <|> node2 <|> jump <|> eol2)
+    *> (coil <|> contact <|> node <|> jump <|> eol2)
     where
-    crossing = skipSome (==VLine) *> hline2
+    crossing = skipSome (isTok VLine) *> hline2
 
-jump :: LdP d Text (Cofree (Diagram c d String) DgExt)
+jump :: LdP d t (Cofree (Diagram c d t) DgExt)
 jump = do
     pos <- currentPos
     Jump' name <- eat
-    return $ pos :< Jump (unpack name)
-
--- vline2 :: DgP ()
-vline2 :: LdP d t ()
-vline2 = do
-    VLine <- eat
-    return ()
+    return $ pos :< Jump name
 
 -- "-||`EOL`" is not allowed
 hline2 :: LdP d t ()
@@ -260,28 +270,48 @@ hline2 = do
 --XXX replicateM_ vl (skip' (==VLine)) ?? fail if VLine already eaten
     when (vl > 0) $ do
         (ln, (co, _)) <- currentPos
-        setPos (ln, (co + vl, ()))
---TODO TEST move to same location is noop
+        setPos (ln, (co + vl, ()))--TODO TEST move to same location is noop
 
-device :: LdP Dev Text (Bool, DevType String)
-       -> LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
+-- device' :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+-- device' = do
+--     pos <- currentPos
+--     LdPCtx{..} <- psUser <$> get
+--     (ops, f) <-
+--         withOperands3 $ do
+--             dev <- coil' <|> contact'
+--             Right (flag, mkDev) <- pure $ ctxMkDev dev
+--             return (flag, mkDev)
+--     Right dev' <- pure $ f ops
+--     (pos :<) <$> (Device dev' <$> hline')
+-- 
+-- coil' :: LdP d t (DevType t)
+-- coil' = do
+--     Coil f <- eat
+--     return (Coil_ f)
+-- 
+-- contact' :: LdP d t (DevType t)
+-- contact' = do
+--     Contact f <- eat
+--     return (Contact_ f)
+
+device :: LdP (Dev t) t (DevOpFlag, DevType t)
+       -> LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
 device p = do
     pos <- currentPos
-    (op, op2, f) <- withOperands p
-    (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline'2)
+    (op, op2, f) <- withOperands2 p
+    (pos :<) <$> (Device (Dev f (op : toList op2)) <$> hline')
 
-coil2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
-coil2 = device $ do
+coil :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+coil = device $ do
     Coil f <- eat
-    return (False, Coil_ (unpack f))
+    return (None, Coil_ f)
 
--- contact2 :: DgP (Cofree (Diagram c Dev String) DgExt)
-contact2 :: LdP Dev Text (Cofree (Diagram c Dev String) DgExt)
-contact2 = device $ do
+contact :: LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
+contact = device $ do
     Contact f <- eat
-    return (elem f cmp, Contact_ (unpack f))
-    where
-    cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
+    LdPCtx{..} <- psUser <$> get
+    Right flag <- return $ ctxHasSndOp (Contact_ f)
+    return (flag, Contact_ f)
 
 --------------------------------------------------------------------------------
 
@@ -318,12 +348,12 @@ clearance (example of incorrect box):
 
 -}
 
-node :: DgP ()
-node = do
+cross :: LdP d t ()
+cross = do
     Cross <- eat
     return ()
 
-edge :: DgP (Tok Text)
+edge :: LdP d t (Tok t)
 edge
     = eat >>= \t -> case t of
         REdge -> return t
@@ -357,7 +387,7 @@ name = do
 --     setPos (ln, co+1)
 --     setDir goRight
 
-box001 :: Int -> DgP ()
+box001 :: Int -> LdP d t ()
 box001 ln = do
     setPos (ln, (1, 1))
     box
@@ -379,7 +409,7 @@ lwall = vline <|> void edge
 --     return ()
 
 --TODO check clearance
-box :: DgP ()
+box :: LdP d t ()
 box = do
 --     (ln, (_, co)) <- currentPos
 
@@ -393,13 +423,13 @@ box = do
     some lwall -- <|> negIn
 --     currentPosM >>= (traceShowM . (here, "left top corner",))
     setDir goRight
-    node
+    cross
 --     currentPosM >>= (traceShowM . (here,"top wall",))
     hline
 
     setDir goDown --parsing right side, look for output line position
 --     currentPosM >>= (traceShowM . (here,"right top corner",))
-    node
+    cross
 
 --     currentPosM >>= (traceShowM . (here,"right wall",))
     --TODO parse box instance name
@@ -411,7 +441,7 @@ box = do
 
 --     currentPosM >>= (traceShowM . (here,"bottom right corner",))
     setDir goLeft
-    node
+    cross
 
 --     currentPosM >>= (traceShowM . (here,"bottom wall",))
 
@@ -428,7 +458,7 @@ box = do
 
 --     currentPosM >>= (traceShowM . (here,"bottom left corner",))
     setDir goUp
-    node
+    cross
 
 --     currentPosM >>= (traceShowM . (here,"remaining left wall",))
     many lwall --0 or more

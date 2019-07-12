@@ -265,11 +265,11 @@ nodeTable :: [(p, [p])] -> [(p, p)]
 nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
 generateStk1
-    :: Cofree (Diagram () Dev String) DgExt
+    :: Cofree (Diagram () (Dev String) String) DgExt
     -> IO [ExtendedInstruction String Int String]
 generateStk1 ast = (EISimple <$>) <$> generateStk ast
 
-generateStk :: Cofree (Diagram () Dev String) DgExt -> IO [Instruction Int String]
+generateStk :: Cofree (Diagram () (Dev String) String) DgExt -> IO [Instruction Int String]
 generateStk ast' = do
     let ast = parseOps ast'
 

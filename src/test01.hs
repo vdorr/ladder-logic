@@ -20,7 +20,7 @@ import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
-testAst :: Cofree (Diagram Void Dev String) DgExt -> IO ()
+testAst :: Cofree (Diagram Void (Dev String) String) DgExt -> IO ()
 testAst ast' = do
     generateStk2 ast'
     return ()

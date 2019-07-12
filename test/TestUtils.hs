@@ -47,7 +47,7 @@ getSignals sg vect trace =
 runLadderTest
     :: Bool
     -> LadderTest
-    -> [(Maybe String, Cofree (Diagram (Void) Dev String) DgExt)]
+    -> [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
     -> IO Bool
 runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
@@ -96,7 +96,7 @@ parseOrDie5 path = do
 parseOrDie4
     :: FilePath
     -> IO ( [String]
-          , [(Maybe String, Cofree (Diagram (Void) Dev String) DgExt)]
+          , [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
           )
 parseOrDie4 path = do
     (_, lxs)    <- loadLadderTest path
@@ -106,7 +106,7 @@ parseOrDie4 path = do
 
 parseOrDie3
     :: FilePath
-    -> IO [(Maybe String, Cofree (Diagram (Void) Dev String) DgExt)]
+    -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
 parseOrDie3 path = do
     (_tst, lxs) <- fmap dropWhitespace <$> loadLadderTest path
     parseOrDie2 lxs
@@ -114,7 +114,7 @@ parseOrDie3 path = do
 -- |like 'parseOrDie' but additionaly can handle labels
 parseOrDie2
     :: [(Int, [((Int, Int), Tok Text)])]
-    -> IO [(Maybe String, Cofree (Diagram (Void) Dev String) DgExt)]
+    -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
 parseOrDie2 lxs = do
     let blocks = labeledRungs lxs
     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
@@ -122,7 +122,7 @@ parseOrDie2 lxs = do
 -- |assuming comments and pragmas were filtered out
 parseOrDie
     :: [(Int, [((Int, Int), Tok Text)])]
-    -> IO (Cofree (Diagram (Void) Dev String) DgExt)
+    -> IO (Cofree (Diagram Void (Dev String) String) DgExt)
 parseOrDie lxs = do
 --    let zp = mkDgZp $ dropWhitespace lxs
 #if 0
@@ -131,7 +131,7 @@ parseOrDie lxs = do
 --    case applyDgp parseLadder zp () of
     case runLadderParser_ ladder lxs of
 --         Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _ _)) -> do
-        Right ast -> return ast
+        Right ast -> return $ ldUnpack ast
         Left err -> fail $ show (here, err)
 
 

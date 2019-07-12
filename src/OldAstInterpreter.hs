@@ -176,7 +176,7 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
-testAstOld :: Cofree (Diagram () Dev String) DgExt -> IO ()
+testAstOld :: Cofree (Diagram () (Dev String) String) DgExt -> IO ()
 testAstOld ast' = do
 
     let watch = ["b", "d"]

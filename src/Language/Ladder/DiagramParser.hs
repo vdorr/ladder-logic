@@ -206,7 +206,7 @@ dgIsEmpty :: SFM (DgPState st tok) ()
 -- dgIsEmpty :: Show tok => SFM (DgPState st tok) ()
 dgIsEmpty
     =   (dgNull . psStr) <$> get
-    >>= flip when (fail $ here ++ "not empty")
+    >>= (`when` fail (here ++ "not empty"))
 --     = do
 --         zp@(Zp zpl zpr) <- psStr <$> get
 --         when (dgNull zp) $ do
@@ -337,11 +337,10 @@ moveToLine ln = move2 (compare ln . fst)
 
 --------------------------------------------------------------------------------
 
-colocated
-    :: (DgExt -> DgExt)
-    -> SFM (DgPState st tok) t
-    -> (t -> SFM (DgPState st tok) b1)
-    -> SFM (DgPState st tok) b1
+colocated :: (DgExt -> DgExt)
+          -> SFM (DgPState st tok) t
+          -> (t -> SFM (DgPState st tok) b1)
+          -> SFM (DgPState st tok) b1
 colocated mapPos p pp = do
     begin <- currentPos
     x     <- p
