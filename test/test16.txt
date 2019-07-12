@@ -1,0 +1,14 @@
+
+| temp   cool
++--[>]----(S)-
+| upper_h
+| temp   cool
++--[<]----(R)-
+| upper_l
+| temp   heat
++--[>]----(R)-
+| lower_h
+| temp   heat
++--[<]----(S)-
+| lower_l
+
