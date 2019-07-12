@@ -17,8 +17,8 @@ import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Base16.Lazy as B16
 
 import Data.Word
-import Data.Foldable
-import Data.Traversable
+-- import Data.Foldable
+-- import Data.Traversable
 import Data.List
 import Numeric
 -- import Data.List
@@ -35,6 +35,7 @@ import Language.Ladder.DiagramParser hiding (get, put)
 import Language.Ladder.LadderParser
 import Language.Ladder.Interpreter
 import Language.Ladder.Target
+import Language.Ladder.Simple
 
 
 import TestUtils

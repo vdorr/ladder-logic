@@ -7,7 +7,7 @@ import Data.Traversable
 import Control.Monad.Writer.Strict
 -- import Data.Function
 import Data.List
-import Data.Char (toUpper)
+-- import Data.Char (toUpper)
 -- import Data.Int
 -- import Data.Word
 -- import Data.Bifunctor
@@ -17,7 +17,6 @@ import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Analysis
-import Language.Ladder.Simple --FIXME should not be imported here
 
 --------------------------------------------------------------------------------
 
@@ -38,7 +37,6 @@ data V
 data ExtendedInstruction label word address
     = EIJump    label
     | EISimple (Instruction word address)
---TODO TODO TODO
     | EIReturn
     deriving (Show, Eq)
 
@@ -209,10 +207,10 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
 verbose1 = False
 
 generateStk2'
-    :: (Show lbl, Eq lbl)
-    => Show addr
-    => Show word
-    => Show device --NO
+    :: (Show lbl, Eq lbl
+    , Show addr
+    , Show word
+    , Show device)
     => (Int -> IO word)
     -> (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
@@ -256,31 +254,6 @@ generateStk2' literalFromInt doDevice ast' = do
         for_ code print
         print (here, "-----------------------")
     return code
-
---------------------------------------------------------------------------------
-
-data RW = Rd | Wr
-    deriving (Show)
-
-data DeviceDescription n impl = DDesc n [(RW, CellType)] impl
-
---backend for this interpreter
-devices =
-    [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
-    , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
-    , (Contact_ ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
-        (\[a, b] -> do
-            a' <- case a of
-                 Lit i -> pure [ILdCnA (fromIntegral i)]
-                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
-            b' <- case b of
-                 Lit i -> pure [ILdCnA (fromIntegral i)]
-                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
-            Right $ a' ++ b' ++ [IGt]))
-
-    , (Coil_    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
-    , (Coil_    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
-    ]
 
 --------------------------------------------------------------------------------
 
@@ -373,78 +346,27 @@ eval = f
 
 --------------------------------------------------------------------------------
 
--- XXX i increasingly feel like Map String [Instruction]
-data Op s n
-    = And       n -- wire out <- wire in and memory cell
-    | AndN      n
-    | Ld          -- ^ set wire state same as argument
-    | On          -- ^ set wire state to #on
-    | St        n
-    | StN       n -- | StOn | StOff
-    | LdP       n -- rising edge detect
-    | LdN       n -- falling edge detect
-    | Jmp s
-    | Cmp CmpOp n n
-    -- | FB String [(String, D)] [(String, D)]
-    deriving (Show) -- , Functor)
+data RW = Rd | Wr
+    deriving (Show)
 
-data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
-    deriving Show
+data DeviceDescription n impl = DDesc n [(RW, CellType)] impl
 
---------------------------------------------------------------------------------
+--backend for this interpreter
+devices =
+    [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
+    , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
+    , (Contact_ ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
+        (\[a, b] -> do
+            a' <- case a of
+                 Lit i -> pure [ILdCnA (fromIntegral i)]
+                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
+            b' <- case b of
+                 Lit i -> pure [ILdCnA (fromIntegral i)]
+                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
+            Right $ a' ++ b' ++ [IGt]))
 
---FIXME IO
-generateStk2
-    :: Cofree (Diagram Void (Dev String) String) DgExt
-    -> IO [ExtendedInstruction String Int String]
-generateStk2 = generateStk2' pure emitBasicDevice . parseOps
-
---FIXME IO
-generateStk2xx
-    :: (Show address, Show word)
-    => (Int -> IO word) --XXX fix that IO thing already !!! OMG
-    -> [(Maybe String, Cofree (Diagram Void (Op String (Operand address)) String) DgExt)]
-    -> IO [ExtendedInstruction Int word address]
-generateStk2xx literalFromInt ast = do
-    ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
-    Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
-    return ast''
-
-emitBasicDevice
-    :: (Show address, Show op)
-    => Op op (Operand address)
-    -> [Instruction word address]
-emitBasicDevice d
-    = case d of
-        And  (Var addr)  -> [ILdBit addr, IAnd]
-        AndN (Var addr)  -> [ILdBit addr, INot, IAnd]
-        St   (Var addr)  -> [IStBit addr]
-        StN  (Var addr)  -> [INot, IStBit addr, INot]
-        _                -> error $ show (here, d)
-
---FIXME do this in LadderParser
-parseOps
-    :: Cofree (Diagram c (Dev String)            s) p
-    -> Cofree (Diagram c (Op s (Operand String)) s) p
-parseOps = either (error here) id . parseOpsM
-
-parseOpsM
-    :: Cofree (Diagram c (Dev String) s) p
-    -> Either String (Cofree (Diagram c (Op s (Operand String)) s) p)
-parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
-    where
-    f (Dev (Coil_ op) arg) = case (fmap toUpper op, arg) of
-        (" ", [n]   ) -> pure $ St n
-        ("/", [n]   ) -> pure $ StN n
-        ("R", [n]   ) -> undefined
-        ("S", [n]   ) -> undefined
-        _               -> Left "unknown coil type"
-    f (Dev (Contact_ op) arg) = case (fmap toUpper op, arg) of
-        (" ", [n]   ) -> pure $ And  n
-        ("/", [n]   ) -> pure $ AndN  n
-        (">", [a, b]) -> pure $ Cmp Gt a b
-        ("P", [n]   ) -> pure $ LdP n
-        ("N", [n]   ) -> pure $ LdN n
-        _               -> Left "unknown contact type"
+    , (Coil_    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
+    , (Coil_    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
+    ]
 
 --------------------------------------------------------------------------------

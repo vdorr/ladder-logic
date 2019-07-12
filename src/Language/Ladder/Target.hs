@@ -163,7 +163,7 @@ instructionTable stk lbl addr lit =
     , pure $ EISimple   ITrap
     , pure $ EISimple   ILdOn
     , pure $ EISimple   IDup
-    ,       (EISimple . IPick) <$> stk
+    ,       (EISimple . IPick)  <$> stk
     , pure $ EISimple   IDrop
     ,       (EISimple . ILdBit) <$> addr
     ,       (EISimple . IStBit) <$> addr
