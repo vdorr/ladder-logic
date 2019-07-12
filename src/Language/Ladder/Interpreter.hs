@@ -13,7 +13,7 @@ import Data.List
 -- import Data.Bifunctor
 import Data.Void
 
-import Language.Ladder.DiagramParser
+import Language.Ladder.DiagramParser (DgExt)
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Analysis
@@ -352,6 +352,12 @@ data RW = Rd | Wr
 data DeviceDescription n impl = DDesc n [(RW, CellType)] impl
 
 --backend for this interpreter
+devices
+    :: (Integral word, Integral addr) 
+    => [(DevType String,
+            DeviceDescription
+                          String
+                          ([Operand addr] -> Either a [Instruction word addr]))]
 devices =
     [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
     , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))

@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wunused-imports #-}
+{-# OPTIONS_GHC -Wunused-imports  -Wall #-}
 {-# LANGUAGE CPP, TupleSections, FlexibleInstances, QuasiQuotes, LambdaCase,
     ScopedTypeVariables, FlexibleContexts #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
@@ -6,13 +6,13 @@
 import qualified Data.Text.IO as TIO
 import System.Environment (getArgs)
 import Data.Foldable
-import Data.Void
+-- import Data.Void
 
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
-import Language.Ladder.Utils
+-- import Language.Ladder.Utils
 -- import Language.Ladder.Interpreter
 import Language.Ladder.Simple
 
@@ -21,10 +21,10 @@ import Language.Ladder.Simple
 
 --------------------------------------------------------------------------------
 
-testAst :: Cofree (Diagram Void (Dev String) String) DgExt -> IO ()
-testAst ast' = do
-    generateStk2 ast'
-    return ()
+-- testAst :: Cofree (Diagram Void (Dev String) String) DgExt -> IO ()
+-- testAst ast' = do
+--     generateStk2 ast'
+--     return ()
 
 --------------------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ main = do
                 forM_ (zpToList zp) (print . (here,))
                 case runLadderParser parseLadderLiberal lxs'' of
                     Left err -> print (here, err)
-                    Right (ast, c@(Zp zpl zpr)) -> do
+                    Right (_ast, Zp zpl zpr) -> do
                         print (here, "--------------------------------------------------")
                         for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
 --                     for_ zpr $ \q -> print (here, q)

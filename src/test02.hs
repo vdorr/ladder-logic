@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wunused-imports #-}
+{-# OPTIONS_GHC -Wunused-imports -Wall #-}
 {-# LANGUAGE CPP #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
@@ -20,6 +20,6 @@ main = do
             print (here, test)
             TIO.putStrLn src
             ast <- parseOrDie2 lxs
-            runLadderTest True test ast
-            return ()
+            passed <- runLadderTest True test ast
+            print (here, passed, if passed then "PASSED" else "FAILED")
         Nothing -> print (here, "no embedded test found")

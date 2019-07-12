@@ -4,7 +4,7 @@
 module Language.Ladder.Simple where
 
 import Data.Traversable
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import Data.Void
 import Data.Char (toUpper)
 
@@ -35,7 +35,6 @@ runLadderParser = runParser wrapDevice
 --     cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
 --     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
 --     has2Ops _ = Right None
--- 
 --     mkDev d = (, pure . Dev d) <$> has2Ops d
 
 wrapDevice
@@ -49,6 +48,37 @@ wrapDevice d = (, pure . Dev d) <$> has2Ops d
     cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
     has2Ops _ = Right None
+
+
+-- wrapDevice2
+--     :: DevType Text
+--     -> Either String
+--         ( DevOpFlag
+--         , [Operand Text] -> Either String (Dev Text)
+--         )
+wrapDevice2 d
+    = case lookup (fmap unpack d) devices of
+        Just dd@(DDesc _name ty _impl)
+            -> Right (if length ty > 1 then Mandatory else None
+                , \ops -> Right (ops, dd))
+        Nothing -> Left "device type unknown"
+--     where
+--     x = lookup (fmap unpack d) devices
+
+--------------------------------------------------------------------------------
+
+--FIXME IO
+generateStk3
+    :: (Show address, Show word, Show device)
+    => (Int -> IO word) --XXX fix that IO thing already !!! OMG
+    -> (device -> [Instruction word address])
+    -> [(Maybe String, Cofree (Diagram Void device String) DgExt)]
+    -> IO [ExtendedInstruction Int word address]
+generateStk3 literalFromInt doDevice ast = do
+    Right ast'
+        <- resolveLabels <$> for ast (traverse (generateStk2' literalFromInt doDevice))
+--     Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
+    return ast'
 
 --------------------------------------------------------------------------------
 
@@ -88,6 +118,8 @@ generateStk2xx literalFromInt ast = do
     ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
     Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
     return ast''
+
+--------------------------------------------------------------------------------
 
 emitBasicDevice
     :: (Show address, Show op)

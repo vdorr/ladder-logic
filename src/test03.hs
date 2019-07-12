@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wunused-imports #-}
+{-# OPTIONS_GHC -Wunused-imports -Wall #-}
 
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances,
     FlexibleInstances, PatternSynonyms, LambdaCase,
