@@ -45,6 +45,22 @@ getSignals :: Eq addr => [addr] -> TestVect addr -> [[V]] -> [[V]]
 getSignals sg vect trace = 
     foldMap (\s -> getSignal s vect trace) sg
 
+--------------------------------------------------------------------------------
+
+compileForTest
+    :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
+    => 
+    --TODO (Backend dev addr) ->
+    [(Maybe lbl, Cofree (Diagram Void (Dev String) lbl) DgExt)]
+    -> IO [ExtendedInstruction Int Int String]
+compileForTest ast = do
+    blocks <- for ast (traverse (generateStk2 parseOp emitBasicDevice))
+    let prog' = case resolveLabels blocks of --FIXME fail properly
+                Right p -> p
+                Left err -> error err
+    return prog'
+--     undefined
+
 runLadderTest
     :: Bool
     -> LadderTest
@@ -53,16 +69,12 @@ runLadderTest
 runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
 
-    blocks <- for ast (traverse generateStk2)
+    prog' <- compileForTest ast
 
     let allSigs = testVectSignals (testVect test)
 --TODO select signals for display independently from signals for test evaluation
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
-
-    let prog' = case resolveLabels blocks of --FIXME fail properly
-                Right p -> p
-                Left err -> error err
 
     let xxy = evalTestVect''' prog' allSigs (testVect test)
 
@@ -76,7 +88,6 @@ runLadderTest verbose test@T01{} ast = do
     when verbose $ print (here, expected test)
 
     let passed = expected test == testTrace
---     let passed = False
     when verbose $ print (here, passed, if passed then "PASSED" else "FAILED")
 
     return passed

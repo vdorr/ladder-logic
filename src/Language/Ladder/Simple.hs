@@ -104,15 +104,21 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --FIXME IO
 generateStk2
-    :: Cofree (Diagram Void (Dev String) String) DgExt
-    -> IO [ExtendedInstruction String Int String]
-generateStk2 = generateStk2' pure emitBasicDevice . parseOps
+    :: (Show lbl, Eq lbl, Show addr)
+    => (dev -> Either String x)
+    -> (x -> [Instruction Int addr])
+    -> Cofree (Diagram Void dev lbl) DgExt
+    -> IO [ExtendedInstruction lbl Int addr]
+-- generateStk2 = generateStk2' pure emitBasicDevice . parseOps
+generateStk2 doOp emitDev ast = do
+    Right ast' <- return $ mapOpsM doOp ast
+    generateStk2' pure emitDev ast'
 
 --FIXME IO
 generateStk2xx
-    :: (Show address, Show word)
+    :: (Show address, Show word, Show lbl, Eq lbl)
     => (Int -> IO word) --XXX fix that IO thing already !!! OMG
-    -> [(Maybe String, Cofree (Diagram Void (Op String (Operand address)) String) DgExt)]
+    -> [(Maybe lbl, Cofree (Diagram Void (Op String (Operand address)) lbl) DgExt)]
     -> IO [ExtendedInstruction Int word address]
 generateStk2xx literalFromInt ast = do
     ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
@@ -122,7 +128,7 @@ generateStk2xx literalFromInt ast = do
 --------------------------------------------------------------------------------
 
 emitBasicDevice
-    :: (Show address, Show op)
+    :: (Show address) -- , Show op)
     => Op op (Operand address)
     -> [Instruction word address]
 emitBasicDevice d
@@ -131,18 +137,29 @@ emitBasicDevice d
         AndN (Var addr)  -> [ILdBit addr, INot, IAnd]
         St   (Var addr)  -> [IStBit addr]
         StN  (Var addr)  -> [INot, IStBit addr, INot]
-        _                -> error $ show (here, d)
+        _                -> error here -- $ show (here, d)
 
 --FIXME do this in LadderParser
-parseOps
-    :: Cofree (Diagram c (Dev String)            s) p
-    -> Cofree (Diagram c (Op s (Operand String)) s) p
-parseOps = either (error here) id . parseOpsM
+-- parseOps
+--     :: Cofree (Diagram c (Dev String)            s) p
+--     -> Cofree (Diagram c (Op s (Operand String)) s) p
+-- parseOps = either (error here) id . parseOpsM
+
+mapOpsM
+    :: Monad m => (a -> m b)
+    -> Cofree (Diagram c a s) p
+    -> m (Cofree (Diagram c b s) p)
+mapOpsM f (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse (mapOpsM f))
 
 parseOpsM
     :: Cofree (Diagram c (Dev String) s) p
     -> Either String (Cofree (Diagram c (Op s (Operand String)) s) p)
-parseOpsM (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse parseOpsM)
+parseOpsM = mapOpsM parseOp
+
+parseOp
+    :: Dev String
+    -> Either String (Op s (Operand String))
+parseOp = f
     where
     f (Dev (Coil_ op) arg) = case (fmap toUpper op, arg) of
         (" ", [n]   ) -> pure $ St n

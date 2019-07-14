@@ -136,7 +136,9 @@ resolveLabels l = for (foldMap snd l) g
 
 --------------------------------------------------------------------------------
 
-genStk :: (Show a0, Show label0, Monad m0)
+genStk :: (
+--     Show a0    , 
+        Show label0, Monad m0)
      => ([ExtendedInstruction label0 word address] -> m0 ())
                       -> (a0 -> [Instruction word address])
                       -> [Cofree (Diagram DgExt a0 label0) DgExt]
@@ -194,7 +196,7 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
                 Nothing -> error here --should not happen
             go (nd:stk) b --XXX not sure about nd on stack here
 
-        f stk n = error $ show (here, stk, n)
+        f stk n = error here -- $ show (here, stk, n)
 
     isConn p0 (_ :< Conn p1) = p0 == p1
     isConn _   _             = False
@@ -210,7 +212,8 @@ generateStk2'
     :: (Show lbl, Eq lbl
     , Show addr
     , Show word
-    , Show device)
+--     , Show device
+    )
     => (Int -> IO word)
     -> (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
@@ -218,32 +221,26 @@ generateStk2'
 generateStk2' literalFromInt doDevice ast' = do
     let ast = dropEnd ast'
     --collapse nodes
---     let (nodes, a0) = merge' ast
     let (nodes, a0) = repositionSinks nodes <$> merge' ast
     --chop
     let Just a1 = forest a0
     let a5 = cut1' a1
     let a6 = sortOn position a5
-    
---     let a6' :: [(Deps DgExt, Cofree (Diagram DgExt (Op Operand String) String) DgExt)]
---                         = fmap (\n -> (dependencies2 nodes n, n)) a6
-    
---     let a7 = tsort2 nodes a6
     let a7 = tsort3 a6
 
     code <- execWriterT $ foldlM (genStk tell doDevice) [] a7 --need failure here
-    when verbose1 $ do
-        print (here, "-----------------------")
-        for_ a1 print
-        print (here, "nodes", "-----------------------")
-        for_ nodes print
-        print (here, "after sort on position", "-----------------------")
-        for_ a6 print
-        print (here, "after tsort2", "-----------------------")
-        for_ a7 print
-        print (here, "-----------------------")
-        for_ code print
-        print (here, "-----------------------")
+--     when verbose1 $ do
+--         print (here, "-----------------------")
+--         for_ a1 print
+--         print (here, "nodes", "-----------------------")
+--         for_ nodes print
+--         print (here, "after sort on position", "-----------------------")
+--         for_ a6 print
+--         print (here, "after tsort2", "-----------------------")
+--         for_ a7 print
+--         print (here, "-----------------------")
+--         for_ code print
+--         print (here, "-----------------------")
     return code
 
 --------------------------------------------------------------------------------

@@ -273,7 +273,7 @@ generateStk1 ast = (EISimple <$>) <$> generateStk ast
 
 generateStk :: Cofree (Diagram () (Dev String) String) DgExt -> IO [Instruction Int String]
 generateStk ast' = do
-    let ast = parseOps ast'
+    let Right ast = parseOpsM ast'
 
     when verbose $ print (here, "-----------------------")
 

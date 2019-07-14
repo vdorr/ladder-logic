@@ -228,7 +228,7 @@ testAstOld ast' = do
 
 #if 1
 
-    let ast = parseOps ast'
+    let Right ast = parseOpsM ast'
     let (_st, op, _cnt) = fffff ast
     print (here, "-----------------------")
     let Just p01 = tsort [] $ or'd [] op
