@@ -168,10 +168,15 @@ operand = variable <|> number
 --     optOper ((None     , a), op) = return (op, Nothing, a)
 
 
-withOperands3 :: LdP d t (DevOpFlag, a)
+withOperands :: LdP d t (DevOpFlag, a)
               -> LdP d t ([Operand t], a)
-withOperands3 p = below (above_ p operand) optOper
+-- withOperands3 p = below (above_ p operand) optOper
+withOperands device
+        =        operand
+        `above'` device
+        `below`  optOper
     where
+    above' = flip above_
     optOper ((Mandatory, a), op) = ((,a).(op:)) <$> (pure <$> operand)
     optOper ((Optional , a), op) = ((,a).(op:)) <$> (toList <$> option operand)
     optOper ((None     , a), op) = ((,a).(op:)) <$> pure []
@@ -250,7 +255,7 @@ device = do
     pos <- currentPos
     LdPCtx{..} <- psUser <$> get
     (ops, f) <-
-        withOperands3 $ do
+        withOperands $ do
             dev <- coil' <|> contact'
             Right (flag, mkDev) <- pure $ ctxMkDev dev
             return (flag, mkDev)

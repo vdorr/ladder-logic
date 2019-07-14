@@ -63,10 +63,10 @@ instructionToChunks = f
 chunkLength :: Chunk -> Integer
 chunkLength = f
     where
-    f C4{}  = 1
-    f C8{}  = 2
-    f C12{} = 3
-    f C16{} = 4
+    f C4  {} = 1
+    f C8  {} = 2
+    f C12 {} = 3
+    f C16 {} = 4
 
 -- |Some bits
 data Chunk

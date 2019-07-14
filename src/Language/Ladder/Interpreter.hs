@@ -235,19 +235,10 @@ generateStk2' literalFromInt doDevice ast' = do
     when verbose1 $ do
         print (here, "-----------------------")
         for_ a1 print
-
         print (here, "nodes", "-----------------------")
         for_ nodes print
-
         print (here, "after sort on position", "-----------------------")
         for_ a6 print
-
---         print (here, "same, but with deps", "-----------------------")
---         for_ a6' $ \(dep, ast) -> do
---             print dep 
---             print $ dependencies ast
---             putStr "  "
---             print ast
         print (here, "after tsort2", "-----------------------")
         for_ a7 print
         print (here, "-----------------------")
@@ -298,9 +289,9 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     f []               st = return st
     f (EIReturn   : _) st = return st
     f (EIJump lbl : p) st@(w:ws, os, m)
-        | w         = nextLabel lbl ([], [], m) --XXX beware! jump clears stacks!
-        | otherwise = f p (ws, os, m)
-    f (EIJump _ : _) _ = error here --stack underflow FIXME proper fail
+        | w               = nextLabel lbl ([], [], m) --XXX beware! jump clears stacks!
+        | otherwise       = f p (ws, os, m)
+    f (EIJump _ : _) _    = error here --stack underflow FIXME proper fail
     f (EISimple i : p) st = eval st i >>= f p
 
     nextLabel lbl = f (drop lbl prog)
@@ -356,8 +347,8 @@ devices
     :: (Integral word, Integral addr) 
     => [(DevType String,
             DeviceDescription
-                          String
-                          ([Operand addr] -> Either a [Instruction word addr]))]
+                String
+                ([Operand addr] -> Either a [Instruction word addr]))]
 devices =
     [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
     , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))

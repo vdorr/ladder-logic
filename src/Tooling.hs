@@ -328,11 +328,11 @@ generateStk ast' = do
 --------------------------------------------------------------------------------
 
 evalTestVect'''
-    :: [(Maybe String, [ExtendedInstruction String Int String])] -- ^program
+    :: [ExtendedInstruction Int Int String] -- ^program
     -> [VarName] -- ^watched memory variables
     -> [(Int, [(VarName, V)])] -- ^test vector
     -> Either (Memory String, String) [[V]]
-evalTestVect''' prog watch vect
+evalTestVect''' prog' watch vect
 
 --     = fst <$> foldlM step ([], ([],[],[])) vect'
     = case foldlM step ([], p) vect' of
@@ -342,9 +342,9 @@ evalTestVect''' prog watch vect
 
     vect' = flattenTestVect vect
 
-    prog' = case resolveLabels prog of --FIXME fail properly
-                Right p -> p
-                Left err -> error err
+--     prog' = case resolveLabels prog of --FIXME fail properly
+--                 Right p -> p
+--                 Left err -> error err
 
     p = makeItpSt3 [] [(1, 0, prog')]
 

@@ -99,7 +99,7 @@ a `dependsOn` b = sinks b `someIsIn` nodes a
 --     someIsIn x y = any (flip elem y) x
 
 data Deps p = Deps { nodes, sinks, conts, conns :: [p] }
-    deriving (Show)
+--     deriving (Show)
 
 instance Semigroup (Deps p) where
     Deps a b c d <> Deps t u v w = Deps (a <> t) (b <> u) (c <> v) (d <> w)

@@ -53,7 +53,6 @@ runLadderTest
 runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
 
---     prog <- generateStk1 ast
     blocks <- for ast (traverse generateStk2)
 
     let allSigs = testVectSignals (testVect test)
@@ -61,7 +60,11 @@ runLadderTest verbose test@T01{} ast = do
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
 
-    let xxy = evalTestVect''' blocks allSigs (testVect test)
+    let prog' = case resolveLabels blocks of --FIXME fail properly
+                Right p -> p
+                Left err -> error err
+
+    let xxy = evalTestVect''' prog' allSigs (testVect test)
 
     when verbose $ print (here, xxy)
     let Right traces = xxy
@@ -84,11 +87,13 @@ ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
          -> Cofree (Diagram c (Dev String) String) a
 ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
 
+--------------------------------------------------------------------------------
+
 -- |also return pragmas
 parseOrDie5
     :: FilePath
     -> IO ( [String]
-          , [(Maybe String, Cofree (Diagram (Void) (Op String (Operand String)) String) DgExt)]
+          , [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
           )
 parseOrDie5 path = do
     (_, lxs)    <- loadLadderTest path
@@ -97,24 +102,24 @@ parseOrDie5 path = do
     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
     return (pragmas, ast')
 
--- |also return pragmas
-parseOrDie4
-    :: FilePath
-    -> IO ( [String]
-          , [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
-          )
-parseOrDie4 path = do
-    (_, lxs)    <- loadLadderTest path
-    ast         <- parseOrDie2 $ dropWhitespace lxs
-    let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
-    return (pragmas, ast)
+-- -- |also return pragmas
+-- parseOrDie4
+--     :: FilePath
+--     -> IO ( [String]
+--           , [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
+--           )
+-- parseOrDie4 path = do
+--     (_, lxs)    <- loadLadderTest path
+--     ast         <- parseOrDie2 $ dropWhitespace lxs
+--     let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
+--     return (pragmas, ast)
 
-parseOrDie3
-    :: FilePath
-    -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
-parseOrDie3 path = do
-    (_tst, lxs) <- fmap dropWhitespace <$> loadLadderTest path
-    parseOrDie2 lxs
+-- parseOrDie3
+--     :: FilePath
+--     -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
+-- parseOrDie3 path = do
+--     (_tst, lxs) <- fmap dropWhitespace <$> loadLadderTest path
+--     parseOrDie2 lxs
 
 -- |like 'parseOrDie' but additionaly can handle labels
 parseOrDie2
@@ -124,21 +129,17 @@ parseOrDie2 lxs = do
     let blocks = labeledRungs lxs
     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
 
--- |assuming comments and pragmas were filtered out
-parseOrDie
-    :: [(Int, [((Int, Int), Tok Text)])]
-    -> IO (Cofree (Diagram Void (Dev String) String) DgExt)
-parseOrDie lxs = do
---    let zp = mkDgZp $ dropWhitespace lxs
-#if 0
-    forM_ (zpToList zp) (print . (here,))
-#endif
---    case applyDgp parseLadder zp () of
-    case runLadderParser_ ladder lxs of
---         Right (ast, (DgPSt _ c@(Zp zpl zpr) _ _ _)) -> do
-        Right ast -> return $ ldUnpack ast
-        Left err -> fail $ show (here, err)
+    where
+    -- |assuming comments and pragmas were filtered out
+    parseOrDie
+        :: [(Int, [((Int, Int), Tok Text)])]
+        -> IO (Cofree (Diagram Void (Dev String) String) DgExt)
+    parseOrDie lxs = do
+        case runLadderParser_ ladder lxs of
+            Right ast -> return $ ldUnpack ast
+            Left  err -> fail $ show (here, err)
 
+--------------------------------------------------------------------------------
 
 loadLadderTest :: FilePath -> IO (Maybe LadderTest, [(Int, [((Int, Int), Tok Text)])])
 loadLadderTest file = do
@@ -146,12 +147,8 @@ loadLadderTest file = do
     case stripPos <$> runLexer src of
         Left err -> fail $ show (here, err)
         Right x -> do
---             print (here, getPragma $ tokens x)
---             let Just pgma = fmap (filter (/='\\') . T.unpack) $getPragma $ tokens x
             let pgma = fmap (filter (/='\\') . unpack) $ getPragma $ dropPos x
---             print ((read pgma) :: LadderTest)
             return (pgma >>= readMaybe, x)
---                     fail $ show (here, "no embedded test found")
 
 --------------------------------------------------------------------------------
 
