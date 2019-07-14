@@ -18,9 +18,6 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Eval
-                     , Ladder
-                     , CodeGen
-                     , Types
                      , Preprocess
                      , DiagramParser
                      , LadderParser
