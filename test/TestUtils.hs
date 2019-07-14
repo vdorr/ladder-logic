@@ -35,13 +35,13 @@ data LadderTest = T01
 
 --------------------------------------------------------------------------------
 
-getSignal :: String -> TestVect -> [[V]] -> [[V]]
+getSignal :: Eq addr => addr -> TestVect addr -> [[V]] -> [[V]]
 getSignal _ []               = const []
 getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))
     where
     Just i = findIndex ((s==) . fst) slice
 
-getSignals :: [String] -> TestVect -> [[V]] -> [[V]]
+getSignals :: Eq addr => [addr] -> TestVect addr -> [[V]] -> [[V]]
 getSignals sg vect trace = 
     foldMap (\s -> getSignal s vect trace) sg
 

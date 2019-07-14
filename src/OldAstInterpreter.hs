@@ -177,6 +177,33 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
+evalBlock :: [Instruction Int String]
+          -> ItpSt String
+          -> Either (ItpSt String, String) (ItpSt String)
+evalBlock p st = foldlM eval st p
+
+evalTestVect''
+    :: [Instruction Int String] -- ^program
+    -> [VarName] -- ^watched memory variables
+    -> [(Int, [(VarName, V)])] -- ^test vector
+    -> Either (Memory String, String) [[V]]
+evalTestVect'' prog watch vect
+    = case foldlM step ([], ([],[],[])) vect' of
+        Left _ -> undefined
+        Right (y, _) -> return y
+    where
+
+    vect' = flattenTestVect vect
+
+    step (tr, st@(w, o, mem)) stim = do
+        st'@(_, _, mem'') <- evalBlock prog (w, o, mem')
+        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+        return (tr ++ [tr'], st')
+        where
+        mem' = updateMemory mem stim
+
+--------------------------------------------------------------------------------
+
 testAstOld :: Cofree (Diagram () (Dev String) String) DgExt -> IO ()
 testAstOld ast' = do
 

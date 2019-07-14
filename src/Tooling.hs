@@ -81,25 +81,26 @@ V0_│_▂▃▄▅▆▇█▇▆▅▄▃▂__
               1s/div
 -}
 
-flattenTestVect :: TestVect -> [[(VarName, V)]]
+flattenTestVect :: TestVect addr -> [[(addr, V)]]
 flattenTestVect [] = []
 flattenTestVect ((d, v) : xs)
     | d >= 1    = [v] ++ replicate (d - 1) [] ++ flattenTestVect xs
     | otherwise = flattenTestVect xs
 
-updateMemory :: [(VarName, V)] -> [(VarName, V)] -> [(VarName, V)]
+updateMemory :: Eq addr => [(addr, V)] -> [(addr, V)] -> [(addr, V)]
 updateMemory old new = nubBy (on (==) fst) $ new ++ old --yeah performace be damned
 
-type TestVect = [(Int, [(VarName, V)])]
+type TestVect addr = [(Int, [(addr, V)])]
+-- type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
 
 -- |Returns names of signals in test vector
-testVectSignals :: TestVect -> [VarName]
+testVectSignals :: Eq addr => TestVect addr -> [addr]
 testVectSignals = nub . foldMap (fmap fst . snd)
 
 --------------------------------------------------------------------------------
 
-vect01 :: TestVect
+vect01 :: TestVect String
 vect01 =
     [ (2, [("a", X False),("b", X False),("c", X False),("d", X False)])
     , (1, [("a", X True)])
@@ -277,18 +278,8 @@ generateStk ast' = do
     when verbose $ print (here, "-----------------------")
 
     --chop
-    let Just (x1_0 ) -- ::[Cofree (Diagram () (Op String Operand) String) DgExt])
-            = forest ast
---     let x1_x = ldlines'' [ast]
---     let x1_xxx = ldlines'' x1_0
--- 
---     for_ x1_x print
---     print (here, "-----------------------")
---     let x1 = x1_x
+    let Just x1_0 = forest ast
     let x1 = x1_0
-
---     for_ x1_0 print
---     print (here, "-----------------------")
 
     --collect stubs (per each forest tree)
     let x1' -- :: [([DgExt], Cofree (Diagram c (Op Operand String) String) DgExt)]
@@ -318,70 +309,34 @@ generateStk ast' = do
         for_ q $ \((stubs, _), tr) -> do
             print $ filter (flip elem allNodes) stubs
             print tr
-
         print (here, "-----------------------")
+
     let subTrees = fmap (\((stubs, _), tr) -> (stubs, tr)) q
---     generate (flip (for_ @[]) (print @Instruction)) nodeToSink
---         subTrees
     execWriterT $ generate tell nodeToSink subTrees
 
 --------------------------------------------------------------------------------
 
 evalTestVect'''
-    :: [ExtendedInstruction Int Int String] -- ^program
-    -> [VarName] -- ^watched memory variables
-    -> [(Int, [(VarName, V)])] -- ^test vector
-    -> Either (Memory String, String) [[V]]
+    :: (Eq addr, Show addr)
+    => [ExtendedInstruction Int Int addr] -- ^program
+    -> [addr] -- ^watched memory variables
+    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+    -> Either (Memory addr, String) [[V]]
 evalTestVect''' prog' watch vect
 
---     = fst <$> foldlM step ([], ([],[],[])) vect'
     = case foldlM step ([], p) vect' of
-        Left _ -> undefined
+        Left  _      -> error here
         Right (y, _) -> return y
     where
 
     vect' = flattenTestVect vect
-
---     prog' = case resolveLabels prog of --FIXME fail properly
---                 Right p -> p
---                 Left err -> error err
 
     p = makeItpSt3 [] [(1, 0, prog')]
 
-    evalBlock' :: (Show a, Eq a) => ItpSt3 a -> Either (ItpSt a, String) (ItpSt3 a)
-    evalBlock' = run
-
---     step = undefined
     step (tr, st@(x, y, mem)) stim = do
-        st'@(_, _, mem'') <- evalBlock' (x, y, mem')
+        st'@(_, _, mem'') <- run (x, y, mem')
         let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
         return (tr ++ [tr'], st')
         where
         mem' = updateMemory mem stim
 
-evalBlock :: [Instruction Int String]
-          -> ItpSt String
-          -> Either (ItpSt String, String) (ItpSt String)
-evalBlock p st = foldlM eval st p
-
-evalTestVect''
-    :: [Instruction Int String] -- ^program
-    -> [VarName] -- ^watched memory variables
-    -> [(Int, [(VarName, V)])] -- ^test vector
-    -> Either (Memory String, String) [[V]]
-evalTestVect'' prog watch vect
---     = bimap (bimap (\((_, _, mem1), _) -> mem1) id) fst
---         $ 
-    = case foldlM step ([], ([],[],[])) vect' of
-        Left _ -> undefined
-        Right (y, _) -> return y
-    where
-
-    vect' = flattenTestVect vect
-
-    step (tr, st@(w, o, mem)) stim = do
-        st'@(_, _, mem'') <- evalBlock prog (w, o, mem')
-        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
-        return (tr ++ [tr'], st')
-        where
-        mem' = updateMemory mem stim
