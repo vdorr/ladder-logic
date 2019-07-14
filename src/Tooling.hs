@@ -1,26 +1,17 @@
-{-# LANGUAGE ViewPatterns #-}
-
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Tooling where
 
 import Data.Semigroup
 import Data.List
--- import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Function
 import Data.Foldable
 import Data.Tuple
 import Data.Maybe
 import Data.Bifunctor
-
--- import Data.Int
--- import Data.Word
-
 import Control.Monad.Writer.Strict
 
--- import Ladder.Zipper
--- import Language.Ladder.Lexer -- (preproc5', runLexer, dropWhitespace)
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
@@ -278,8 +269,7 @@ generateStk ast' = do
     when verbose $ print (here, "-----------------------")
 
     --chop
-    let Just x1_0 = forest ast
-    let x1 = x1_0
+    let Just x1 = forest ast
 
     --collect stubs (per each forest tree)
     let x1' -- :: [([DgExt], Cofree (Diagram c (Op Operand String) String) DgExt)]

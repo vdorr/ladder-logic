@@ -1,4 +1,3 @@
-
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.LadderParser
@@ -7,12 +6,10 @@ module Language.Ladder.LadderParser
     , Operand(..)
     , DevType(..)
     , DevOpFlag(..)
---     , LdPCtx(..) --FIXME should not be exported
     , LdP
     , runParser
     , ladder
-    , parseLadderLiberal
---     , runLadderParser, runLadderParser_
+    , ladderLiberal
 -- *for testing only
     , box001
     ) where
@@ -139,8 +136,8 @@ ladder
     <* dgIsEmpty
 
 -- like 'ladder' but do not check if all lexemes consumed
-parseLadderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
-parseLadderLiberal
+ladderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
+ladderLiberal
     = setDir goDown
     *> ((:<) <$> currentPos <*> fmap Source vline')
 

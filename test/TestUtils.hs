@@ -6,16 +6,12 @@ import Data.List
 import Text.Read
 import qualified Data.Text.IO as TIO
 import Data.Text (Text, unpack)
--- import qualified Data.Text as T
 import Control.Monad
 import Control.Applicative
 import Data.Traversable
 import Data.Semigroup
 import Data.Void
 
--- import Control.Monad.Except
-
--- import Language.Ladder.Zipper
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
@@ -49,17 +45,9 @@ getSignals sg vect trace =
 
 compileForTest
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
-    => 
-    --TODO (Backend dev addr) ->
-    [(Maybe lbl, Cofree (Diagram Void (Dev String) lbl) DgExt)]
+    => [(Maybe lbl, Cofree (Diagram Void (Dev String) lbl) DgExt)]
     -> IO [ExtendedInstruction Int Int String]
-compileForTest ast = do
-    blocks <- for ast (traverse (generateStk2 parseOp emitBasicDevice))
-    let prog' = case resolveLabels blocks of --FIXME fail properly
-                Right p -> p
-                Left err -> error err
-    return prog'
---     undefined
+compileForTest = generateStk2xx parseOp emitBasicDevice literalFromInt
 
 runLadderTest
     :: Bool
@@ -82,13 +70,13 @@ runLadderTest verbose test@T01{} ast = do
     let Right traces = xxy
     when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
 
---     let idxs = fmap (findIndex)
     let testTrace = getSignals (watch test) (testVect test) traces
-    when verbose $ print (here, testTrace)
-    when verbose $ print (here, expected test)
-
     let passed = expected test == testTrace
-    when verbose $ print (here, passed, if passed then "PASSED" else "FAILED")
+
+    when verbose $do
+        print (here, testTrace)
+        print (here, expected test)
+        print (here, passed, if passed then "PASSED" else "FAILED")
 
     return passed
 
@@ -112,25 +100,6 @@ parseOrDie5 path = do
     let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
     return (pragmas, ast')
-
--- -- |also return pragmas
--- parseOrDie4
---     :: FilePath
---     -> IO ( [String]
---           , [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
---           )
--- parseOrDie4 path = do
---     (_, lxs)    <- loadLadderTest path
---     ast         <- parseOrDie2 $ dropWhitespace lxs
---     let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
---     return (pragmas, ast)
-
--- parseOrDie3
---     :: FilePath
---     -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
--- parseOrDie3 path = do
---     (_tst, lxs) <- fmap dropWhitespace <$> loadLadderTest path
---     parseOrDie2 lxs
 
 -- |like 'parseOrDie' but additionaly can handle labels
 parseOrDie2

@@ -8,7 +8,6 @@ import Data.Text (Text, unpack)
 import Data.Void
 import Data.Char (toUpper)
 
--- import Language.Ladder.Zipper
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
@@ -31,11 +30,6 @@ runLadderParser
     -> [(Int, [((Int, Int), Tok Text)])]
     -> Either String (a, Dg (Tok Text))
 runLadderParser = runParser wrapDevice
---     where
---     cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
---     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
---     has2Ops _ = Right None
---     mkDev d = (, pure . Dev d) <$> has2Ops d
 
 wrapDevice
     :: DevType Text
@@ -49,7 +43,6 @@ wrapDevice d = (, pure . Dev d) <$> has2Ops d
     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
     has2Ops _ = Right None
 
-
 -- wrapDevice2
 --     :: DevType Text
 --     -> Either String
@@ -62,23 +55,20 @@ wrapDevice2 d
             -> Right (if length ty > 1 then Mandatory else None
                 , \ops -> Right (ops, dd))
         Nothing -> Left "device type unknown"
---     where
---     x = lookup (fmap unpack d) devices
 
 --------------------------------------------------------------------------------
 
 --FIXME IO
-generateStk3
-    :: (Show address, Show word, Show device)
-    => (Int -> IO word) --XXX fix that IO thing already !!! OMG
-    -> (device -> [Instruction word address])
-    -> [(Maybe String, Cofree (Diagram Void device String) DgExt)]
-    -> IO [ExtendedInstruction Int word address]
-generateStk3 literalFromInt doDevice ast = do
-    Right ast'
-        <- resolveLabels <$> for ast (traverse (generateStk2' literalFromInt doDevice))
---     Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
-    return ast'
+-- generateStk3
+--     :: (Show address, Show word, Show device)
+--     => (Int -> IO word) --XXX fix that IO thing already !!! OMG
+--     -> (device -> [Instruction word address])
+--     -> [(Maybe String, Cofree (Diagram Void device String) DgExt)]
+--     -> IO [ExtendedInstruction Int word address]
+-- generateStk3 literalFromInt doDevice ast = do
+--     Right ast'
+--         <- resolveLabels <$> for ast (traverse (generateStk2' literalFromInt doDevice))
+--     return ast'
 
 --------------------------------------------------------------------------------
 
@@ -102,28 +92,43 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --------------------------------------------------------------------------------
 
---FIXME IO
-generateStk2
-    :: (Show lbl, Eq lbl, Show addr)
-    => (dev -> Either String x)
-    -> (x -> [Instruction Int addr])
-    -> Cofree (Diagram Void dev lbl) DgExt
-    -> IO [ExtendedInstruction lbl Int addr]
--- generateStk2 = generateStk2' pure emitBasicDevice . parseOps
-generateStk2 doOp emitDev ast = do
-    Right ast' <- return $ mapOpsM doOp ast
-    generateStk2' pure emitDev ast'
+literalFromInt :: (Bounded a, Integral a) => Int -> IO a
+literalFromInt i = return $ fromIntegral i --TODO check range
 
 --FIXME IO
+-- generateStk2
+--     :: (Show lbl, Eq lbl, Show addr)
+--     => (dev -> Either String x)
+--     -> (x -> [Instruction Int addr])
+--     -> Cofree (Diagram Void dev lbl) DgExt
+--     -> IO [ExtendedInstruction lbl Int addr]
+-- -- generateStk2 = generateStk2' pure emitBasicDevice . parseOps
+-- generateStk2 doOp emitDev ast = do
+--     Right ast' <- return $ mapOpsM doOp ast
+--     generateStk2' pure emitDev ast'
+
+--FIXME IO
+-- generateStk2xx
+--     :: (Show addr, Show word, Show lbl, Eq lbl)
+--     => (Int -> IO word) --XXX fix that IO thing already !!! OMG
+--     -> [(Maybe lbl, Cofree (Diagram Void (Op String (Operand addr)) lbl) DgExt)]
+--     -> IO [ExtendedInstruction Int word addr]
+-- generateStk2xx literalFromInt ast = do
+--     ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
+--     Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
+--     return ast''
 generateStk2xx
-    :: (Show address, Show word, Show lbl, Eq lbl)
-    => (Int -> IO word) --XXX fix that IO thing already !!! OMG
-    -> [(Maybe lbl, Cofree (Diagram Void (Op String (Operand address)) lbl) DgExt)]
-    -> IO [ExtendedInstruction Int word address]
-generateStk2xx literalFromInt ast = do
-    ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
-    Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
-    return ast''
+    :: (Show addr, Show word, Show lbl, Eq lbl)
+    => (dev -> Either String x)
+    -> (x -> [Instruction word addr])
+    -> (Int -> IO word) --XXX fix that IO thing already !!! OMG
+    -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
+    -> IO [ExtendedInstruction Int word addr]
+generateStk2xx doOp emitDev literalFromInt ast = do
+    Right ast' <- return $ for ast (traverse (mapOpsM doOp))
+    ast'' <- for ast' (traverse (generateStk2' literalFromInt emitDev))
+    Right ast''' <- return $ resolveLabels ast'' -- AAAAAAAAAAAAAAAAAAAA
+    return ast'''
 
 --------------------------------------------------------------------------------
 
@@ -138,12 +143,6 @@ emitBasicDevice d
         St   (Var addr)  -> [IStBit addr]
         StN  (Var addr)  -> [INot, IStBit addr, INot]
         _                -> error here -- $ show (here, d)
-
---FIXME do this in LadderParser
--- parseOps
---     :: Cofree (Diagram c (Dev String)            s) p
---     -> Cofree (Diagram c (Op s (Operand String)) s) p
--- parseOps = either (error here) id . parseOpsM
 
 mapOpsM
     :: Monad m => (a -> m b)

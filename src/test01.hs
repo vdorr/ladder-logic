@@ -12,12 +12,7 @@ import Language.Ladder.Zipper
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
--- import Language.Ladder.Utils
--- import Language.Ladder.Interpreter
 import Language.Ladder.Simple
-
--- import Tooling
--- import TestUtils
 
 --------------------------------------------------------------------------------
 
@@ -43,7 +38,7 @@ main = do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 forM_ (zpToList zp) (print . (here,))
-                case runLadderParser parseLadderLiberal lxs'' of
+                case runLadderParser ladderLiberal lxs'' of
                     Left err -> print (here, err)
                     Right (_ast, Zp zpl zpr) -> do
                         print (here, "--------------------------------------------------")

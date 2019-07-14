@@ -212,7 +212,7 @@ testAstOld ast' = do
                 [ ("a", X True),("b", X False),("c", X False),("d", X False)
 --                 , ("%QX0", X True), ("%IX0", I 0)
                 ]
-#if 1
+
     xxx <- generateStk ast'
     for_ xxx print
     let watch2 = ["a","b","c","d"]
@@ -220,13 +220,6 @@ testAstOld ast' = do
     print (here, xxy)
     let Right tr2 = xxy
     putStrLn $ unlines $ prettyTrace $ zip watch2 $ transpose tr2
-#endif
-
-
---     generateStk2 ast'
---     return ()
-
-#if 1
 
     let Right ast = parseOpsM ast'
     let (_st, op, _cnt) = fffff ast
@@ -243,4 +236,3 @@ testAstOld ast' = do
     let !trace = evalTestVect p01 watch vect01
     print (here, trace)
     putStrLn $ unlines $ prettyTrace $ zip watch $ transpose trace
-#endif

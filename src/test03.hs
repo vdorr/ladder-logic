@@ -8,11 +8,6 @@
 
 import System.Environment (getArgs)
 
--- import Data.Bytes.Put
--- import Data.Bytes.Get
--- import Data.Bits.Coded
--- import Data.Bits.Coding
--- import Data.Binary.Get (Get)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Base16.Lazy as B16
 
@@ -36,7 +31,6 @@ import Language.Ladder.LadderParser
 import Language.Ladder.Interpreter
 import Language.Ladder.Target
 import Language.Ladder.Simple
-
 
 import TestUtils
 
@@ -241,9 +235,6 @@ data MemTrack n = MemTrack
 
 --------------------------------------------------------------------------------
 
-literalFromInt :: (Bounded a, Integral a) => Int -> IO a
-literalFromInt i = return $ fromIntegral i --TODO check range
-
 compileOrDie
     :: FilePath
     -> IO ( MemTrack String
@@ -255,7 +246,7 @@ compileOrDie fn = do
     let Right (blocks', memory)
                 = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
 --     print (here, memory)
-    prog <- generateStk2xx literalFromInt blocks'
+    prog <- generateStk2xx return emitBasicDevice literalFromInt blocks'
 --     print (here, prog)
     return (memory, prog)
 
