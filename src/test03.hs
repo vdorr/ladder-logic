@@ -26,7 +26,6 @@ import qualified Data.Map.Lazy as M
 
 -- import Tooling
 import Language.Ladder.Utils
-import Language.Ladder.DiagramParser hiding (get, put)
 import Language.Ladder.LadderParser
 import Language.Ladder.Interpreter
 import Language.Ladder.Target
@@ -55,16 +54,17 @@ cstub1 = unlines (concat (concat q))
     f [(op, ch)] = ([], [ opcase op ch ])
     f is         = ([], [ subop is ])
 
-    subop is@((op, ops@(C4 ic : _)) : _) = swcase (show ic) (show op)
+    subop is@((op, _ops@(C4 ic : _)) : _) = swcase (show ic) (show op)
             (mkget "subop" (C4 0) ++
             [ unlines $ indentBlock $ switch "subop"
                 (fmap (uncurry opcase) (fmap (fmap (drop 1)) is))
             ])
+    subop _ = error here
 
     opcase op (C4 ic : ops) = swcase (show ic) (show op) (argLoads ++ [opCall])
         where
-        argNames = zipWith (\i _ -> "f" ++ show i) [0..] ops
-        argLoads = concat $ zipWith (\an op -> mkget an op) argNames ops
+        argNames = zipWith (\i _ -> "f" ++ show i) [0::Integer .. ] ops
+        argLoads = concat $ zipWith (\an thisOp -> mkget an thisOp) argNames ops
         opCall = mkopstub op ++ "(" ++ intercalate ", " argNames ++ ");"
     opcase _ _ = error here
 
@@ -103,67 +103,15 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
-type MemoryVariables = [(String, CellType)]
+-- type MemoryVariables = [(String, CellType)]
 
 --here vars already have their place in memory
-type MemoryConfiguration = [(String, CellType, Address Int)]
-
--- data CellAddress a = Bits Int | Word Int
-zgh :: MemoryConfiguration -> [(String, CellType, Int)]
-zgh = undefined
+-- type MemoryConfiguration = [(String, CellType, Address Int)]
 
 data Address a = BitAddr a | WordAddr a
     deriving (Show, Eq)
 
--- data Operand' = Mem Address | Lit' Int
---     deriving (Show, Eq)
-
--- data Dev' = Dev' String [Operand']
---     deriving (Show, Eq)
-
--- assignAddresses
---     :: Cofree (Diagram () Dev String) DgExt
---     -> MemoryConfiguration
---     -> Either String (Cofree (Diagram () Dev' String) DgExt)
--- assignAddresses = undefined
-
--- allocateMemory :: MemoryVariables -> MemoryConfiguration
--- allocateMemory = undefined
-
---evil approach
-extractVariables
-    :: Cofree (Diagram () (Op (Operand String) String) String) DgExt
-    -> MemoryVariables
-extractVariables = undefined
--- data Dev = Dev String [Operand]
-
---XXX do two passes
---gather (+allocate) and assign addresses
---that way is more like usual setting where vars are declared first
-xxxx ast = flip runStateT (0, M.empty, 0, M.empty) $ mapDgA pure f pure ast
-    where
-    f (And    a  ) = And <$> doOperand Bit a
-    f (AndN   a  ) = undefined
-    f (St     a  ) = undefined
-    f (StN    a  ) = undefined
-    f (Cmp op a b) = Cmp op <$> doOperand Word a <*> doOperand Word b
-    f other        = pure other
-
-    doOperand _t (Lit _) = throwError "TODO"
-    doOperand t (Var n) = doVariable t n
-
-    doVariable t n
-        = throwError "TODO"
---         = do
---             st <- get
---             runStateT ( alterF (alterVar t) )
-
-    alterVar t (Just (t', _addr))
-        | t == t'   = undefined
-        | otherwise = throwError "type mismatch"
-    alterVar t Nothing = undefined
-
-
+emptyMemory :: MemTrack n
 emptyMemory = MemTrack 0 0 M.empty
 
 allocateMemory
@@ -177,16 +125,25 @@ allocateMemory (p :< n)
     where
     doOperand Word (Lit v) = return $ Lit v
     doOperand _    (Lit _) = throwError "type mismatch"
-    doOperand ty   (Var n) = do
+    doOperand ty   (Var name) = do
         st          <- get
-        (addr, st') <- addCell st ty n
+        (addr, st') <- addCell st ty name
         put st'
         return $ Var addr
 
 -- xdgcfg :: _
-xdgcfg doOperand st ast = flip runStateT st $ mapDgA pure (cfggjhj doOperand) pure ast
+-- xdgcfg doOperand st ast = flip runStateT st $ mapDgA pure (cfggjhj doOperand) pure ast
+
+hjdtfd
+    :: (CellType -> t -> StateT (MemTrack String) (Either String) n)
+    -> Diagram c' (Op s t) s' a
+    -> StateT (MemTrack String) (Either String) (Diagram c' (Op s n) s' a)
 hjdtfd doOperand ast = mapDgA pure (cfggjhj doOperand) pure ast
 
+cfggjhj
+    :: (CellType -> t -> StateT (MemTrack String) (Either String) n)
+    -> Op s t
+    -> StateT (MemTrack String) (Either String) (Op s n)
 cfggjhj doOperand = f
     where
     f (And    a  ) =        And    <$> doOperand Bit a
@@ -200,13 +157,14 @@ cfggjhj doOperand = f
     f  On          = pure   On
     f (Jmp s)      = pure $ Jmp s
 
-addCell :: MemTrack String
-                      -> CellType
-                      -> String
-                      -> StateT
-                           (MemTrack String)
-                           (Either String)
-                           (Address Int, MemTrack String)
+addCell
+    :: MemTrack String
+    -> CellType
+    -> String
+    -> StateT
+        (MemTrack String)
+        (Either String)
+        (Address Int, MemTrack String)
 addCell mt@MemTrack{..} ty n0
     = case M.lookup n variables of
         Just (addr, ty')
@@ -226,6 +184,8 @@ addCell mt@MemTrack{..} ty n0
     new Bit     = let a = BitAddr  bitsSize  in (a, updated a 1 0)
     new TwoBits = let a = BitAddr  bitsSize  in (a, updated a 2 0)
     new Word    = let a = WordAddr wordsSize in (a, updated a 0 1)
+
+--------------------------------------------------------------------------------
 
 data MemTrack n = MemTrack
     { bitsSize, wordsSize :: Int
@@ -273,22 +233,6 @@ aaaargh = runIdentity . go
 main :: IO ()
 main = do
     print here
---     let x = runPutL $ runEncode
---             $ do
---     --             putUnaligned $ 
---                 putBitsFrom 3 (11 :: Word8)
---                 putBitsFrom 11 (3800 :: Word16)
---     --             putBitsFrom 6 (0x00 :: Word8)
---                 flush
--- 
---     print (here, x, L.unpack x, B16.encode x)
--- 
---     let y = runGetL (runDecode $ do
---         getBitsFrom 7 (0::Word8)
--- --         return ()
---         ) (L.pack [0xaa,0x55])
--- 
---     print (here, y)
 
 --     let p = [EISimple $ ILdBit (4::Word8), EISimple $ ILdCnA (0::Word16), EIJump (0::Word16)]
     let p = [EISimple $ ILdBit (4::Word8), EISimple $ ILdCnA (123::Word16), EIJump (1::Int)]
@@ -303,7 +247,6 @@ main = do
             $ chunksToByteString $ instructionsToChunks p
         )
     print (here, instructionsToChunks i0)
---     putStrLn cstub
     putStrLn cstub1
 
     args <- getArgs
