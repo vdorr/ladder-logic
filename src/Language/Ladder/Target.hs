@@ -19,6 +19,32 @@ import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
+mapInstruction g h = f
+    where
+    f ITrap = pure ITrap
+
+    f ILdOn = pure ILdOn
+    f IDup = pure IDup
+    f (IPick lbl) = pure $ IPick lbl
+    f IDrop = pure IDrop
+
+    f (ILdBit a) = ILdBit <$> g a
+    f (IStBit a) = IStBit <$> g a
+
+    f IAnd = pure IAnd
+    f IOr = pure IOr
+    f INot = pure INot
+
+    f (ILdCnA w) = ILdCnA <$> h w
+    f ILdM = pure ILdM
+    f IStM = pure IStM
+
+    f IEq = pure IEq
+    f ILt = pure ILt
+    f IGt = pure IGt
+
+--------------------------------------------------------------------------------
+
 programToByteString :: [ExtendedInstruction Int Word16 Word8] -> L.ByteString
 programToByteString = chunksToByteString . instructionsToChunks
 

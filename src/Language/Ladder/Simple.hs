@@ -58,21 +58,24 @@ wrapDevice2 d
 
 --------------------------------------------------------------------------------
 
---FIXME IO
--- generateStk3
---     :: (Show address, Show word, Show device)
---     => (Int -> IO word) --XXX fix that IO thing already !!! OMG
---     -> (device -> [Instruction word address])
---     -> [(Maybe String, Cofree (Diagram Void device String) DgExt)]
---     -> IO [ExtendedInstruction Int word address]
--- generateStk3 literalFromInt doDevice ast = do
---     Right ast'
---         <- resolveLabels <$> for ast (traverse (generateStk2' literalFromInt doDevice))
---     return ast'
+literalFromInt :: (Bounded a, Integral a) => Int -> IO a
+literalFromInt i = return $ fromIntegral i --TODO check range
+
+generateStk2xx
+    :: (Show addr, Show word, Show lbl, Eq lbl)
+    => (dev -> Either String x)
+    -> (x -> [Instruction word addr])
+    -> (Int -> IO word) --XXX fix that IO thing already !!! OMG
+    -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
+    -> IO [ExtendedInstruction Int word addr]
+generateStk2xx doOp emitDev literalFromInt ast = do
+    Right ast'   <- return $ for ast (traverse (mapOpsM doOp))
+    ast''        <- for ast' (traverse (generateStk2' literalFromInt emitDev))
+    Right ast''' <- return $ resolveLabels ast'' -- AAAAAAAAAAAAAAAAAAAA
+    return ast'''
 
 --------------------------------------------------------------------------------
 
--- XXX i increasingly feel like Map String [Instruction]
 data Op s n
     = And       n -- wire out <- wire in and memory cell
     | AndN      n
@@ -89,46 +92,6 @@ data Op s n
 
 data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
     deriving Show
-
---------------------------------------------------------------------------------
-
-literalFromInt :: (Bounded a, Integral a) => Int -> IO a
-literalFromInt i = return $ fromIntegral i --TODO check range
-
---FIXME IO
--- generateStk2
---     :: (Show lbl, Eq lbl, Show addr)
---     => (dev -> Either String x)
---     -> (x -> [Instruction Int addr])
---     -> Cofree (Diagram Void dev lbl) DgExt
---     -> IO [ExtendedInstruction lbl Int addr]
--- -- generateStk2 = generateStk2' pure emitBasicDevice . parseOps
--- generateStk2 doOp emitDev ast = do
---     Right ast' <- return $ mapOpsM doOp ast
---     generateStk2' pure emitDev ast'
-
---FIXME IO
--- generateStk2xx
---     :: (Show addr, Show word, Show lbl, Eq lbl)
---     => (Int -> IO word) --XXX fix that IO thing already !!! OMG
---     -> [(Maybe lbl, Cofree (Diagram Void (Op String (Operand addr)) lbl) DgExt)]
---     -> IO [ExtendedInstruction Int word addr]
--- generateStk2xx literalFromInt ast = do
---     ast' <- for ast (traverse (generateStk2' literalFromInt emitBasicDevice))
---     Right ast'' <- return $ resolveLabels ast' -- AAAAAAAAAAAAAAAAAAAA
---     return ast''
-generateStk2xx
-    :: (Show addr, Show word, Show lbl, Eq lbl)
-    => (dev -> Either String x)
-    -> (x -> [Instruction word addr])
-    -> (Int -> IO word) --XXX fix that IO thing already !!! OMG
-    -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
-    -> IO [ExtendedInstruction Int word addr]
-generateStk2xx doOp emitDev literalFromInt ast = do
-    Right ast' <- return $ for ast (traverse (mapOpsM doOp))
-    ast'' <- for ast' (traverse (generateStk2' literalFromInt emitDev))
-    Right ast''' <- return $ resolveLabels ast'' -- AAAAAAAAAAAAAAAAAAAA
-    return ast'''
 
 --------------------------------------------------------------------------------
 

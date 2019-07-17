@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wunused-imports -Wall #-}
 
 {-# LANGUAGE CPP, TupleSections, TypeSynonymInstances,
-    FlexibleInstances, PatternSynonyms, LambdaCase,
+    FlexibleInstances, PatternSynonyms, LambdaCase, RankNTypes,
     ScopedTypeVariables, FlexibleContexts, RecordWildCards #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
@@ -101,6 +101,73 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 
 --------------------------------------------------------------------------------
 
+allocateMemory
+    :: Cofree (Diagram c' (Op s (Operand String)) s') a
+    -> StateT
+        (MemTrack String)
+        (Either String)
+        (Cofree (Diagram c' (Op s (Operand (Address Int))) s') a)
+allocateMemory (p :< n)
+    = (p :<) <$> (mapDevA (cfggjhj doOperand) n >>= traverse allocateMemory)
+    where
+    doOperand Word (Lit v) = return $ Lit v
+    doOperand _    (Lit _) = throwError "type mismatch"
+    doOperand ty   (Var name) = do
+        st          <- get
+        (addr, st') <- addCell st ty name
+        put st'
+        return $ Var addr
+
+allocateMemory2
+    :: (forall t n.
+        (CellType -> t -> StateT (MemTrack String) (Either String) n)
+        -> Op s t
+        -> StateT (MemTrack String) (Either String) (Op s n)
+        )
+    -> Cofree (Diagram c' (Op s (Operand String)) s') a
+    -> StateT
+        (MemTrack String)
+        (Either String)
+        (Cofree (Diagram c' (Op s (Operand (Address Int))) s') a)
+allocateMemory2 f (p :< n)
+    = (p :<) <$> (mapDevA (f doOperand) n >>= traverse (allocateMemory2 f))
+    where
+-- :: CellType -> Operand String -> StateT (MemTrack String) (Either String) (Operand (Address Int))
+    doOperand Word (Lit v) = return $ Lit v
+    doOperand _    (Lit _) = throwError "type mismatch"
+    doOperand ty   (Var name) = do
+        st          <- get
+        (addr, st') <- addCell st ty name
+        put st'
+        return $ Var addr
+
+mapDevA
+    :: (Applicative m)
+    => (d -> m d')
+    -> Diagram c d s a
+    -> m (Diagram c d' s a)
+mapDevA doDevice = mapDgA pure doDevice pure
+
+cfggjhj
+    :: (Applicative m)
+    => (CellType -> t -> m n)
+    -> Op s t
+    -> m (Op s n)
+cfggjhj doOperand = f
+    where
+    f (And    a  ) =        And    <$> doOperand Bit a
+    f (AndN   a  ) =        AndN   <$> doOperand Bit a
+    f (St     a  ) =        St     <$> doOperand Bit a
+    f (StN    a  ) =        StN    <$> doOperand Bit a
+    f (Cmp op a b) =        Cmp op <$> doOperand Word a <*> doOperand Word b
+    f  Ld          = pure   Ld
+    f (LdP    a  ) =        LdP    <$> doOperand TwoBits a
+    f (LdN    a  ) =        LdN    <$> doOperand TwoBits a
+    f  On          = pure   On
+    f (Jmp s)      = pure $ Jmp s
+
+--------------------------------------------------------------------------------
+
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
 -- type MemoryVariables = [(String, CellType)]
@@ -114,48 +181,11 @@ data Address a = BitAddr a | WordAddr a
 emptyMemory :: MemTrack n
 emptyMemory = MemTrack 0 0 M.empty
 
-allocateMemory
-    :: Cofree (Diagram c' (Op s (Operand String)) s') a
-    -> StateT
-        (MemTrack String)
-        (Either String)
-        (Cofree (Diagram c' (Op s (Operand (Address Int))) s') a)
-allocateMemory (p :< n)
-    = (p :<) <$> (hjdtfd doOperand n >>= traverse allocateMemory)
-    where
-    doOperand Word (Lit v) = return $ Lit v
-    doOperand _    (Lit _) = throwError "type mismatch"
-    doOperand ty   (Var name) = do
-        st          <- get
-        (addr, st') <- addCell st ty name
-        put st'
-        return $ Var addr
-
--- xdgcfg :: _
--- xdgcfg doOperand st ast = flip runStateT st $ mapDgA pure (cfggjhj doOperand) pure ast
-
-hjdtfd
-    :: (CellType -> t -> StateT (MemTrack String) (Either String) n)
-    -> Diagram c' (Op s t) s' a
-    -> StateT (MemTrack String) (Either String) (Diagram c' (Op s n) s' a)
-hjdtfd doOperand ast = mapDgA pure (cfggjhj doOperand) pure ast
-
-cfggjhj
-    :: (CellType -> t -> StateT (MemTrack String) (Either String) n)
-    -> Op s t
-    -> StateT (MemTrack String) (Either String) (Op s n)
-cfggjhj doOperand = f
-    where
-    f (And    a  ) =        And    <$> doOperand Bit a
-    f (AndN   a  ) =        AndN   <$> doOperand Bit a
-    f (St     a  ) =        St     <$> doOperand Bit a
-    f (StN    a  ) =        StN    <$> doOperand Bit a
-    f (Cmp op a b) =        Cmp op <$> doOperand Word a <*> doOperand Word b
-    f  Ld          = pure   Ld
-    f (LdP    a  ) =        LdP    <$> doOperand TwoBits a
-    f (LdN    a  ) =        LdN    <$> doOperand TwoBits a
-    f  On          = pure   On
-    f (Jmp s)      = pure $ Jmp s
+data MemTrack n = MemTrack
+    { bitsSize, wordsSize :: Int
+    , variables :: M.Map n (Address Int, CellType)
+    }
+    deriving (Show)
 
 addCell
     :: MemTrack String
@@ -187,14 +217,6 @@ addCell mt@MemTrack{..} ty n0
 
 --------------------------------------------------------------------------------
 
-data MemTrack n = MemTrack
-    { bitsSize, wordsSize :: Int
-    , variables :: M.Map n (Address Int, CellType)
-    }
-    deriving (Show)
-
---------------------------------------------------------------------------------
-
 compileOrDie
     :: FilePath
     -> IO ( MemTrack String
@@ -223,9 +245,9 @@ aaaargh :: ExtendedInstruction Int Int    (Address Int)
         -> ExtendedInstruction Int Word16  Word8
 aaaargh = runIdentity . go
     where
-    go (EIJump lbl) = pure $ EIJump lbl
-    go (EISimple i) = EISimple <$> mapInstruction unAddr fromIntegral i
-    go  EIReturn    = pure EIReturn
+    go (EIJump   lbl) = pure $ EIJump lbl
+    go (EISimple i)   = EISimple <$> mapInstruction unAddr fromIntegral i
+    go  EIReturn      = pure EIReturn
 
     unAddr (WordAddr a) = pure $ fromIntegral a
     unAddr (BitAddr  a) = pure $ fromIntegral a

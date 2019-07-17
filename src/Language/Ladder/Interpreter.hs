@@ -67,30 +67,6 @@ data Instruction w a
 --     | IMov a a
     deriving (Show, Eq)
 
-mapInstruction g h = f
-    where
-    f ITrap = pure ITrap
-
-    f ILdOn = pure ILdOn
-    f IDup = pure IDup
-    f (IPick lbl) = pure $ IPick lbl
-    f IDrop = pure IDrop
-
-    f (ILdBit a) = ILdBit <$> g a
-    f (IStBit a) = IStBit <$> g a
-
-    f IAnd = pure IAnd
-    f IOr = pure IOr
-    f INot = pure INot
-
-    f (ILdCnA w) = ILdCnA <$> h w
-    f ILdM = pure ILdM
-    f IStM = pure IStM
-
-    f IEq = pure IEq
-    f ILt = pure ILt
-    f IGt = pure IGt
-
 --------------------------------------------------------------------------------
 
 -- could hide writer monad stuff
@@ -250,7 +226,6 @@ type Program a = [ExtendedInstruction Int Int a]
 -- data Trigger = Periodic Int | Memory String
 data Task a = Task { nextRun, priority, period :: Int, program :: Program a }
 
--- type ItpSt3 = (Clock, [Task String], Memory String)
 type ItpSt3 a = (Clock, [Task a], Memory a)
 type Period = Int
 type Clock = Int

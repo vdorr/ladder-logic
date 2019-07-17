@@ -36,7 +36,7 @@ data Diagram continuation device label a
     | Sink       -- ^where wire connects to (implied) right rail
     | End        -- ^where vertical left rail ends at the bottom
 --     | Stub       -- ^intersection of hline and node
-    | Device device a --
+    | Device device a
     | Jump   label
     | Node   [a] --order matters here
     | Cont   continuation a

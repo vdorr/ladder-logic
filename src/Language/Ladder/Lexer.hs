@@ -185,7 +185,7 @@ breakLines [] = []
 
 -- |Returns True if lexeme is comment or pragma
 isWsTok :: Tok a -> Bool
-isWsTok Pragma{}  = True
+isWsTok Pragma {} = True
 isWsTok Comment{} = True
 isWsTok _         = False
 
@@ -208,14 +208,6 @@ labeledRungs t = (lbl, this) : labeledRungs rest
     isLabel (_, [(_, Label _)]) = True
     isLabel _         = False
 
--- basicBlocks
---     :: [[Tok a]]
---     -> [(Maybe a, [[Tok a]])]
--- basicBlocks
---     = fmap (fmap (fmap (snd . fmap(fmap snd))))
---     . labeledRungs
---     . (fmap (((),).fmap (((),()),)))
-
 --------------------------------------------------------------------------------
 
 -- |Discard 'SourcePos', keep only integer line numbers and column ranges
@@ -229,9 +221,6 @@ stripPos = fmap (bimap (unPos.sourceLine)
 
 -- |Look for first pragma in list of lexemes
 getPragma :: [Tok a] -> Maybe a
--- getPragma (Pragma p : xs) = Just p
--- getPragma (_ : xs)        = getPragma xs
--- getPragma _               = Nothing
 getPragma xs = case getLeadingPragmas xs of
     x : _ -> Just x
     _     -> Nothing
