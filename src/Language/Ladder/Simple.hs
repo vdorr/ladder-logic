@@ -43,6 +43,8 @@ wrapDevice d = (, pure . Dev d) <$> has2Ops d
     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
     has2Ops _ = Right None
 
+--------------------------------------------------------------------------------
+
 -- wrapDevice2
 --     :: DevType Text
 --     -> Either String

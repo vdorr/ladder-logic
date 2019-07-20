@@ -11,8 +11,8 @@ import qualified Hedgehog.Range as Range
 import Hedgehog.Range
 import System.Environment
 
-import Data.List
-import Data.Ord
+-- import Data.List
+-- import Data.Ord
 import Control.Monad
 import NeatInterpolation
 import Data.Text (Text, pack, unpack)
@@ -25,7 +25,7 @@ import Data.Foldable hiding (toList)
 import System.Directory
 import System.FilePath
 import qualified Data.Text.IO as TIO
-import qualified Data.Text as T
+-- import qualified Data.Text as T
 
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
@@ -73,6 +73,12 @@ simpleResult = bimap (/=mempty) id
 
 isEmpty :: (Eq a, Monoid a) => a -> Bool
 isEmpty = (==mempty)
+
+checkSyntax :: Text -> Either String ()
+checkSyntax s = () <$ (preproc5'' s >>= runLadderParser_ ladder)
+
+assertFullyConsumed :: [(Int, [((Int, Int), Tok Text)])] -> Assertion
+assertFullyConsumed tk = (() <$ runLadderParser ladder tk) @?= Right ()
 
 --------------------------------------------------------------------------------
 
@@ -159,7 +165,7 @@ prop_lexeme_trip =
             (pack . foldMap (renderLexeme . fmap unpack))
             testLexer
 
---TODO
+#if 0
 prop_trip :: Property
 prop_trip =
     withTests 1000 . property $ do
@@ -170,6 +176,7 @@ prop_trip =
 
 genTokens :: Gen [Tok Text]
 genTokens = Gen.list (Range.linear 0 100) genToken
+#endif
 
 -- HLine 0 - prob should use 'Natural'
 genToken :: Gen (Tok Text)
@@ -201,10 +208,10 @@ genToken =
 zipperTests :: TestTree
 zipperTests = testGroup "Zipper"
     [ testCase "from/to list" $
-        zpToList <$> (stepRight $ zpFromList [1,2,3,4])
+        zpToList <$> (stepRight $ zpFromList [1::Int,2,3,4])
             @=? Just [1,2,3,4]
     , testCase "length" $
-        zpLength <$> (stepRight $ zpFromList [0,1,2,3])
+        zpLength <$> (stepRight $ zpFromList [0::Int,1,2,3])
             @=? Just 4
     , testCase "bad move left" $
         stepLeft (zpFromList [1::Int,2])
@@ -213,22 +220,22 @@ zipperTests = testGroup "Zipper"
         (stepRight >=> stepRight) (zpFromList [1::Int])
             @=? Nothing
     , testCase "okay move" $
-        (stepRight (zpFromList [1,2]) >>= tip)
+        (stepRight (zpFromList [1::Int,2]) >>= tip)
             @=? Just 2
     , testCase "move there and back" $
-        (stepRight (zpFromList [1,2]) >>= stepLeft >>= tip)
+        (stepRight (zpFromList [1::Int,2]) >>= stepLeft >>= tip)
             @=? Just 1
     , testCase "okay focus" $
-        tip (focus (Zp [2,1] []))
+        tip (focus (Zp [2::Int,1] []))
             @=? Just 2
     , testCase "nothing to focus to" $
         tip (focus (zpFromList []))
             @=? Nothing @()
     , testCase "zpLookup, found" $
-        zpLookup 2 (zpFromList [(1, ()), (2, ()), (3, ())])
+        zpLookup 2 (zpFromList [(1::Int, ()), (2, ()), (3, ())])
             @=? Zp [(1, ())] [(2, ()), (3, ())]
     , testCase "zpLookup, not found" $
-        zpLookup 4 (zpFromList [(1, ()), (2, ()), (3, ())])
+        zpLookup 4 (zpFromList [(1::Int, ()), (2, ()), (3, ())])
             @=? Zp [(3, ()), (2, ()), (1, ())] []
     , testCase "fmap + show" $
         show (fmap not $ zpFromList [True])
@@ -266,13 +273,7 @@ ladderTests = testGroup "Ladder parser"
     , testCase "test00" $ assertFullyConsumed t00
     , testCase "test01" $ fullyConsumed' test01
     , testCase "test04" $ assertFullyConsumed t04
---     , testCase "test05" $
---         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t05))
---             @?= Right (Zp [] [])
     , testCase "test07a" $ assertFullyConsumed t07a
---     , testCase "test07" $
---         fmap (dgTrim.psStr.snd) (applyDgp test002 (mkDgZp t07))
---             @?= Right (Zp [] [])
     , testCase "unexpected"
         $ simpleResult (runLadderParser_ ladder [ (1, [((1, 1), Return)]) ])
             @?= Left True
@@ -293,33 +294,20 @@ ladderTests = testGroup "Ladder parser"
 
     fullyConsumed' tk = checkSyntax tk @?= Right ()
 
---     parse :: Text -> Either String (Dg (Tok Text))
---     parse = preproc5'' >=> dgParse >=> return.getDg
-
-
-
     Right t00 = test00_tokenized
---     Right t01 = test01_tokenized
     Right t04 = test04_tokenized
-    Right t05 = test05_tokenized
-    Right t07 = test07_tokenized
+--     Right t05 = test05_tokenized
+--     Right t07 = test07_tokenized
     Right t07a = test07a_tokenized
 
-checkSyntax :: Text -> Either String ()
-checkSyntax s = () <$ (preproc5'' s >>= runLadderParser_ ladder)
+    test00_tokenized = preproc5' test00
 
-assertFullyConsumed tk = (() <$ runLadderParser ladder tk) @?= Right ()
--- assertFullyConsumed tk = getDg <$> dgParse tk @?= Right (Zp [] [])
--- getDg = dgTrim.psStr.snd
--- dgParse = flip (applyDgp ladder) () . mkDgZp
+    test04_tokenized = preproc5' test04
+--     test05_tokenized = preproc5' test05
+--     test07_tokenized = preproc5' test07
+    test07a_tokenized = preproc5' test07a
 
-test00_tokenized = preproc5' test00
-
--- test01_tokenized = preproc5' test01
-test04_tokenized = preproc5' test04
-test05_tokenized = preproc5' test05
-test07_tokenized = preproc5' test07
-test07a_tokenized = preproc5' test07a
+test00, test01, test04, test07a, test10, testN01 :: Text
 
 test00 =
     [text|
@@ -353,29 +341,29 @@ test04 =
     +--[ ]--[ ]--(R)--(R)-
     |                          |]
 
-test05 =
-    [text|
-    (* --- test 05 --- *)
+-- test05 =
+--     [text|
+--     (* --- test 05 --- *)
+-- 
+--     | %MX0
+--     +--[ ]-->>MAIN
+--     | %QX0 %MX0
+--     +--(S)--(S)--
+--     |
+--     MAIN:
+--     | %IX0 %QX0
+--     +--[ ]--( )--
+--     |                          |]
 
-    | %MX0
-    +--[ ]-->>MAIN
-    | %QX0 %MX0
-    +--(S)--(S)--
-    |
-    MAIN:
-    | %IX0 %QX0
-    +--[ ]--( )--
-    |                          |]
-
-test07 =
-    [text|
-    (* --- test 07 --- *)
-
-    | %IX0    %QX0
-    +--[ ]--+--( )--
-    | %IX1  |
-    +--[ ]--+
-    |                          |]
+-- test07 =
+--     [text|
+--     (* --- test 07 --- *)
+-- 
+--     | %IX0    %QX0
+--     +--[ ]--+--( )--
+--     | %IX1  |
+--     +--[ ]--+
+--     |                          |]
 
 test07a =
     [text|
@@ -469,7 +457,7 @@ analysisTests = testGroup "Analysis"
 --                     (\p -> iscycle (on (==) snd) dep01 p s2)
 --                     $ istopoM dep01 s2
 --                 , s2)
-
+g01, g01' :: [([Int], Int)]
 g01' = sttsort gDepends g01
 g01 =
     [ ( [ 7 , 4 ] , 2 )
@@ -482,14 +470,14 @@ genGraph :: Gen [([Int], Int)]
 genGraph = do --Gen.sample $ 
     let k = 10
     n <- Gen.int $ constant 0 k
-    let l = [0..n]
+--     let l = [0..n]
     ll <- for [0..n] $ \v -> do
         deps <- Gen.list (linear 0 k) (Gen.int $ constant 0 k)
         return (deps, v)
     return ll
 
 gDepends :: ([Int], Int) -> ([Int], Int) -> Bool
-gDepends = (\(as, a) (bs, b) -> elem b as)
+gDepends = (\(as, _a) (_bs, b) -> elem b as)
 
 prop_sttsort :: Property
 prop_sttsort =
@@ -500,18 +488,14 @@ prop_sttsort =
 
 --------------------------------------------------------------------------------
 
--- testBox :: Int -> Text -> Either String ((), DgPState () (Tok Text))
 testBox :: Int -> Text -> Either String (Dg (Tok Text))
 testBox ln input
---     = mkDgZp <$> (preproc5'' input)
---     >>= flip (applyDgp (box001 ln)) ()
     = preproc5'' input >>= runLadderParser (box001 ln) >>= (return . snd)
 
 boxTests :: TestTree
 boxTests = testGroup "Box parser"
     [ testCase "1" $
         fmap (dgTrim.snd) (runLadderParser (box001 2) box01_tokenized)
---         fmap (dgTrim.psStr.snd) (applyDgp (box001 2) (mkDgZp box01_tokenized) ())
             @?= Right (Zp [] [])
 --     , testCase "1b" $
 --         box01b_tokenized
@@ -531,7 +515,10 @@ boxTests = testGroup "Box parser"
     ]
     where
     Right box01_tokenized = preproc5' box01
+--     Right box03_tokenized = preproc5' box03
 --     Right box01b_tokenized = preproc5' box01b
+
+box01, box02 :: Text
 
 box01 =
     [text|
@@ -553,6 +540,7 @@ box02 =
     <     |
     +-----+                    |]
 
+#if 0
 box03 =
     [text|
     |   +-----+
@@ -560,6 +548,7 @@ box03 =
     +--0|     |
     |   |     |
         +-----+                 |]
+#endif
 
 --------------------------------------------------------------------------------
 
@@ -592,34 +581,32 @@ getTests = do
     ftNeg <- fileTestsNeg $ "test" </> "negative"
     return $ testGroup "Tests" [testGroup "Basic" basicTests, ftPos, ftNeg]
 
-fileTestsNeg :: FilePath -> IO TestTree
-fileTestsNeg path = do
-    files <- filter ((".txt"==).takeExtension) <$> listDirectory path
-    print (here, files)
+--------------------------------------------------------------------------------
 
-    tests <- for files $ \fn -> do
+testFromDirectory :: FilePath -> TestName -> (FilePath -> IO TestTree) -> IO TestTree
+testFromDirectory path name mkCase = do
+    files <- filter ((".txt"==).takeExtension) <$> listDirectory path
+--     print (here, files)
+    tests <- for files $ \fn -> mkCase fn
+    return $ testGroup name tests
+
+fileTestsNeg :: FilePath -> IO TestTree
+fileTestsNeg path
+    = testFromDirectory path "File tests - negative" $ \fn -> do
         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
             case preproc5' src of
                  Left _ -> return () --preproc failed -> test succeeeded
                  Right lxs ->
                     case snd <$> runLadderParser ladder lxs of
---                     case getDg <$> dgParse lxs of
                         Right (Zp [] []) -> assertFailure here
                         Left _ -> return ()
                         _ -> return ()
-    return $ testGroup "File tests - negative" tests
-
---     where
---     dgParse = flip (applyDgp ladder) () . mkDgZp
 
 
 fileTests :: FilePath -> IO TestTree
-fileTests path = do
-    files <- filter ((".txt"==).takeExtension) <$> listDirectory path
---     print (here, files)
-
-    tests <- for files $ \fn -> do
+fileTests path
+    = testFromDirectory path "File tests - positive" $ \fn -> do
         return $ testCase fn $ do
             (tst, lxs) <- fmap dropWhitespace <$> loadLadderTest (path </> fn)
             let blocks = labeledRungs lxs
@@ -633,8 +620,6 @@ fileTests path = do
                     ast <- parseOrDie2 lxs
                     passed <- runLadderTest False t ast
                     passed @?= True
-
-    return $ testGroup "File tests - positive" tests
 
 --------------------------------------------------------------------------------
 

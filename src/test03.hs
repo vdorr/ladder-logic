@@ -124,10 +124,6 @@ varFromOperand ty   (Var n) = do
 
 --------------------------------------------------------------------------------
 
-type Alloc n a = StateT
-        (MemTrack n)
-        (Either String) a
-
 mapDevsM
     :: Monad m
     => (d -> m d')
@@ -141,6 +137,12 @@ mapDevA
     -> Diagram c d s a
     -> m (Diagram c d' s a)
 mapDevA doDevice = mapDgA pure doDevice pure
+
+--------------------------------------------------------------------------------
+
+type Alloc n a = StateT
+        (MemTrack n)
+        (Either String) a
 
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
