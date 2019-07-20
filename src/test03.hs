@@ -106,7 +106,7 @@ allocateMemory
     -> Alloc
         String
         (Cofree (Diagram c (Op s (Operand (Address Int))) s') a)
-allocateMemory = allocateAndAnnotate (mapOperandA varFromOperand)
+allocateMemory = mapDevsM (mapOperandA varFromOperand)
 -- allocateMemory (p :< n)
 --     = (p :<) <$> (mapDevA (mapOperandA varFromOperand) n >>= traverse allocateMemory)
 
@@ -116,9 +116,9 @@ varFromOperand
     -> Alloc String (Operand (Address Int))
 varFromOperand Word (Lit v) = return $ Lit v
 varFromOperand _    (Lit _) = throwError "type mismatch"
-varFromOperand ty   (Var name) = do
+varFromOperand ty   (Var n) = do
     st          <- get
-    (addr, st') <- addCell st ty (fmap toUpper name)
+    (addr, st') <- addCell st ty (fmap toUpper n)
     put st'
     return $ Var addr
 
@@ -128,13 +128,12 @@ type Alloc n a = StateT
         (MemTrack n)
         (Either String) a
 
-allocateAndAnnotate
-    :: (dev -> Alloc n dev')
-    -> Cofree (Diagram c (dev) s) ann
-    -> Alloc n (Cofree (Diagram c (dev') s) ann)
-allocateAndAnnotate f (p :< n)
-    = (p :<) <$> (mapDevA (f) n
-                    >>= traverse (allocateAndAnnotate f))
+mapDevsM
+    :: Monad m
+    => (d -> m d')
+    -> Cofree (Diagram c d s) a
+    -> m (Cofree (Diagram c d' s) a)
+mapDevsM f (p :< n) = (p :<) <$> (mapDevA f n >>= traverse (mapDevsM f))
 
 mapDevA
     :: (Applicative m)

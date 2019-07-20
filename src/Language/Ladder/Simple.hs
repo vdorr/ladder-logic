@@ -87,7 +87,6 @@ data Op s n
     | LdN       n -- falling edge detect
     | Jmp s
     | Cmp CmpOp n n
-    -- | FB String [(String, D)] [(String, D)]
     deriving (Show) -- , Functor)
 
 data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
