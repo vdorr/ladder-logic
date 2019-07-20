@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings, RankNTypes #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.Interpreter where
@@ -5,12 +6,8 @@ module Language.Ladder.Interpreter where
 import Data.Foldable
 import Data.Traversable
 import Control.Monad.Writer.Strict
--- import Data.Function
 import Data.List
--- import Data.Char (toUpper)
--- import Data.Int
--- import Data.Word
--- import Data.Bifunctor
+import Data.String
 import Data.Void
 
 import Language.Ladder.DiagramParser (DgExt)
@@ -25,8 +22,8 @@ data CellType = Bit | TwoBits | Word -- | TON | TOF
 
 -- |Memory cell value, also represents its type and default value
 data V
-    = X Bool
-    | I Int
+    = X !Bool
+    | I !Int
     deriving (Show, Read, Eq)
 
 -- data V2 = T | F | I Int
@@ -35,8 +32,8 @@ data V
 --------------------------------------------------------------------------------
 
 data ExtendedInstruction label word address
-    = EIJump    label
-    | EISimple (Instruction word address)
+    = EIJump   !label
+    | EISimple !(Instruction word address)
     | EIReturn
     deriving (Show, Eq)
 
@@ -45,18 +42,18 @@ data Instruction w a
 --     | ISysRq
     | ILdOn -- push #1 onto wire stack {- w: -- #1 -}
     | IDup -- coudl be replaced by IPick 0, dup value on top of wire stack {- w: x -- x x -}
-    | IPick  Int -- push wire stack value at index onto wire stack {- w: -- x -}
+    | IPick  !Int -- push wire stack value at index onto wire stack {- w: -- x -}
     | IDrop --drop value from wire stack {- w: x -- -}
 
-    | ILdBit a -- push bit from address onto wire stack
-    | IStBit a -- dtto for store
+    | ILdBit !a -- push bit from address onto wire stack
+    | IStBit !a -- dtto for store
 
     | IAnd -- and two values on wire stack, push result back
     | IOr -- dtto, or
     | INot -- negate value on top of wire stack
 --     | IXor
 
-    | ILdCnA w {- push int const onto argument stack, a: -- l -}
+    | ILdCnA !w {- push int const onto argument stack, a: -- l -}
     | ILdM {- a: size addr -- <value> -}
     | IStM
 
@@ -312,15 +309,23 @@ eval = f
 data RW = Rd | Wr
     deriving (Show)
 
-data DeviceDescription n impl = DDesc n [(RW, CellType)] impl
+data DeviceDescription n impl = DDesc !n ![(RW, CellType)] !impl
+
+type DeviceImpl word addr = [Operand addr] -> Either String [Instruction word addr]
+
+type Devices word addr name = (Integral word, Integral addr, IsString name)
+    => [(DevType name,
+            DeviceDescription name (DeviceImpl word addr)
+            )]
 
 --backend for this interpreter
-devices
-    :: (Integral word, Integral addr) 
-    => [(DevType String,
-            DeviceDescription
-                String
-                ([Operand addr] -> Either a [Instruction word addr]))]
+-- devices
+--     :: (Integral word, Integral addr, IsString name)
+--     => [(DevType name,
+--             DeviceDescription
+--                 name
+--                 ([Operand addr] -> Either a [Instruction word addr]))]
+devices :: Devices word addr name
 devices =
     [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
     , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
@@ -333,9 +338,12 @@ devices =
                  Lit i -> pure [ILdCnA (fromIntegral i)]
                  Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
             Right $ a' ++ b' ++ [IGt]))
+    , (Contact_ "<", DDesc "LT" [(Rd, Word), (Rd, Word)] (\[Var a] -> undefined))
 
     , (Coil_    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
     , (Coil_    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
+    , (Coil_    "S", DDesc "SET"  [(Wr, Bit)] (\[Var a] -> undefined))
+    , (Coil_    "R", DDesc "RST"  [(Wr, Bit)] (\[Var a] -> undefined))
     ]
 
 --------------------------------------------------------------------------------

@@ -29,7 +29,7 @@ runLadderParser
     :: LdP (Dev Text) Text a
     -> [(Int, [((Int, Int), Tok Text)])]
     -> Either String (a, Dg (Tok Text))
-runLadderParser = runParser wrapDevice
+runLadderParser = runParser wrapDevice2
 
 wrapDevice
     :: DevType Text
@@ -45,17 +45,34 @@ wrapDevice d = (, pure . Dev d) <$> has2Ops d
 
 --------------------------------------------------------------------------------
 
--- wrapDevice2
---     :: DevType Text
---     -> Either String
---         ( DevOpFlag
---         , [Operand Text] -> Either String (Dev Text)
---         )
+devices1 :: Devices word addr Text
+devices1 = devices
+
+wrapDevice2
+    :: DevType Text
+    -> Either String
+        ( DevOpFlag
+        , [Operand Text] -> Either String (Dev Text)
+        )
 wrapDevice2 d
-    = case lookup (fmap unpack d) devices of
+    = case lookup d devices1 of
         Just dd@(DDesc _name ty _impl)
             -> Right (if length ty > 1 then Mandatory else None
-                , \ops -> Right (ops, dd))
+                    , \ops -> Right $ Dev d ops)
+        Nothing -> Left "device type unknown"
+
+wrapDevice3
+    :: (Integral word, Integral addr)
+    => DevType Text
+    -> Either String
+        ( DevOpFlag
+        , [Operand Text] -> Either String ([Operand Text], DeviceImpl word addr)
+        )
+wrapDevice3 d
+    = case lookup d devices of
+        Just dd@(DDesc _name ty impl)
+            -> Right (if length ty > 1 then Mandatory else None
+                    , \ops -> Right (ops, impl))
         Nothing -> Left "device type unknown"
 
 --------------------------------------------------------------------------------
