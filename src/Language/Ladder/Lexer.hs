@@ -89,6 +89,8 @@ data Tok a
 --whitespace
     | Comment      !a   -- ^ (* ... *)
     | Pragma       !a   -- ^ { ... }
+--     | NewLine XXX ?!?!
+-- | Whitespace Int
     deriving (Show, Eq, Functor)
 
 --------------------------------------------------------------------------------

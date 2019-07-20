@@ -102,44 +102,39 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 --------------------------------------------------------------------------------
 
 allocateMemory
-    :: Cofree (Diagram c' (Op s (Operand String)) s') a
-    -> StateT
-        (MemTrack String)
-        (Either String)
-        (Cofree (Diagram c' (Op s (Operand (Address Int))) s') a)
-allocateMemory (p :< n)
-    = (p :<) <$> (mapDevA (cfggjhj doOperand) n >>= traverse allocateMemory)
-    where
-    doOperand Word (Lit v) = return $ Lit v
-    doOperand _    (Lit _) = throwError "type mismatch"
-    doOperand ty   (Var name) = do
-        st          <- get
-        (addr, st') <- addCell st ty name
-        put st'
-        return $ Var addr
+    :: Cofree (Diagram c (Op s (Operand String)) s') a
+    -> Alloc
+        String
+        (Cofree (Diagram c (Op s (Operand (Address Int))) s') a)
+allocateMemory = allocateAndAnnotate (mapOperandA varFromOperand)
+-- allocateMemory (p :< n)
+--     = (p :<) <$> (mapDevA (mapOperandA varFromOperand) n >>= traverse allocateMemory)
 
-allocateMemory2
-    :: (forall t n.
-        (CellType -> t -> StateT (MemTrack String) (Either String) n)
-        -> Op s t
-        -> StateT (MemTrack String) (Either String) (Op s n)
-        )
-    -> Cofree (Diagram c' (Op s (Operand String)) s') a
-    -> StateT
-        (MemTrack String)
-        (Either String)
-        (Cofree (Diagram c' (Op s (Operand (Address Int))) s') a)
-allocateMemory2 f (p :< n)
-    = (p :<) <$> (mapDevA (f doOperand) n >>= traverse (allocateMemory2 f))
-    where
--- :: CellType -> Operand String -> StateT (MemTrack String) (Either String) (Operand (Address Int))
-    doOperand Word (Lit v) = return $ Lit v
-    doOperand _    (Lit _) = throwError "type mismatch"
-    doOperand ty   (Var name) = do
-        st          <- get
-        (addr, st') <- addCell st ty name
-        put st'
-        return $ Var addr
+varFromOperand
+    :: CellType
+    -> Operand String
+    -> Alloc String (Operand (Address Int))
+varFromOperand Word (Lit v) = return $ Lit v
+varFromOperand _    (Lit _) = throwError "type mismatch"
+varFromOperand ty   (Var name) = do
+    st          <- get
+    (addr, st') <- addCell st ty (fmap toUpper name)
+    put st'
+    return $ Var addr
+
+--------------------------------------------------------------------------------
+
+type Alloc n a = StateT
+        (MemTrack n)
+        (Either String) a
+
+allocateAndAnnotate
+    :: (dev -> Alloc n dev')
+    -> Cofree (Diagram c (dev) s) ann
+    -> Alloc n (Cofree (Diagram c (dev') s) ann)
+allocateAndAnnotate f (p :< n)
+    = (p :<) <$> (mapDevA (f) n
+                    >>= traverse (allocateAndAnnotate f))
 
 mapDevA
     :: (Applicative m)
@@ -147,26 +142,6 @@ mapDevA
     -> Diagram c d s a
     -> m (Diagram c d' s a)
 mapDevA doDevice = mapDgA pure doDevice pure
-
-cfggjhj
-    :: (Applicative m)
-    => (CellType -> t -> m n)
-    -> Op s t
-    -> m (Op s n)
-cfggjhj doOperand = f
-    where
-    f (And    a  ) =        And    <$> doOperand Bit a
-    f (AndN   a  ) =        AndN   <$> doOperand Bit a
-    f (St     a  ) =        St     <$> doOperand Bit a
-    f (StN    a  ) =        StN    <$> doOperand Bit a
-    f (Cmp op a b) =        Cmp op <$> doOperand Word a <*> doOperand Word b
-    f  Ld          = pure   Ld
-    f (LdP    a  ) =        LdP    <$> doOperand TwoBits a
-    f (LdN    a  ) =        LdN    <$> doOperand TwoBits a
-    f  On          = pure   On
-    f (Jmp s)      = pure $ Jmp s
-
---------------------------------------------------------------------------------
 
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
@@ -188,13 +163,11 @@ data MemTrack n = MemTrack
     deriving (Show)
 
 addCell
-    :: MemTrack String
+    :: Ord n
+    => MemTrack n
     -> CellType
-    -> String
-    -> StateT
-        (MemTrack String)
-        (Either String)
-        (Address Int, MemTrack String)
+    -> n
+    -> Alloc n (Address Int, MemTrack n)
 addCell mt@MemTrack{..} ty n0
     = case M.lookup n variables of
         Just (addr, ty')
@@ -203,7 +176,7 @@ addCell mt@MemTrack{..} ty n0
         Nothing -> return $ new ty
 
     where
-    n = fmap toUpper n0
+    n = n0
 
     updated addr addBits addWords = mt
         { variables = M.insert n (addr, ty) variables

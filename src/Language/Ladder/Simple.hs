@@ -95,6 +95,24 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --------------------------------------------------------------------------------
 
+mapOperandA
+    :: (Applicative m)
+    => (CellType -> t -> m n)
+    -> Op s t
+    -> m (Op s n)
+mapOperandA doOperand = f
+    where
+    f (And    a  ) =        And    <$> doOperand Bit a
+    f (AndN   a  ) =        AndN   <$> doOperand Bit a
+    f (St     a  ) =        St     <$> doOperand Bit a
+    f (StN    a  ) =        StN    <$> doOperand Bit a
+    f (Cmp op a b) =        Cmp op <$> doOperand Word a <*> doOperand Word b
+    f  Ld          = pure   Ld
+    f (LdP    a  ) =        LdP    <$> doOperand TwoBits a
+    f (LdN    a  ) =        LdN    <$> doOperand TwoBits a
+    f  On          = pure   On
+    f (Jmp s)      = pure $ Jmp s
+
 emitBasicDevice
     :: (Show address) -- , Show op)
     => Op op (Operand address)
