@@ -63,21 +63,21 @@ devices1 :: Devices word addr Text
 devices1 = devices
 
 
-parseSimpleDevice2 :: DeviceParser Text (Op s (Operand String))
-parseSimpleDevice2 d
+parseSimpleDevice :: DeviceParser Text (Op String (Operand String))
+parseSimpleDevice d
     = case lookup d devices1 of
         Just dd@(DDesc _name ty _impl)
             -> Right (if length ty > 1 then Mandatory else None
                     , \ops -> parseOp $ fmap unpack $ Dev d ops)
         Nothing -> Left "device type unknown"
 
-parseSimpleDevice :: DeviceParser Text (Dev Text)
-parseSimpleDevice d
-    = case lookup d devices1 of
-        Just dd@(DDesc _name ty _impl)
-            -> Right (if length ty > 1 then Mandatory else None
-                    , \ops -> Right $ Dev d ops)
-        Nothing -> Left "device type unknown"
+-- parseSimpleDevice :: DeviceParser Text (Dev Text)
+-- parseSimpleDevice d
+--     = case lookup d devices1 of
+--         Just dd@(DDesc _name ty _impl)
+--             -> Right (if length ty > 1 then Mandatory else None
+--                     , \ops -> Right $ Dev d ops)
+--         Nothing -> Left "device type unknown"
 
 -- wrapDevice3
 --     :: (Integral word, Integral addr)
@@ -128,10 +128,11 @@ data Op s n
     | LdN       n -- falling edge detect
     | Jmp s
     | Cmp CmpOp n n
-    deriving (Show) -- , Functor)
+--     | OpTrap
+    deriving (Show, Eq) -- , Functor)
 
 data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
-    deriving Show
+    deriving (Show, Eq)
 
 --------------------------------------------------------------------------------
 
@@ -184,13 +185,14 @@ parseOp = f
     f (Dev (Coil_ op) arg) = case (fmap toUpper op, arg) of
         (" ", [n]   ) -> pure $ St n
         ("/", [n]   ) -> pure $ StN n
-        ("R", [n]   ) -> undefined
-        ("S", [n]   ) -> undefined
+        ("R", [n]   ) -> pure undefined
+        ("S", [n]   ) -> pure undefined
         _               -> Left "unknown coil type"
     f (Dev (Contact_ op) arg) = case (fmap toUpper op, arg) of
         (" ", [n]   ) -> pure $ And  n
         ("/", [n]   ) -> pure $ AndN  n
         (">", [a, b]) -> pure $ Cmp Gt a b
+        ("<", [a, b]) -> pure $ Cmp Lt a b
         ("P", [n]   ) -> pure $ LdP n
         ("N", [n]   ) -> pure $ LdN n
         _               -> Left "unknown contact type"
