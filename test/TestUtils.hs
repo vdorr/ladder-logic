@@ -73,7 +73,7 @@ runLadderTest verbose test@T01{} ast = do
     let testTrace = getSignals (watch test) (testVect test) traces
     let passed = expected test == testTrace
 
-    when verbose $do
+    when verbose $ do
         print (here, testTrace)
         print (here, expected test)
         print (here, passed, if passed then "PASSED" else "FAILED")
@@ -82,9 +82,9 @@ runLadderTest verbose test@T01{} ast = do
 
 --------------------------------------------------------------------------------
 
-ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
-         -> Cofree (Diagram c (Dev String) String) a
-ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
+-- ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
+--          -> Cofree (Diagram c (Dev String) String) a
+-- ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
 
 ldUnpack1 :: Cofree (Diagram c op Text) a
          -> Cofree (Diagram c op String) a

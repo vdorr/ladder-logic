@@ -41,14 +41,12 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 
 --------------------------------------------------------------------------------
 
-allocateMemory
+allocateMemory1
     :: Cofree (Diagram c (Op s (Operand String)) s') a
     -> Alloc
         String
         (Cofree (Diagram c (Op s (Operand (Address Int))) s') a)
-allocateMemory = mapDevsM (mapSimpleOpOperandA varFromOperand)
--- allocateMemory (p :< n)
---     = (p :<) <$> (mapDevA (mapOperandA varFromOperand) n >>= traverse allocateMemory)
+allocateMemory1 = mapDevsM (mapSimpleOpOperandA varFromOperand)
 
 varFromOperand
     :: CellType
@@ -107,7 +105,7 @@ addCell
     -> CellType
     -> n
     -> Alloc n (Address Int, MemTrack n)
-addCell mt@MemTrack{..} ty n0
+addCell mt@MemTrack{..} ty n
     = case M.lookup n variables of
         Just (addr, ty')
             | ty == ty' -> return (addr, mt)
@@ -115,7 +113,6 @@ addCell mt@MemTrack{..} ty n0
         Nothing -> return $ new ty
 
     where
-    n = n0
 
     updated addr addBits addWords = mt
         { variables = M.insert n (addr, ty) variables
@@ -136,8 +133,8 @@ compileOrDie
           )
 compileOrDie fn = do
     (_pragmas, blocks) <- parseOrDie5 parseSimpleDevice fn
-    Right (blocks', memory)
-        <- return $ runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
+    let doMem ast = runStateT (traverse (traverse allocateMemory1) ast) emptyMemory
+    Right (blocks', memory) <- return $ doMem blocks
 --     print (here, memory)
     prog <- generateStk2xx return emitBasicDevice literalFromInt blocks'
 --     print (here, prog)

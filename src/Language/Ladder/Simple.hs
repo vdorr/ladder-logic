@@ -16,9 +16,6 @@ import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------
 
-data Dev t = Dev !(DevType t) ![Operand t]
-    deriving (Show, Eq, Functor)
-
 runLadderParser_
     :: DeviceParser t d
     -> LdP d t a
@@ -63,14 +60,6 @@ devices1 :: Devices word addr Text
 devices1 = devices
 
 
-parseSimpleDevice :: DeviceParser Text (Op String (Operand String))
-parseSimpleDevice d
-    = case lookup d devices1 of
-        Just dd@(DDesc _name ty _impl)
-            -> Right (if length ty > 1 then Mandatory else None
-                    , \ops -> parseOp $ fmap unpack $ Dev d ops)
-        Nothing -> Left "device type unknown"
-
 -- parseSimpleDevice :: DeviceParser Text (Dev Text)
 -- parseSimpleDevice d
 --     = case lookup d devices1 of
@@ -114,6 +103,19 @@ generateStk2xx doOp emitDev literalFromInt ast = do
     ast''        <- for ast' (traverse (generateStk2' literalFromInt emitDev))
     Right ast''' <- return $ resolveLabels ast'' -- AAAAAAAAAAAAAAAAAAAA
     return ast'''
+
+--------------------------------------------------------------------------------
+
+data Dev t = Dev !(DevType t) ![Operand t]
+    deriving (Show, Eq, Functor)
+
+parseSimpleDevice :: DeviceParser Text (Op String (Operand String))
+parseSimpleDevice d
+    = case lookup d devices1 of
+        Just dd@(DDesc _name ty _impl)
+            -> Right (if length ty > 1 then Mandatory else None
+                    , \ops -> parseOp $ fmap unpack $ Dev d ops)
+        Nothing -> Left "device type unknown"
 
 --------------------------------------------------------------------------------
 
