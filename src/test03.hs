@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wunused-imports -Wall #-}
-{-# LANGUAGE CPP, RecordWildCards #-}
+{-# LANGUAGE CPP, RecordWildCards, TupleSections #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -10,10 +10,10 @@ import Data.ByteString.Base16.Lazy as B16
 
 import Data.Word
 -- import Data.Foldable
--- import Data.Traversable
+import Data.Traversable
 import Data.List
 import Numeric
--- import Data.List
+import Data.Text (Text, unpack)
 import Data.Functor.Identity
 import Data.Char (toUpper)
 
@@ -59,6 +59,28 @@ varFromOperand ty   (Var n) = do
     (addr, st') <- addCell st ty (fmap toUpper n)
     put st'
     return $ Var addr
+
+--------------------------------------------------------------------------------
+
+allocateMemory2
+    :: (Integral word, Integral addr)
+    => Cofree (Diagram c (([(CellType, Operand Text)], DeviceImpl word addr)) s') a
+    -> Alloc
+        String
+        (Cofree
+            (Diagram c (([Operand (Address Int)], DeviceImpl word addr)) s')
+            a
+        )
+allocateMemory2 = mapDevsM (eeeek varFromOperand)
+    where
+    eeeek :: (CellType
+                -> Operand String
+                -> Alloc String (Operand (Address Int)))
+
+            -> ([(CellType, Operand Text)], DeviceImpl word addr)
+            -> Alloc String
+                    ([Operand (Address Int)], DeviceImpl word addr)
+    eeeek f (ops, impl) = (, impl) <$> for (fmap (fmap (fmap unpack)) ops) (uncurry f)
 
 --------------------------------------------------------------------------------
 
@@ -140,6 +162,32 @@ compileOrDie fn = do
 --     print (here, prog)
     return (memory, prog)
 
+compileOrDieX
+    :: FilePath
+    -> IO ( MemTrack String
+          , [ExtendedInstruction Int Word16 Word8]
+          )
+compileOrDieX fn = do
+    (_pragmas, blocks) <- parseOrDie5 wrapDevice3 fn
+    let doMem ast = runStateT (traverse (traverse allocateMemory2) ast) emptyMemory
+    Right (blocks', memory) <- return $ doMem blocks
+--     print (here, memory)
+    prog <- generateStk2xx pure emitDev literalFromInt blocks'
+--     print (here, prog)
+    return (memory, prog)
+
+    where
+    emitDev :: ([Operand (Address Int)], DeviceImpl Word16 Word8)
+             -> [Instruction Word16 Word8]
+    emitDev (ops, impl) = case impl (fmap unAddr ops) of
+                               Left err -> error $ show (here, err)
+                               Right x -> x
+
+    unAddr :: Operand (Address Int) -> Operand Word8
+    unAddr (Var (WordAddr a)) = Var $ fromIntegral a
+    unAddr (Var (BitAddr  a)) = Var $ fromIntegral a
+    unAddr (Lit _) = undefined -- ???
+
 writeBlob
     :: FilePath
     -> [ExtendedInstruction Int Word16 Word8]
@@ -147,8 +195,8 @@ writeBlob
 writeBlob = do
     undefined
 
-aaaargh :: ExtendedInstruction Int Int    (Address Int)
-        -> ExtendedInstruction Int Word16  Word8
+aaaargh :: ExtendedInstruction Int Int   (Address Int)
+        -> ExtendedInstruction Int Word16 Word8
 aaaargh = runIdentity . go
     where
     go (EIJump   lbl) = pure $ EIJump lbl
@@ -181,15 +229,18 @@ main = do
     print (here, args)
     case args of
         fn : fns -> do
-            (memory, prog) <- compileOrDie fn
+            (memory, prog) <- compileOrDieX fn
             print (here, memory)
             print (here, prog)
-            let prog' = fmap aaaargh prog
-            putStrLn $ asCArray $ programToByteString prog'
+--             (memory, prog') <- compileOrDie fn
+--             print (here, memory)
+--             let prog = fmap aaaargh prog
+--             print (here, prog)
+            putStrLn $ asCArray $ programToByteString prog
             case fns of
                 outputFile : _ -> do
                     print (here, outputFile)
-                    writeBlob outputFile prog'
+                    writeBlob outputFile prog
                 _ -> return ()
         _    ->
             return ()
