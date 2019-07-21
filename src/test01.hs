@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wunused-imports  -Wall #-}
-{-# LANGUAGE CPP, TupleSections, FlexibleInstances, QuasiQuotes, LambdaCase,
-    ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE CPP, TupleSections #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO
@@ -37,15 +36,12 @@ main = do
             forM_ blocks $ \(lbl, lxs'') -> do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
-                forM_ (zpToList zp) (print . (here,))
+                for_ (zpToList zp) (print . (here,))
                 case runLadderParser ladderLiberal lxs'' of
                     Left err -> print (here, err)
-                    Right (_ast, Zp zpl zpr) -> do
+                    Right (_ast, zp1) -> do
                         print (here, "--------------------------------------------------")
-                        for_ (reverse zpl ++ zpr) $ \q -> print (here, q)
---                     for_ zpr $ \q -> print (here, q)
-
+                        for_ (zpToList zp1) (print . (here,))
                         print (here, "--------------------------------------------------")
                         TIO.putStrLn src
                         print (here, "--------------------------------------------------")
-

@@ -113,12 +113,12 @@ data CmpOp = Lt | Gt | Lte | Gte | Eq | NEq
 
 --------------------------------------------------------------------------------
 
-mapOperandA
+mapSimpleOpOperandA
     :: (Applicative m)
     => (CellType -> t -> m n)
     -> Op s t
     -> m (Op s n)
-mapOperandA doOperand = f
+mapSimpleOpOperandA doOperand = f
     where
     f (And    a  ) =        And    <$> doOperand Bit a
     f (AndN   a  ) =        AndN   <$> doOperand Bit a
