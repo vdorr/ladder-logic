@@ -119,8 +119,8 @@ renderLexeme t = case t of
 -- lexemeLength t = case t of
 --     Cross            -> (0, 1)
 --     VLine            -> (0, 1)
---     Label        a   -> (0, length a)
---     HLine        n _ -> (0, n+1)
+--     Label        a   -> (0, 1 + length a)
+--     HLine        n _ -> (0, n + 1)
 --     REdge            -> (0, 1)
 --     FEdge            -> (0, 1)
 --     Number       n   -> (0, length $ show n)
