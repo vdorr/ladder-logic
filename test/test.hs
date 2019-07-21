@@ -185,7 +185,7 @@ genToken =
         [ pure Cross
         , pure VLine
         ,      Label        <$> name --TODO numeric label
-        ,      HLine        <$> smallNumber <*> pure 0
+        ,      HLine        <$> smallNonZero <*> pure 0
         , pure REdge
         , pure FEdge
         ,      Number       <$> number
@@ -195,14 +195,15 @@ genToken =
         , pure Return
         ,      Jump'        <$> name --TODO numeric label
         ,      Name         <$> name
-        ,      Comment      <$> name --TODO richer alphabet
-        ,      Pragma       <$> name --TODO richer alphabet
+        ,      Comment      <$> pure <$> name --TODO richer alphabet
+        ,      Pragma       <$> pure <$> name --TODO richer alphabet
         , pure NewLine
-        ,      Whitespace   <$> smallNumber
+        ,      Whitespace   <$> smallNonZero
         ]
     where
     name = Gen.text (Range.linear 1 20) Gen.alpha
-    smallNumber = Gen.int (Range.linear 0 999999)
+--     smallNumber = Gen.int (Range.linear 0 999999)
+    smallNonZero = Gen.int (Range.linear 1 999)
     number = Gen.int (Range.linear 0 maxBound)
 
 --------------------------------------------------------------------------------

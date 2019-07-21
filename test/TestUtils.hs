@@ -102,7 +102,7 @@ parseOrDie5
 parseOrDie5 devP path = do
     lxs         <- lexFile path
     ast         <- parseOrDie2 devP $ dropWhitespace lxs
-    let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
+    let pragmas  = fmap unpack $ fmap mconcat <$> getLeadingPragmas $ dropPos lxs
 --     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
     return (pragmas, ast)
 
@@ -149,7 +149,7 @@ lexFile file = do
 loadLadderTest :: FilePath -> IO (Maybe LadderTest, [(Int, [((Int, Int), Tok Text)])])
 loadLadderTest file = do
     x <- lexFile file
-    let pgma = fmap (filter (/='\\') . unpack) $ getPragma $ dropPos x
+    let pgma = fmap (filter (/='\\') . unpack) $ fmap mconcat $ getPragma $ dropPos x
     return (pgma >>= readMaybe, x)
 
 --------------------------------------------------------------------------------

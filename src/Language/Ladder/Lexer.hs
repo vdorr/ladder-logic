@@ -14,10 +14,11 @@ import Data.Text (Text)
 
 --------------------------------------------------------------------------------
 
-type ParseErr = String
+newtype ParseErr = PE String
+    deriving (Show, Eq, Ord)
 
 instance ShowErrorComponent ParseErr where
-    showErrorComponent  = show
+    showErrorComponent (PE e)  = show e
 
 --------------------------------------------------------------------------------
 
@@ -87,8 +88,8 @@ data Tok a
 --     | Store a            -- FBD only "---VARIABLE"
     | Name         !a   -- ^inside of block
 --whitespace
-    | Comment      !a   -- ^ (* ... *)
-    | Pragma       !a   -- ^ { ... }
+    | Comment      ![a]   -- ^ (* ... *)
+    | Pragma       ![a]   -- ^ { ... }
     | NewLine
     | Whitespace   !Int
     deriving (Show, Eq, Functor)
@@ -110,8 +111,8 @@ renderLexeme t = case t of
     Return           -> "<RETURN>"
     Jump'        a   -> ">>" <> a
     Name         a   -> a
-    Comment      a   -> "(*" <> a <> "*)"
-    Pragma       a   -> "{" <> a <> "}"
+    Comment      a   -> "(*" <> mconcat a <> "*)"
+    Pragma       a   -> "{" <> mconcat a <> "}"
     NewLine          -> "\n" --FIXME windows
     Whitespace   n   -> replicate n ' '
 
@@ -119,8 +120,10 @@ renderLexeme t = case t of
 
 lexeme :: Parsec ParseErr Text (Tok Text)
 lexeme
-    =   Pragma       <$> between''' "{" "}"
-    <|> Comment      <$> between''' "(*" "*)"
+    =   Pragma       <$> T.lines <$> between''' "{" "}"
+    <|> Comment      <$> T.lines <$> between''' "(*" "*)"
+    <|> Whitespace   <$> length <$> some (char ' ')
+    <|> NewLine      <$  eol
     <|> Label        <$> try (labelName <* char ':')
 --     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
@@ -139,8 +142,6 @@ lexeme
     <|> REdge        <$  char '>'
     <|> FEdge        <$  char '<'
     <|> Name         <$> name
-    <|> Whitespace   <$> length <$> some (char ' ')
-    <|> NewLine      <$  eol
 
     where
     labelName = T.pack <$> some alphaNumChar
@@ -229,18 +230,20 @@ stripPos = fmap (bimap (unPos.sourceLine)
 --------------------------------------------------------------------------------
 
 -- |Look for first pragma in list of lexemes
-getPragma :: [Tok a] -> Maybe a
+getPragma :: [Tok a] -> Maybe [a]
 getPragma xs = case getLeadingPragmas xs of
     x : _ -> Just x
     _     -> Nothing
 
 -- |Look for first pragma in list of lexemes
-getLeadingPragmas :: [Tok a] -> [a]
+getLeadingPragmas :: [Tok a] -> [[a]]
 getLeadingPragmas = go
     where
-    go (Pragma  p : xs ) = p : go xs
-    go (Comment _ : xs)  =     go xs
-    go _                 =     []
+    go (Pragma  p : xs )   = p : go xs
+    go (Comment _ : xs)    =     go xs
+    go (Whitespace _ : xs) =     go xs
+    go (NewLine : xs)      =     go xs
+    go _                   = []
 
 -- should be called "dropPos" or something like that
 -- |Discard position informations from list of lexemes
