@@ -89,8 +89,8 @@ data Tok a
 --whitespace
     | Comment      !a   -- ^ (* ... *)
     | Pragma       !a   -- ^ { ... }
---     | NewLine XXX ?!?!
---     | Whitespace Int
+    | NewLine
+    | Whitespace   !Int
     deriving (Show, Eq, Functor)
 
 --------------------------------------------------------------------------------
@@ -112,6 +112,8 @@ renderLexeme t = case t of
     Name         a   -> a
     Comment      a   -> "(*" <> a <> "*)"
     Pragma       a   -> "{" <> a <> "}"
+    NewLine          -> "\n" --FIXME windows
+    Whitespace   n   -> replicate n ' '
 
 --------------------------------------------------------------------------------
 
@@ -137,6 +139,8 @@ lexeme
     <|> REdge        <$  char '>'
     <|> FEdge        <$  char '<'
     <|> Name         <$> name
+    <|> Whitespace   <$> length <$> some (char ' ')
+    <|> NewLine      <$  eol
 
     where
     labelName = T.pack <$> some alphaNumChar
@@ -156,7 +160,8 @@ lexeme
             else return (T.singleton c)
 
 lexerP :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
-lexerP = space *> many (withPos lexeme <* space) <* eof
+-- lexerP = space *> many (withPos lexeme <* space) <* eof
+lexerP = many (withPos lexeme) <* eof
 
 lexerLinesP :: Parsec ParseErr Text [(SourcePos, [((SourcePos, SourcePos), Tok Text)])]
 lexerLinesP = breakLines <$> lexerP
@@ -187,9 +192,11 @@ breakLines [] = []
 
 -- |Returns True if lexeme is comment or pragma
 isWsTok :: Tok a -> Bool
-isWsTok Pragma {} = True
-isWsTok Comment{} = True
-isWsTok _         = False
+isWsTok Pragma {}    = True
+isWsTok Comment{}    = True
+isWsTok Whitespace{} = True
+isWsTok NewLine      = True
+isWsTok _            = False
 
 -- |Chop by network labels
 --TODO keep source pos for start of block

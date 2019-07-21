@@ -197,6 +197,8 @@ genToken =
         ,      Name         <$> name
         ,      Comment      <$> name --TODO richer alphabet
         ,      Pragma       <$> name --TODO richer alphabet
+        , pure NewLine
+        ,      Whitespace   <$> smallNumber
         ]
     where
     name = Gen.text (Range.linear 1 20) Gen.alpha
