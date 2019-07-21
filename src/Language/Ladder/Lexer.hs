@@ -115,6 +115,26 @@ renderLexeme t = case t of
     NewLine          -> "\n" --FIXME windows
     Whitespace   n   -> replicate n ' '
 
+-- lexemeLength :: Tok String -> (Int, Int)
+-- lexemeLength t = case t of
+--     Cross            -> (0, 1)
+--     VLine            -> (0, 1)
+--     Label        a   -> (0, length a)
+--     HLine        n _ -> (0, n+1)
+--     REdge            -> (0, 1)
+--     FEdge            -> (0, 1)
+--     Number       n   -> (0, length $ show n)
+--     Contact      a   -> (0, 2 + length a)
+--     Coil         a   -> (0, 2 + length a)
+--     Continuation a   -> (0, 2 + length a)
+--     Return           -> (0, 8)
+--     Jump'        a   -> (0, 2 + length a)
+--     Name         a   -> (0, length a)
+--     Comment      a   -> (length a - 1, 4 + (length $ unlines a))
+--     Pragma       a   -> (length a - 1, 2 + (length $ unlines a))
+--     NewLine          -> (1, 0)
+--     Whitespace   n   -> (0, n)
+
 --------------------------------------------------------------------------------
 
 lexeme :: Parsec ParseErr Text (Tok Text)
