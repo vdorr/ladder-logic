@@ -20,59 +20,81 @@ data Dev t = Dev !(DevType t) ![Operand t]
     deriving (Show, Eq, Functor)
 
 runLadderParser_
-    :: LdP (Dev Text) Text a
-    -> [(Int, [((Int, Int), Tok Text)])]
+    :: DeviceParser t d
+    -> LdP d t a
+    -> [(Int, [((Int, Int), Tok t)])]
     -> Either String a
-runLadderParser_ p s = fst <$> runLadderParser p s
+runLadderParser_ pd p s = fst <$> runLadderParser pd p s
+
+-- runLadderParser
+--     :: LdP (Dev Text) Text a
+--     -> [(Int, [((Int, Int), Tok Text)])]
+--     -> Either String (a, Dg (Tok Text))
+-- runLadderParser = runLadderParser' parseSimpleDevice
 
 runLadderParser
-    :: LdP (Dev Text) Text a
-    -> [(Int, [((Int, Int), Tok Text)])]
-    -> Either String (a, Dg (Tok Text))
-runLadderParser = runParser wrapDevice2
+    :: DeviceParser t d
+    -> LdP d t a
+    -> [(Int, [((Int, Int), Tok t)])]
+    -> Either String (a, Dg (Tok t))
+runLadderParser = runParser
 
-wrapDevice
-    :: DevType Text
-    -> Either String
-        ( DevOpFlag
-        , [Operand Text] -> Either String (Dev Text)
-        )
-wrapDevice d = (, pure . Dev d) <$> has2Ops d
-    where
-    cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
-    has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
-    has2Ops _ = Right None
+-- parseSimpleDevice
+--     :: DevType Text
+--     -> Either String
+--         ( DevOpFlag
+--         , [Operand Text] -> Either String (Dev Text)
+--         )
+-- parseSimpleDevice d = (, pure . Dev d) <$> has2Ops d
+--     where
+--     cmp = [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
+--     has2Ops (Contact_ f) = Right $ if elem f cmp then Mandatory else None
+--     has2Ops _ = Right None
 
 --------------------------------------------------------------------------------
+
+type DeviceParser name dev = DevType name
+    -> Either String
+        ( DevOpFlag
+        , [Operand name] -> Either String dev
+        )
 
 devices1 :: Devices word addr Text
 devices1 = devices
 
-wrapDevice2
-    :: DevType Text
-    -> Either String
-        ( DevOpFlag
-        , [Operand Text] -> Either String (Dev Text)
-        )
-wrapDevice2 d
+
+parseSimpleDevice2 :: DeviceParser Text (Op s (Operand String))
+parseSimpleDevice2 d
+    = case lookup d devices1 of
+        Just dd@(DDesc _name ty _impl)
+            -> Right (if length ty > 1 then Mandatory else None
+                    , \ops -> parseOp $ fmap unpack $ Dev d ops)
+        Nothing -> Left "device type unknown"
+
+parseSimpleDevice :: DeviceParser Text (Dev Text)
+parseSimpleDevice d
     = case lookup d devices1 of
         Just dd@(DDesc _name ty _impl)
             -> Right (if length ty > 1 then Mandatory else None
                     , \ops -> Right $ Dev d ops)
         Nothing -> Left "device type unknown"
 
+-- wrapDevice3
+--     :: (Integral word, Integral addr)
+--     => DevType Text
+--     -> Either String
+--         ( DevOpFlag
+--         , [Operand Text] -> Either String
+--             ([(CellType, Operand Text)], DeviceImpl word addr)
+--         )
 wrapDevice3
     :: (Integral word, Integral addr)
-    => DevType Text
-    -> Either String
-        ( DevOpFlag
-        , [Operand Text] -> Either String ([Operand Text], DeviceImpl word addr)
-        )
+    => DeviceParser Text ([(CellType, Operand Text)], DeviceImpl word addr)
 wrapDevice3 d
     = case lookup d devices of
         Just dd@(DDesc _name ty impl)
             -> Right (if length ty > 1 then Mandatory else None
-                    , \ops -> Right (ops, impl))
+                    , \ops -> Right (zip (fmap snd ty) ops, impl))
         Nothing -> Left "device type unknown"
 
 --------------------------------------------------------------------------------

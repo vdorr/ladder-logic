@@ -88,20 +88,33 @@ ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
 
 --------------------------------------------------------------------------------
 
--- |also return pragmas
+-- |return pragmas
 parseOrDie5
     :: FilePath
-    -> IO ( [String]
+    -> IO ( [String] -- leading pragmas
           , [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
           )
 parseOrDie5 path = do
-    (_, lxs)    <- loadLadderTest path
+    lxs         <- lexFile path
     ast         <- parseOrDie2 $ dropWhitespace lxs
     let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
     return (pragmas, ast')
 
--- |like 'parseOrDie' but additionaly can handle labels
+-- |return pragmas
+parseOrDie6
+    :: DeviceParser Text dev
+    -> FilePath
+    -> IO ( [String] -- leading pragmas
+          , [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
+          )
+parseOrDie6 devParse path = do
+    lxs         <- lexFile path
+    ast         <- parseOrDie2 $ dropWhitespace lxs
+    let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
+    ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
+    return (pragmas, ast')
+
 parseOrDie2
     :: [(Int, [((Int, Int), Tok Text)])]
     -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
@@ -111,24 +124,25 @@ parseOrDie2 lxs = do
 
     where
     -- |assuming comments and pragmas were filtered out
-    parseOrDie
-        :: [(Int, [((Int, Int), Tok Text)])]
-        -> IO (Cofree (Diagram Void (Dev String) String) DgExt)
     parseOrDie lxs = do
-        case runLadderParser_ ladder lxs of
+        case runLadderParser_ parseSimpleDevice ladder lxs of
             Right ast -> return $ ldUnpack ast
             Left  err -> fail $ show (here, err)
+
+lexFile :: FilePath -> IO [(Int, [((Int, Int), Tok Text)])]
+lexFile file = do
+    src <- TIO.readFile file
+    case stripPos <$> runLexer src of
+        Left  err -> fail $ show (here, err)
+        Right x   -> return x
 
 --------------------------------------------------------------------------------
 
 loadLadderTest :: FilePath -> IO (Maybe LadderTest, [(Int, [((Int, Int), Tok Text)])])
 loadLadderTest file = do
-    src <- TIO.readFile file
-    case stripPos <$> runLexer src of
-        Left err -> fail $ show (here, err)
-        Right x -> do
-            let pgma = fmap (filter (/='\\') . unpack) $ getPragma $ dropPos x
-            return (pgma >>= readMaybe, x)
+    x <- lexFile file
+    let pgma = fmap (filter (/='\\') . unpack) $ getPragma $ dropPos x
+    return (pgma >>= readMaybe, x)
 
 --------------------------------------------------------------------------------
 

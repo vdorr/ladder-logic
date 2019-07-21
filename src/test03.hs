@@ -80,9 +80,7 @@ mapDevA doDevice = mapDgA pure doDevice pure
 
 --------------------------------------------------------------------------------
 
-type Alloc n a = StateT
-        (MemTrack n)
-        (Either String) a
+type Alloc name = StateT (MemTrack name) (Either String)
 
 -- possibly fetched from config file or pragma
 -- ".var "Start" BitWithEdge"
@@ -138,9 +136,8 @@ compileOrDie
           )
 compileOrDie fn = do
     (_pragmas, blocks) <- parseOrDie5 fn
-
-    let Right (blocks', memory)
-                = runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
+    Right (blocks', memory)
+        <- return $ runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
 --     print (here, memory)
     prog <- generateStk2xx return emitBasicDevice literalFromInt blocks'
 --     print (here, prog)

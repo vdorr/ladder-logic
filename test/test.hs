@@ -75,10 +75,10 @@ isEmpty :: (Eq a, Monoid a) => a -> Bool
 isEmpty = (==mempty)
 
 checkSyntax :: Text -> Either String ()
-checkSyntax s = () <$ (preproc5'' s >>= runLadderParser_ ladder)
+checkSyntax s = () <$ (preproc5'' s >>= runLadderParser_ wrapDevice3 ladder)
 
 assertFullyConsumed :: [(Int, [((Int, Int), Tok Text)])] -> Assertion
-assertFullyConsumed tk = (() <$ runLadderParser ladder tk) @?= Right ()
+assertFullyConsumed tk = (() <$ runLadderParser wrapDevice3 ladder tk) @?= Right ()
 
 --------------------------------------------------------------------------------
 
@@ -268,17 +268,17 @@ dgpTests = testGroup "Diagram parser"
 ladderTests :: TestTree
 ladderTests = testGroup "Ladder parser"
     [ testCase "test00" $
-        (fmap (const ())) <$> runLadderParser_ ladder t00
+        (fmap (const ())) <$> runLadderParser_ parseSimpleDevice ladder t00
             @?= Right (() :< Source (() :< End))
     , testCase "test00" $ assertFullyConsumed t00
     , testCase "test01" $ fullyConsumed' test01
     , testCase "test04" $ assertFullyConsumed t04
     , testCase "test07a" $ assertFullyConsumed t07a
     , testCase "unexpected"
-        $ simpleResult (runLadderParser_ ladder [ (1, [((1, 1), Return)]) ])
+        $ simpleResult (runLadderParser_ parseSimpleDevice ladder [ (1, [((1, 1), Return)]) ])
             @?= Left True
     , testCase "gap"
-        $ simpleResult (runLadderParser_ ladder
+        $ simpleResult (runLadderParser_ parseSimpleDevice ladder
             [ (1, [((1, 1), VLine)])
             , (2, [((1, 1), Cross), ((2, 2), HLine 2 0), ((4, 4), HLine 2 0)])
             ])
@@ -490,12 +490,12 @@ prop_sttsort =
 
 testBox :: Int -> Text -> Either String (Dg (Tok Text))
 testBox ln input
-    = preproc5'' input >>= runLadderParser (box001 ln) >>= (return . snd)
+    = preproc5'' input >>= runLadderParser parseSimpleDevice (box001 ln) >>= (return . snd)
 
 boxTests :: TestTree
 boxTests = testGroup "Box parser"
     [ testCase "1" $
-        fmap (dgTrim.snd) (runLadderParser (box001 2) box01_tokenized)
+        fmap (dgTrim.snd) (runLadderParser parseSimpleDevice (box001 2) box01_tokenized)
             @?= Right (Zp [] [])
 --     , testCase "1b" $
 --         box01b_tokenized
@@ -598,7 +598,7 @@ fileTestsNeg path
             case preproc5' src of
                  Left _ -> return () --preproc failed -> test succeeeded
                  Right lxs ->
-                    case snd <$> runLadderParser ladder lxs of
+                    case snd <$> runLadderParser parseSimpleDevice ladder lxs of
                         Right (Zp [] []) -> assertFailure here
                         Left _ -> return ()
                         _ -> return ()
@@ -613,7 +613,7 @@ fileTests path
             case tst of
                 Nothing -> do
                     for_ blocks $ \(_, lxs') -> do
-                        case runLadderParser ladder lxs' of
+                        case runLadderParser parseSimpleDevice ladder lxs' of
                             Right _ -> return ()
                             Left err -> fail err
                 Just t -> do
