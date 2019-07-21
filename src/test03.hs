@@ -14,7 +14,7 @@ import Data.Traversable
 import Data.List
 import Numeric
 import Data.Text (Text, unpack)
-import Data.Functor.Identity
+-- import Data.Functor.Identity
 import Data.Char (toUpper)
 
 import Control.Monad.State
@@ -148,19 +148,19 @@ addCell mt@MemTrack{..} ty n
 
 --------------------------------------------------------------------------------
 
-compileOrDie
-    :: FilePath
-    -> IO ( MemTrack String
-          , [ExtendedInstruction Int Int (Address Int)]
-          )
-compileOrDie fn = do
-    (_pragmas, blocks) <- parseOrDie5 parseSimpleDevice fn
-    let doMem ast = runStateT (traverse (traverse allocateMemory1) ast) emptyMemory
-    Right (blocks', memory) <- return $ doMem blocks
---     print (here, memory)
-    prog <- generateStk2xx return emitBasicDevice literalFromInt blocks'
---     print (here, prog)
-    return (memory, prog)
+-- compileOrDie
+--     :: FilePath
+--     -> IO ( MemTrack String
+--           , [ExtendedInstruction Int Int (Address Int)]
+--           )
+-- compileOrDie fn = do
+--     (_pragmas, blocks) <- parseOrDie5 parseSimpleDevice fn
+--     let doMem ast = runStateT (traverse (traverse allocateMemory1) ast) emptyMemory
+--     Right (blocks', memory) <- return $ doMem blocks
+-- --     print (here, memory)
+--     prog <- generateStk2xx return emitBasicDevice literalFromInt blocks'
+-- --     print (here, prog)
+--     return (memory, prog)
 
 compileOrDieX
     :: FilePath
@@ -195,16 +195,16 @@ writeBlob
 writeBlob = do
     undefined
 
-aaaargh :: ExtendedInstruction Int Int   (Address Int)
-        -> ExtendedInstruction Int Word16 Word8
-aaaargh = runIdentity . go
-    where
-    go (EIJump   lbl) = pure $ EIJump lbl
-    go (EISimple i)   = EISimple <$> mapInstruction unAddr fromIntegral i
-    go  EIReturn      = pure EIReturn
-
-    unAddr (WordAddr a) = pure $ fromIntegral a
-    unAddr (BitAddr  a) = pure $ fromIntegral a
+-- aaaargh :: ExtendedInstruction Int Int   (Address Int)
+--         -> ExtendedInstruction Int Word16 Word8
+-- aaaargh = runIdentity . go
+--     where
+--     go (EIJump   lbl) = pure $ EIJump lbl
+--     go (EISimple i)   = EISimple <$> mapInstruction unAddr fromIntegral i
+--     go  EIReturn      = pure EIReturn
+-- 
+--     unAddr (WordAddr a) = pure $ fromIntegral a
+--     unAddr (BitAddr  a) = pure $ fromIntegral a
 
 --------------------------------------------------------------------------------
 
