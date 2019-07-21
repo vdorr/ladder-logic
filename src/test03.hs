@@ -135,7 +135,7 @@ compileOrDie
           , [ExtendedInstruction Int Int (Address Int)]
           )
 compileOrDie fn = do
-    (_pragmas, blocks) <- parseOrDie5 fn
+    (_pragmas, blocks) <- parseOrDie5 parseSimpleDevice2 fn
     Right (blocks', memory)
         <- return $ runStateT (traverse (traverse allocateMemory) blocks) emptyMemory
 --     print (here, memory)

@@ -45,14 +45,14 @@ getSignals sg vect trace =
 
 compileForTest
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
-    => [(Maybe lbl, Cofree (Diagram Void (Dev String) lbl) DgExt)]
+    => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
     -> IO [ExtendedInstruction Int Int String]
-compileForTest = generateStk2xx parseOp emitBasicDevice literalFromInt
+compileForTest = generateStk2xx pure emitBasicDevice literalFromInt
 
 runLadderTest
     :: Bool
     -> LadderTest
-    -> [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
+    -> [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
     -> IO Bool
 runLadderTest verbose test@T01{} ast = do
     when verbose $ print here
@@ -86,47 +86,55 @@ ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
          -> Cofree (Diagram c (Dev String) String) a
 ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
 
+ldUnpack1 :: Cofree (Diagram c op Text) a
+         -> Cofree (Diagram c op String) a
+ldUnpack1 (a :< n) = a :< fmap ldUnpack1 (mapDg id (id) unpack n)
+
 --------------------------------------------------------------------------------
 
 -- |return pragmas
 parseOrDie5
-    :: FilePath
-    -> IO ( [String] -- leading pragmas
-          , [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
-          )
-parseOrDie5 path = do
-    lxs         <- lexFile path
-    ast         <- parseOrDie2 $ dropWhitespace lxs
-    let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
-    ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
-    return (pragmas, ast')
-
--- |return pragmas
-parseOrDie6
     :: DeviceParser Text dev
     -> FilePath
     -> IO ( [String] -- leading pragmas
-          , [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
+          , [(Maybe String, Cofree (Diagram Void dev String) DgExt)]
           )
-parseOrDie6 devParse path = do
+parseOrDie5 devP path = do
     lxs         <- lexFile path
-    ast         <- parseOrDie2 $ dropWhitespace lxs
+    ast         <- parseOrDie2 devP $ dropWhitespace lxs
     let pragmas  = fmap unpack $ getLeadingPragmas $ dropPos lxs
-    ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
-    return (pragmas, ast')
+--     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
+    return (pragmas, ast)
+
+
+-- parseOrDie2
+--     :: [(Int, [((Int, Int), Tok Text)])]
+--     -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
+-- parseOrDie2 lxs = do
+--     let blocks = labeledRungs lxs
+--     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
+-- 
+--     where
+--     -- |assuming comments and pragmas were filtered out
+--     parseOrDie lxs = do
+--         case runLadderParser_ parseSimpleDevice ladder lxs of
+--             Right ast -> return $ ldUnpack ast
+--             Left  err -> fail $ show (here, err)
 
 parseOrDie2
-    :: [(Int, [((Int, Int), Tok Text)])]
-    -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
-parseOrDie2 lxs = do
+    :: DeviceParser Text dev
+    -> [(Int, [((Int, Int), Tok Text)])]
+    -> IO [(Maybe String
+        , Cofree (Diagram Void dev String) DgExt)]
+parseOrDie2 devP lxs = do
     let blocks = labeledRungs lxs
     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
 
     where
     -- |assuming comments and pragmas were filtered out
     parseOrDie lxs = do
-        case runLadderParser_ parseSimpleDevice ladder lxs of
-            Right ast -> return $ ldUnpack ast
+        case runLadderParser_ devP ladder lxs of
+            Right ast -> return $ ldUnpack1 ast
             Left  err -> fail $ show (here, err)
 
 lexFile :: FilePath -> IO [(Int, [((Int, Int), Tok Text)])]

@@ -617,7 +617,7 @@ fileTests path
                             Right _ -> return ()
                             Left err -> fail err
                 Just t -> do
-                    ast <- parseOrDie2 lxs
+                    ast <- parseOrDie2 parseSimpleDevice2 lxs
                     passed <- runLadderTest False t ast
                     passed @?= True
 

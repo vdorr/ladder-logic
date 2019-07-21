@@ -37,7 +37,7 @@ main = do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 for_ (zpToList zp) (print . (here,))
-                case runLadderParser ladderLiberal lxs'' of
+                case runLadderParser wrapDevice3 ladderLiberal lxs'' of
                     Left err -> print (here, err)
                     Right (_ast, zp1) -> do
                         print (here, "--------------------------------------------------")
