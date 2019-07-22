@@ -1,4 +1,27 @@
 
+{ T01
+  \{ testVect =
+    [ (2, [("temp", I 40),("cool", X False),("heat", X False)])
+    , (1, [("temp", I 50)])
+    , (1, [("temp", I 60)])
+    , (1, [("temp", I 70)])
+    , (1, [("temp", I 60)])
+    , (1, [("temp", I 50)])
+    , (1, [("temp", I 40)])
+    ]
+  , watch    = ["cool", "heat"]
+  , expected =
+    [ [X False, X False]
+    , [X False, X False]
+    , [X False, X False]
+    , [X False, X False]
+    , [X False, X False]
+    , [X False, X False]
+    , [X False, X False]
+    , [X False, X False]]
+  \}
+}
+
 |  temp           cool
 +--[>]------------(S)-
 |  57
