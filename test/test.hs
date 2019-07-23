@@ -75,10 +75,14 @@ isEmpty :: (Eq a, Monoid a) => a -> Bool
 isEmpty = (==mempty)
 
 checkSyntax :: Text -> Either String ()
-checkSyntax s = () <$ (preproc5'' s >>= runLadderParser_ wrapDevice3 ladder)
+checkSyntax s
+    = () <$
+    (preproc5'' s >>= runLadderParser_ (wrapDevice3 (pure.fromIntegral) (pure.fromIntegral)) ladder)
 
 assertFullyConsumed :: [(Int, [((Int, Int), Tok Text)])] -> Assertion
-assertFullyConsumed tk = (() <$ runLadderParser wrapDevice3 ladder tk) @?= Right ()
+assertFullyConsumed tk
+    = (() <$ runLadderParser (wrapDevice3 (pure.fromIntegral) (pure.fromIntegral)) ladder tk)
+    @?= Right ()
 
 --------------------------------------------------------------------------------
 
@@ -620,8 +624,13 @@ fileTests path
                             Right _ -> return ()
                             Left err -> fail err
                 Just t -> do
-                    ast <- parseOrDie2 parseSimpleDevice lxs
-                    passed <- runLadderTest False t ast
+                    ast <- parseOrDie2
+                            (wrapDevice3
+                                    (pure)
+                                    (undefined) --litFromAddr
+                                    )
+                            lxs --parseSimpleDevice
+                    passed <- runLadderTest2 False t ast
                     passed @?= True
 
 --------------------------------------------------------------------------------

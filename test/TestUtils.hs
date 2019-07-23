@@ -43,28 +43,71 @@ getSignals sg vect trace =
 
 --------------------------------------------------------------------------------
 
+emitDevice03
+    :: ([(CellType, Operand Text)], DeviceImpl Int String)
+    -> [Instruction Int String]
+emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
+                            Left err -> error $ show (here, err)
+                            Right x -> x
+    where
+    unAddr :: (CellType, Operand Text) -> Operand String
+    unAddr (_, Var a) = Var $ unpack a
+    unAddr (_, Lit i) = Lit i
+
 compileForTest
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
     => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
     -> IO [ExtendedInstruction Int Int String]
 compileForTest = generateStk2xx pure emitBasicDevice literalFromInt
 
+compileForTest03
+    :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
+    => [(Maybe lbl, Cofree (Diagram Void
+            (([(CellType, Operand Text)], DeviceImpl Int String))
+            lbl) DgExt)]
+    -> IO [ExtendedInstruction Int Int String]
+compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt
+
+--------------------------------------------------------------------------------
+runLadderTest2
+    :: Bool
+    -> LadderTest
+    -> [(Maybe String
+            , Cofree (Diagram Void 
+                    (([(CellType, Operand Text)], DeviceImpl Int String))
+                    String) DgExt)]
+    -> IO Bool
+runLadderTest2 verbose test ast = do
+--     undefined
+    when verbose $ print here
+
+    prog <- compileForTest03 ast
+    runLadderTestX verbose test prog
+
 runLadderTest
     :: Bool
     -> LadderTest
     -> [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
     -> IO Bool
-runLadderTest verbose test@T01{} ast = do
+runLadderTest verbose test ast = do
     when verbose $ print here
 
-    prog' <- compileForTest ast
+    prog <- compileForTest ast
+    runLadderTestX verbose test prog
+
+runLadderTestX
+    :: Bool
+    -> LadderTest
+    -> [ExtendedInstruction Int Int String]
+    -> IO Bool
+runLadderTestX verbose test@T01{} prog = do
 
     let allSigs = testVectSignals (testVect test)
 --TODO select signals for display independently from signals for test evaluation
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
 
-    let xxy = evalTestVect''' prog' allSigs (testVect test)
+    let xxy = evalTestVect''' prog allSigs (testVect test)
 
     when verbose $ print (here, xxy)
     let Right traces = xxy

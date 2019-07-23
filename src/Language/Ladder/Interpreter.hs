@@ -313,8 +313,9 @@ data DeviceDescription n impl = DDesc !n ![(RW, CellType)] !impl
 
 type DeviceImpl word addr = [Operand addr] -> Either String [Instruction word addr]
 
-type Devices word addr name = (Integral word, Integral addr, IsString name)
-    => [(DevType name,
+type Devices word addr name =
+--    (Integral word, Integral addr, IsString name) => 
+    [(DevType name,
             DeviceDescription name (DeviceImpl word addr)
             )]
 
@@ -325,18 +326,28 @@ type Devices word addr name = (Integral word, Integral addr, IsString name)
 --             DeviceDescription
 --                 name
 --                 ([Operand addr] -> Either a [Instruction word addr]))]
-devices :: Devices word addr name
-devices =
+devices
+    :: IsString name
+    => (Int -> Either String word)
+    -> (addr -> Either String word)
+    -> Devices word addr name
+devices mkWord litFromAddr =
     [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
     , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
     , (Contact_ ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
         (\[a, b] -> do
+--             a' <- case a of
+--                  Lit i -> pure [ILdCnA (fromIntegral i)]
+--                  Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
+--             b' <- case b of
+--                  Lit i -> pure [ILdCnA (fromIntegral i)]
+--                  Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
             a' <- case a of
-                 Lit i -> pure [ILdCnA (fromIntegral i)]
-                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
+                 Lit i -> mkWord i >>= \i' -> pure [ILdCnA i']
+                 Var addr -> litFromAddr addr >>= \addr' -> pure [ILdCnA addr', ILdM]
             b' <- case b of
-                 Lit i -> pure [ILdCnA (fromIntegral i)]
-                 Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
+                 Lit i -> mkWord i >>= \i' -> pure [ILdCnA i']
+                 Var addr -> litFromAddr addr >>= \addr' -> pure [ILdCnA addr', ILdM]
             Right $ a' ++ b' ++ [IGt]))
     , (Contact_ "<", DDesc "LT" [(Rd, Word), (Rd, Word)] (\[Var a] -> undefined))
 
