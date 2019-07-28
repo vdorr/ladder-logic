@@ -24,6 +24,7 @@ data CellType = Bit | TwoBits | Word -- | TON | TOF
 data V
     = X !Bool
     | I !Int
+    | A !String --FIXME parametrize
     deriving (Show, Read, Eq)
 
 -- data V2 = T | F | I Int
@@ -220,7 +221,7 @@ generateStk2' literalFromInt doDevice ast' = do
 
 --------------------------------------------------------------------------------
 
-type Program a = [ExtendedInstruction Int Int a]
+type Program a = [ExtendedInstruction Int V a]
 
 -- data Trigger = Periodic Int | Memory String
 data Task a = Task { nextRun, priority, period :: Int, program :: Program a }
@@ -252,7 +253,7 @@ run (clk, tasks, st0)
 
 execute :: (Eq address, Show address)
          => Memory address
-        -> [ExtendedInstruction Int Int address]
+        -> [ExtendedInstruction Int V address]
         -> Either (ItpSt address, String) (Memory address)
 execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     where
@@ -275,7 +276,7 @@ type ItpSt a = ([Bool], [V], Memory a)
 
 eval :: (Eq address, Show address)
      => ItpSt address
-     -> Instruction Int address
+     -> Instruction V address
      -> Either
          (ItpSt address, String)
          (ItpSt address)

@@ -44,8 +44,8 @@ getSignals sg vect trace =
 --------------------------------------------------------------------------------
 
 emitDevice03
-    :: ([(CellType, Operand Text)], DeviceImpl Int String)
-    -> [Instruction Int String]
+    :: ([(CellType, Operand Text)], DeviceImpl V String)
+    -> [Instruction V String]
 emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
                             Left err -> error $ show (here, err)
                             Right x -> x
@@ -57,16 +57,16 @@ emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
 compileForTest
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
     => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
-    -> IO [ExtendedInstruction Int Int String]
-compileForTest = generateStk2xx pure emitBasicDevice literalFromInt
+    -> IO [ExtendedInstruction Int V String]
+compileForTest = generateStk2xx pure emitBasicDevice literalFromInt2
 
 compileForTest03
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
     => [(Maybe lbl, Cofree (Diagram Void
-            (([(CellType, Operand Text)], DeviceImpl Int String))
+            (([(CellType, Operand Text)], DeviceImpl V String))
             lbl) DgExt)]
-    -> IO [ExtendedInstruction Int Int String]
-compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt
+    -> IO [ExtendedInstruction Int V String]
+compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt2
 
 --------------------------------------------------------------------------------
 
@@ -75,7 +75,7 @@ runLadderTest2
     -> LadderTest
     -> [(Maybe String
             , Cofree (Diagram Void 
-                    (([(CellType, Operand Text)], DeviceImpl Int String))
+                    (([(CellType, Operand Text)], DeviceImpl V String))
                     String) DgExt)]
     -> IO Bool
 runLadderTest2 verbose test ast = do
@@ -99,7 +99,7 @@ runLadderTest verbose test ast = do
 runLadderTestX
     :: Bool
     -> LadderTest
-    -> [ExtendedInstruction Int Int String]
+    -> [ExtendedInstruction Int V String]
     -> IO Bool
 runLadderTestX verbose test@T01{} prog = do
 

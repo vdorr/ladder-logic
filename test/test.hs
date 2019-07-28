@@ -33,6 +33,7 @@ import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Simple
+import Language.Ladder.Interpreter
 
 -- import Debug.Trace
 
@@ -626,8 +627,8 @@ fileTests path
                 Just t -> do
                     ast <- parseOrDie2
                             (wrapDevice3
-                                    (pure)
-                                    (undefined) -- _ :: String -> Either String Int
+                                    (pure . I)
+                                    (pure . A) -- _ :: String -> Either String Int
                                     --litFromAddr
                                     )
                             lxs --parseSimpleDevice

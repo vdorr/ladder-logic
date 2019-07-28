@@ -259,10 +259,10 @@ nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
 generateStk1
     :: Cofree (Diagram () (Dev String) String) DgExt
-    -> IO [ExtendedInstruction String Int String]
+    -> IO [ExtendedInstruction String V String]
 generateStk1 ast = (EISimple <$>) <$> generateStk ast
 
-generateStk :: Cofree (Diagram () (Dev String) String) DgExt -> IO [Instruction Int String]
+generateStk :: Cofree (Diagram () (Dev String) String) DgExt -> IO [Instruction V String]
 generateStk ast' = do
     let Right ast = parseOpsM ast'
 
@@ -308,7 +308,7 @@ generateStk ast' = do
 
 evalTestVect'''
     :: (Eq addr, Show addr)
-    => [ExtendedInstruction Int Int addr] -- ^program
+    => [ExtendedInstruction Int V addr] -- ^program
     -> [addr] -- ^watched memory variables
     -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
     -> Either (Memory addr, String) [[V]]

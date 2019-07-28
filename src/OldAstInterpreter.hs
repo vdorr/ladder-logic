@@ -177,13 +177,13 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
-evalBlock :: [Instruction Int String]
+evalBlock :: [Instruction V String]
           -> ItpSt String
           -> Either (ItpSt String, String) (ItpSt String)
 evalBlock p st = foldlM eval st p
 
 evalTestVect''
-    :: [Instruction Int String] -- ^program
+    :: [Instruction V String] -- ^program
     -> [VarName] -- ^watched memory variables
     -> [(Int, [(VarName, V)])] -- ^test vector
     -> Either (Memory String, String) [[V]]

@@ -97,6 +97,9 @@ wrapDevice3 mkWord litFromAddr d
 literalFromInt :: (Bounded a, Integral a) => Int -> IO a
 literalFromInt i = return $ fromIntegral i --TODO check range
 
+literalFromInt2 :: Int -> IO V
+literalFromInt2 i = return $ I $ fromIntegral i --TODO check range
+
 generateStk2xx
     :: (Show addr, Show word, Show lbl, Eq lbl)
     => (dev -> Either String x)
