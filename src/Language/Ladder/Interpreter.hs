@@ -23,10 +23,10 @@ data CellType = Bit | TwoBits | Word -- | TON | TOF
     deriving (Show, Read, Eq, Ord)
 
 -- |Memory cell value, also represents its type and default value
-data V
+data V addr
     = X !Bool
     | I !Int
-    | A !String --FIXME parametrize
+    | A !addr
     deriving (Show, Read, Eq)
 
 -- data V2 = T | F | I Int
@@ -223,7 +223,7 @@ generateStk2' literalFromInt doDevice ast' = do
 
 --------------------------------------------------------------------------------
 
-type Program a = [ExtendedInstruction Int V a]
+type Program a = [ExtendedInstruction Int (V a) a]
 
 -- data Trigger = Periodic Int | Memory String
 data Task a = Task { nextRun, priority, period :: Int, program :: Program a }
@@ -255,7 +255,7 @@ run (clk, tasks, st0)
 
 execute :: (Eq address, Show address)
          => Memory address
-        -> [ExtendedInstruction Int V address]
+        -> [ExtendedInstruction Int (V address) address]
         -> Either (ItpSt address, String) (Memory address)
 execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     where
@@ -272,13 +272,13 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
 
 --------------------------------------------------------------------------------
 
-type Memory a = [(a, V)]
+type Memory a = [(a, V a)]
 
-type ItpSt a = ([Bool], [V], Memory a)
+type ItpSt a = ([Bool], [V a], Memory a)
 
 eval :: (Eq address, Show address)
      => ItpSt address
-     -> Instruction V address
+     -> Instruction (V address) address
      -> Either
          (ItpSt address, String)
          (ItpSt address)
@@ -304,9 +304,9 @@ eval = f
 
     f st@(ws,   os, m) (ILdCnA k) = pure (ws,  k : os, m)
 
---     f st@(ws,   A a : os, m)  ILdM
---         | Just v <- lookup a m  = pure (ws, v : os, m)
---         | otherwise                 = Left (st, "invalid memory access")
+    f st@(ws,   A a : os, m)  ILdM
+        | Just v <- lookup a m  = pure (ws, v : os, m)
+        | otherwise                 = Left (st, "invalid memory access")
 
     f _                  i          = error $ show (here, i)
 

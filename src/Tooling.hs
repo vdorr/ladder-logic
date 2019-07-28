@@ -26,7 +26,7 @@ verbose = False
 --------------------------------------------------------------------------------
 
 --generates one screen, chopping might be done outside
-prettyTrace :: [(String, [V])] -> [String]
+prettyTrace :: [(String, [V addr])] -> [String]
 prettyTrace trace = x ++ ticks
     where
     ticks = case trace of
@@ -39,7 +39,7 @@ prettyTrace trace = x ++ ticks
     pad s = replicate (w - length s) ' ' ++ s
 
 -- "_▅_▅▅▅_"
-sparkline :: [V] -> String
+sparkline :: [V addr] -> String
 sparkline trace = fmap (bar.asInt) trace
     where
 --     trace' = fmap asInt trace
@@ -72,16 +72,16 @@ V0_│_▂▃▄▅▆▇█▇▆▅▄▃▂__
               1s/div
 -}
 
-flattenTestVect :: TestVect addr -> [[(addr, V)]]
+flattenTestVect :: TestVect addr -> [[(addr, V addr)]]
 flattenTestVect [] = []
 flattenTestVect ((d, v) : xs)
     | d >= 1    = [v] ++ replicate (d - 1) [] ++ flattenTestVect xs
     | otherwise = flattenTestVect xs
 
-updateMemory :: Eq addr => [(addr, V)] -> [(addr, V)] -> [(addr, V)]
+updateMemory :: Eq addr => [(addr, V addr)] -> [(addr, V addr)] -> [(addr, V addr)]
 updateMemory old new = nubBy (on (==) fst) $ new ++ old --yeah performace be damned
 
-type TestVect addr = [(Int, [(addr, V)])]
+type TestVect addr = [(Int, [(addr, (V addr))])]
 -- type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
 
@@ -259,10 +259,12 @@ nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
 generateStk1
     :: Cofree (Diagram () (Dev String) String) DgExt
-    -> IO [ExtendedInstruction String V String]
+    -> IO [ExtendedInstruction String (V String) String]
 generateStk1 ast = (EISimple <$>) <$> generateStk ast
 
-generateStk :: Cofree (Diagram () (Dev String) String) DgExt -> IO [Instruction V String]
+generateStk
+    :: Cofree (Diagram () (Dev String) String) DgExt
+    -> IO [Instruction (V String) String]
 generateStk ast' = do
     let Right ast = parseOpsM ast'
 
@@ -308,10 +310,10 @@ generateStk ast' = do
 
 evalTestVect'''
     :: (Eq addr, Show addr)
-    => [ExtendedInstruction Int V addr] -- ^program
+    => [ExtendedInstruction Int (V addr) addr] -- ^program
     -> [addr] -- ^watched memory variables
     -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
-    -> Either (Memory addr, String) [[V]]
+    -> Either (Memory addr, String) [[V addr]]
 evalTestVect''' prog' watch vect
 
     = case foldlM step ([], p) vect' of

@@ -24,28 +24,28 @@ import Tooling
 --------------------------------------------------------------------------------
 
 data LadderTest = T01
-    { testVect :: [(Int, [(String, V)])]
+    { testVect :: [(Int, [(String, V String)])]
     , watch :: [String]
-    , expected :: [[V]]
+    , expected :: [[V String]]
     } deriving (Show, Read)
 
 --------------------------------------------------------------------------------
 
-getSignal :: Eq addr => addr -> TestVect addr -> [[V]] -> [[V]]
+getSignal :: Eq addr => addr -> TestVect addr -> [[V addr]] -> [[V addr]]
 getSignal _ []               = const []
 getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))
     where
     Just i = findIndex ((s==) . fst) slice
 
-getSignals :: Eq addr => [addr] -> TestVect addr -> [[V]] -> [[V]]
+getSignals :: Eq addr => [addr] -> TestVect addr -> [[V addr]] -> [[V addr]]
 getSignals sg vect trace = 
     foldMap (\s -> getSignal s vect trace) sg
 
 --------------------------------------------------------------------------------
 
 emitDevice03
-    :: ([(CellType, Operand Text)], DeviceImpl V String)
-    -> [Instruction V String]
+    :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
+    -> [Instruction (V String) String]
 emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
                             Left err -> error $ show (here, err)
                             Right x -> x
@@ -57,15 +57,15 @@ emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
 compileForTest
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
     => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
-    -> IO [ExtendedInstruction Int V String]
+    -> IO [ExtendedInstruction Int (V String) String]
 compileForTest = generateStk2xx pure emitBasicDevice literalFromInt2
 
 compileForTest03
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
     => [(Maybe lbl, Cofree (Diagram Void
-            (([(CellType, Operand Text)], DeviceImpl V String))
+            (([(CellType, Operand Text)], DeviceImpl (V String) String))
             lbl) DgExt)]
-    -> IO [ExtendedInstruction Int V String]
+    -> IO [ExtendedInstruction Int (V String) String]
 compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt2
 
 --------------------------------------------------------------------------------
@@ -75,7 +75,7 @@ runLadderTest2
     -> LadderTest
     -> [(Maybe String
             , Cofree (Diagram Void 
-                    (([(CellType, Operand Text)], DeviceImpl V String))
+                    (([(CellType, Operand Text)], DeviceImpl (V String) String))
                     String) DgExt)]
     -> IO Bool
 runLadderTest2 verbose test ast = do
@@ -99,7 +99,7 @@ runLadderTest verbose test ast = do
 runLadderTestX
     :: Bool
     -> LadderTest
-    -> [ExtendedInstruction Int V String]
+    -> [ExtendedInstruction Int (V String) String]
     -> IO Bool
 runLadderTestX verbose test@T01{} prog = do
 

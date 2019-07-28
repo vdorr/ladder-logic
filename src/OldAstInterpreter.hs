@@ -79,16 +79,16 @@ ffff (st, op, cnt) r src (p :< x) = f x
 evalTestVect
     :: [(D, [E (Op String (Operand String))])] -- ^network to evaluate
     -> [VarName]                      -- ^watched memory variables
-    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
-    -> [[V]]       -- ^resulting trace, elems are same length as watch list
+    -> [(Int, [(VarName, V String)])]        -- ^test vector (duration, stimuli)
+    -> [[V String]]       -- ^resulting trace, elems are same length as watch list
 evalTestVect net = evalTestVect' (network' net)
 
 --Foldable?
 evalTestVect'
-    :: ([(String, V)] -> [(VarName, V)]) -- ^network to evaluate
+    :: ([(String, V String)] -> [(VarName, V String)]) -- ^network to evaluate
     -> [VarName]                      -- ^watched memory variables
-    -> [(Int, [(VarName, V)])]        -- ^test vector (duration, stimuli)
-    -> [[V]]       -- ^resulting trace, elems are same length as watch list
+    -> [(Int, [(VarName, V String)])]        -- ^test vector (duration, stimuli)
+    -> [[V String]]       -- ^resulting trace, elems are same length as watch list
 evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
     where
 
@@ -105,8 +105,8 @@ evalTestVect' prog watch vect = fst $ foldl step ([], []) vect'
 --TODO replace lookup by iorefs
 network
     :: [(D, [E (Op String (Operand String))])]
-    -> [(String, V)]
-    -> ([(Int, Bool)], [(String, V)])
+    -> [(String, V String)]
+    -> ([(Int, Bool)], [(String, V String)])
 network net m0
     = foldl (\(m, r) -> f m r) ([], m0) net
     where
@@ -177,16 +177,16 @@ tsort ks xs = do
 
 --------------------------------------------------------------------------------
 
-evalBlock :: [Instruction V String]
+evalBlock :: [Instruction (V String) String]
           -> ItpSt String
           -> Either (ItpSt String, String) (ItpSt String)
 evalBlock p st = foldlM eval st p
 
 evalTestVect''
-    :: [Instruction V String] -- ^program
+    :: [Instruction (V String) String] -- ^program
     -> [VarName] -- ^watched memory variables
-    -> [(Int, [(VarName, V)])] -- ^test vector
-    -> Either (Memory String, String) [[V]]
+    -> [(Int, [(VarName, V String)])] -- ^test vector
+    -> Either (Memory String, String) [[V String]]
 evalTestVect'' prog watch vect
     = case foldlM step ([], ([],[],[])) vect' of
         Left _ -> undefined
