@@ -6,6 +6,9 @@
 import qualified Data.Text.IO as TIO
 import System.Environment (getArgs)
 
+import Language.Ladder.Interpreter --FIXME
+import Language.Ladder.Simple --FIXME
+
 import TestUtils
 
 --------------------------------------------------------------------------------
@@ -19,7 +22,7 @@ main = do
         Just test -> do
             print (here, test)
             TIO.putStrLn src
-            ast <- parseOrDie2 lxs
-            passed <- runLadderTest True test ast
+            ast <- parseOrDie2 (wrapDevice3 (pure . I) (pure . A)) lxs
+            passed <- runLadderTest2 False test ast
             print (here, passed, if passed then "PASSED" else "FAILED")
         Nothing -> print (here, "no embedded test found")
