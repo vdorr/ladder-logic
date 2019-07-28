@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, RankNTypes #-}
+{-# LANGUAGE OverloadedStrings, RankNTypes, FlexibleInstances #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.Interpreter where
@@ -9,6 +9,8 @@ import Control.Monad.Writer.Strict
 import Data.List
 import Data.String
 import Data.Void
+
+import qualified Control.Monad.Fail --FIXME
 
 import Language.Ladder.DiagramParser (DgExt)
 import Language.Ladder.LadderParser
@@ -300,6 +302,12 @@ eval = f
     f st@(a:b:ws, os, m) IOr        = pure ((a || b) : ws, os, m)
     f st@(a:ws,   os, m) INot       = pure (not a : ws,  os, m)
 
+    f st@(ws,   os, m) (ILdCnA k) = pure (ws,  k : os, m)
+
+--     f st@(ws,   A a : os, m)  ILdM
+--         | Just v <- lookup a m  = pure (ws, v : os, m)
+--         | otherwise                 = Left (st, "invalid memory access")
+
     f _                  i          = error $ show (here, i)
 
 --     f    (ItSt ws     os         m) (ILdArg o) = pure $ ItSt ws (o:os) m
@@ -322,6 +330,10 @@ type Devices word addr name =
             DeviceDescription name (DeviceImpl word addr)
             )]
 
+--OUCH!!!
+instance Control.Monad.Fail.MonadFail (Either String) where
+    fail = Left
+
 --backend for this interpreter
 -- devices
 --     :: (Integral word, Integral addr, IsString name)
@@ -339,25 +351,30 @@ devices mkWord litFromAddr =
     , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
     , (Contact_ ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
         (\[a, b] -> do
---             a' <- case a of
---                  Lit i -> pure [ILdCnA (fromIntegral i)]
---                  Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
---             b' <- case b of
---                  Lit i -> pure [ILdCnA (fromIntegral i)]
---                  Var addr -> pure [ILdCnA (fromIntegral addr), ILdM]
-            a' <- case a of
-                 Lit i -> mkWord i >>= \i' -> pure [ILdCnA i']
-                 Var addr -> litFromAddr addr >>= \addr' -> pure [ILdCnA addr', ILdM]
-            b' <- case b of
-                 Lit i -> mkWord i >>= \i' -> pure [ILdCnA i']
-                 Var addr -> litFromAddr addr >>= \addr' -> pure [ILdCnA addr', ILdM]
+            a' <- emitOp a
+            b' <- emitOp b
             Right $ a' ++ b' ++ [IGt]))
-    , (Contact_ "<", DDesc "LT" [(Rd, Word), (Rd, Word)] (\[Var a] -> undefined))
+    , (Contact_ "<", DDesc "LT" [(Rd, Word), (Rd, Word)]
+        (\ops -> do
+            [a, b] <- for ops emitOp
+            Right $ a ++ b ++ [ILt]))
 
     , (Coil_    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
     , (Coil_    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
-    , (Coil_    "S", DDesc "SET"  [(Wr, Bit)] (\[Var a] -> undefined))
-    , (Coil_    "R", DDesc "RST"  [(Wr, Bit)] (\[Var a] -> undefined))
+    , (Coil_    "S", DDesc "SET"  [(Wr, Bit)]
+        (\[Var a] -> Right [ILdBit a, IOr, IStBit a]))
+    , (Coil_    "R", DDesc "RST"  [(Wr, Bit)]
+        (\[Var a] -> Right [INot, ILdBit a, IAnd, IStBit a]))
     ]
+    where
+    emitOp a = case a of
+                 Lit i -> mkWord i >>= \i' -> pure [ILdCnA i']
+                 Var addr -> litFromAddr addr >>= \addr' -> Right [ILdCnA addr', ILdM]
+
+-- w m m'
+-- 0 0 0
+-- 0 1 1
+-- 1 0 0
+-- 1 1 0
 
 --------------------------------------------------------------------------------
