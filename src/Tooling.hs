@@ -317,8 +317,8 @@ evalTestVect'''
 evalTestVect''' prog' watch vect
 
     = case foldlM step ([], p) vect' of
-        Left  _      -> error here
-        Right (y, _) -> return y
+        Left  (_st, err) -> error $ show (here, err)
+        Right (y, _)     -> return y
     where
 
     vect' = flattenTestVect vect

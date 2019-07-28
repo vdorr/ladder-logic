@@ -293,11 +293,11 @@ eval = f
     f    (_:ws, os, m)   IDrop      = pure (ws, os, m)
     f st@(ws,   os, m)  (ILdBit a)
         | Just (X v) <- lookup a m  = pure (v : ws, os, m)
-        | otherwise                 = Left (st, "invalid memory access")
+        | otherwise                 = Left (st, show (here, "invalid memory access", a))
     f st@(w:ws, os, m)  (IStBit a)
         | (m0,(_,X _):m1) <- break ((==a) . fst) m
                                     = pure (w : ws, os, (m0 ++ (a, X w) : m1))
-        | otherwise                 = Left (st, "invalid memory access")
+        | otherwise                 = Left (st, show (here, "invalid memory access", a))
     f st@(a:b:ws, os, m) IAnd       = pure ((a && b) : ws, os, m)
     f st@(a:b:ws, os, m) IOr        = pure ((a || b) : ws, os, m)
     f st@(a:ws,   os, m) INot       = pure (not a : ws,  os, m)
@@ -306,7 +306,10 @@ eval = f
 
     f st@(ws,   A a : os, m)  ILdM
         | Just v <- lookup a m  = pure (ws, v : os, m)
-        | otherwise                 = Left (st, "invalid memory access")
+        | otherwise                 = Left (st, show (here, "invalid memory access", a))
+
+    f st@(ws,   I a : I b : os, m)  IGt = pure (ws,  X (a > b) : os, m)
+    f st@(ws,   I a : I b : os, m)  ILt = pure (ws,  X (a < b) : os, m)
 
     f _                  i          = error $ show (here, i)
 
