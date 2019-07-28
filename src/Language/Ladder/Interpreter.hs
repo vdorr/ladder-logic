@@ -66,6 +66,26 @@ data Instruction w a
 
 --------------------------------------------------------------------------------
 
+--get rid of text
+resolveLabels
+    :: (Show lbl, Eq lbl)
+    => [(Maybe lbl, [ExtendedInstruction lbl w a])]
+    -> Either String [ExtendedInstruction Int w a]
+resolveLabels l = for (foldMap snd l) g
+    where
+    l' = fmap (fmap length) l
+
+    (_, l'') = foldl f (0, []) l'
+    f (acc, xs) (lbl, blkLen) = (acc + blkLen, (lbl, acc) : xs)
+
+    g (EIJump lbl) = case lookup (Just lbl) l'' of
+                       Just a  -> Right (EIJump a)
+                       Nothing -> Left $ show (here, lbl)
+    g (EISimple i) = Right (EISimple i)
+    g  EIReturn    = Right EIReturn
+
+--------------------------------------------------------------------------------
+
 -- could hide writer monad stuff
 -- or data I m  = I { ldOn :: m () }
 --not that i need monad, monoid or even semigroup would do the job
@@ -88,24 +108,6 @@ class I d m where
 --     , emPick :: Int -> m ()
 --     , emDup :: m ()
 --     }
-
---get rid of text
-resolveLabels
-    :: (Show lbl, Eq lbl)
-    => [(Maybe lbl, [ExtendedInstruction lbl w a])]
-    -> Either String [ExtendedInstruction Int w a]
-resolveLabels l = for (foldMap snd l) g
-    where
-    l' = fmap (fmap length) l
-
-    (_, l'') = foldl f (0, []) l'
-    f (acc, xs) (lbl, blkLen) = (acc + blkLen, (lbl, acc) : xs)
-
-    g (EIJump lbl) = case lookup (Just lbl) l'' of
-                       Just a  -> Right (EIJump a)
-                       Nothing -> Left $ show (here, lbl)
-    g (EISimple i) = Right (EISimple i)
-    g  EIReturn    = Right EIReturn
 
 --------------------------------------------------------------------------------
 

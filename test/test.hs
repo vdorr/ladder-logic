@@ -627,7 +627,8 @@ fileTests path
                     ast <- parseOrDie2
                             (wrapDevice3
                                     (pure)
-                                    (undefined) --litFromAddr
+                                    (undefined) -- _ :: String -> Either String Int
+                                    --litFromAddr
                                     )
                             lxs --parseSimpleDevice
                     passed <- runLadderTest2 False t ast

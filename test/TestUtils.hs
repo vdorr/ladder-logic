@@ -69,6 +69,7 @@ compileForTest03
 compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt
 
 --------------------------------------------------------------------------------
+
 runLadderTest2
     :: Bool
     -> LadderTest
