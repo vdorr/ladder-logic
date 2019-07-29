@@ -40,6 +40,8 @@ prettyTrace trace = x ++ ticks
 
 -- "_▅_▅▅▅_"
 sparkline :: [V addr] -> String
+sparkline = sparkline2
+#if 0
 sparkline trace = fmap (bar.asInt) trace
     where
 --     trace' = fmap asInt trace
@@ -48,9 +50,42 @@ sparkline trace = fmap (bar.asInt) trace
     asInt _ = 0 --FIXME implement integers
 --     asInt (I i)     = i
     bar = ("_▂▃▄▅▆▇█" !!)
+#endif
+
+sparkline2 :: [V addr] -> String
+sparkline2 [] = []
+sparkline2 trace@(I _ : _) = fmap (bar.asInt) values
+    where
+    values = (`fmap` trace) $ \case
+                                     I x -> x
+                                     _ -> 0
+    l = minimum values
+    m = maximum values
+    k = abs $ (m - l) `div` 6
+    asInt i = (i - l) `div` k
+sparkline2 trace@(X _ : _) = fmap (bar.asInt) trace
+    where
+    asInt (X True)  = 5
+    asInt _ = 0
+sparkline2 _ = undefined
+
+bar :: Int -> Char
+bar = ("_▂▃▄▅▆▇█" !!)
 
 {-
 
+├ ─
+
+├─
+
+      ├─
+│ │   └─
+
+  │_▅_▅▅▅_
+  │_▅▅_▅__
+  │ 
+
+  
   |_▅_▅▅▅_
   |_▅▅_▅__
   ╵ 

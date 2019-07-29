@@ -568,7 +568,30 @@ otherTests = testGroup "Other tests"
     , testCase "fold ast" $
         fold (() :< Nothing)
             @=? ()
+    , testCase "get signal 0" $
+        getSignal "x" vect trace1
+            @?= [[I 2],[I 5]]
+    , testCase "get signal 1" $
+        getSignal "y" vect trace1
+            @?= [[I 3], [I 5]]
+    , testCase "get signal 1" $
+        getSignals ["x", "y"] vect trace1
+            @?= [[I 3, I 3], [I 5, I 3]]
     ]
+    where
+    vect = [ (1, [("v", I 0), ("x", X False), ("y", X False)])
+               , (1, [("v", I 5)])
+               , (1, [("v", I 10)])
+               , (1, [("v", I 20)])
+               ]
+--   , watch    = ["x", "y"]
+    trace1 =
+        [ [I 1,I 2,I 3]
+        , [I 4,I 5,I 5]
+        ]
+--     xxx = [[X False, X True], [X False, X True], [X False, X False], [X True, X False]]
+--     expected0 = fmap ((:[]) . (!! 0)) xxx
+--     expected1 = fmap ((:[]) . (!! 1)) xxx
 
 --------------------------------------------------------------------------------
 

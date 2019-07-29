@@ -1,0 +1,21 @@
+(* --- test 18 --- *)
+
+{ T01
+  \{ testVect =
+               [ (1, [("v", I 0), ("x", X False), ("y", X False)])
+               , (1, [("v", I 5)])
+               , (1, [("v", I 10)])
+               , (1, [("v", I 20)])
+               ]
+  , watch    = ["x", "y"]
+  , expected = [[X False, X True], [X False, X True], [X False, X False], [X True, X False]]
+  \}
+}
+
+
+|  v     x
++--[>]---( )--
+|  10
+|  v     y
++--[<]---( )--
+|  10

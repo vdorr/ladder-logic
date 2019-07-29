@@ -31,6 +31,7 @@ data LadderTest = T01
 
 --------------------------------------------------------------------------------
 
+--FIXME should not be that specialized
 getSignal :: Eq addr => addr -> TestVect addr -> [[V addr]] -> [[V addr]]
 getSignal _ []               = const []
 getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))

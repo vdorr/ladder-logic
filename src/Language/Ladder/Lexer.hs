@@ -56,7 +56,16 @@ blockcomment : '(*' anychar* '*)'
 pragma       : '{' anychar* '}'
 
 -}
+{-
 
+├ ─
+
+├─
+
+      ├─
+│ │   └─
+
+-}
 
 -- |Diagram token
 --rule: control statements (jump) are followed by EOL

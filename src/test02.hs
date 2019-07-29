@@ -23,6 +23,6 @@ main = do
             print (here, test)
             TIO.putStrLn src
             ast <- parseOrDie2 (wrapDevice3 (pure . I) (pure . A)) lxs
-            passed <- runLadderTest2 False test ast
+            passed <- runLadderTest2 True test ast
             print (here, passed, if passed then "PASSED" else "FAILED")
         Nothing -> print (here, "no embedded test found")

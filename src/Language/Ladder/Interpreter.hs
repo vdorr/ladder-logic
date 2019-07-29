@@ -308,8 +308,8 @@ eval = f
         | Just v <- lookup a m  = pure (ws, v : os, m)
         | otherwise                 = Left (st, show (here, "invalid memory access", a))
 
-    f st@(ws,   I a : I b : os, m)  IGt = pure (ws,  X (a > b) : os, m)
-    f st@(ws,   I a : I b : os, m)  ILt = pure (ws,  X (a < b) : os, m)
+    f st@(ws,   I b : I a : os, m)  IGt = pure ((a > b) : ws,  os, m)
+    f st@(ws,   I b : I a : os, m)  ILt = pure ((a < b) : ws,  os, m)
 
     f _                  i          = error $ show (here, i)
 
