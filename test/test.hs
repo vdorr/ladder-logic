@@ -574,9 +574,9 @@ otherTests = testGroup "Other tests"
     , testCase "get signal 1" $
         getSignal "y" vect trace1
             @?= [[I 3], [I 5]]
-    , testCase "get signal 1" $
+    , testCase "get signals" $
         getSignals ["x", "y"] vect trace1
-            @?= [[I 3, I 3], [I 5, I 3]]
+            @?= [[I 2, I 3], [I 5, I 5]]
     ]
     where
     vect = [ (1, [("v", I 0), ("x", X False), ("y", X False)])

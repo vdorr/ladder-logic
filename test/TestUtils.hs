@@ -38,9 +38,16 @@ getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))
     where
     Just i = findIndex ((s==) . fst) slice
 
+getSignal1 :: Eq addr => addr -> TestVect addr -> [[V addr]] -> [V addr]
+getSignal1 _ []               = const []
+getSignal1 s ((_, slice) : _) = fmap (!!i)
+    where
+    Just i = findIndex ((s==) . fst) slice
+
 getSignals :: Eq addr => [addr] -> TestVect addr -> [[V addr]] -> [[V addr]]
 getSignals sg vect trace = 
-    foldMap (\s -> getSignal s vect trace) sg
+    transpose $ fmap (\s -> getSignal1 s vect trace) sg
+--     foldMap (\s -> getSignal s vect trace) sg
 
 --------------------------------------------------------------------------------
 
