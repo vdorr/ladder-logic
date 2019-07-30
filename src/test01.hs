@@ -12,6 +12,7 @@ import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Simple
+import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
@@ -37,7 +38,7 @@ main = do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 for_ (zpToList zp) (print . (here,))
-                case runLadderParser wrapDevice3 ladderLiberal lxs'' of
+                case runLadderParser deviceThing ladderLiberal lxs'' of
                     Left err -> print (here, err)
                     Right (_ast, zp1) -> do
                         print (here, "--------------------------------------------------")
@@ -45,3 +46,5 @@ main = do
                         print (here, "--------------------------------------------------")
                         TIO.putStrLn src
                         print (here, "--------------------------------------------------")
+    where
+    deviceThing = wrapDevice3 (pure . I) (pure . A)

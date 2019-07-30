@@ -1,13 +1,17 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
+{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Ladder.DiagramParser where
 
 import Prelude hiding (fail)
 import Control.Monad.Fail
-import Control.Applicative hiding (fail)
+import Control.Applicative
 import Control.Monad hiding (fail)
 import Data.Maybe
 import Data.Traversable
+
+import Control.Monad.Except hiding (fail)
+import Control.Monad.State hiding (fail)
 
 import Language.Ladder.Zipper
 
@@ -28,38 +32,56 @@ dgTrim (Zp l r) = Zp (trim l) (trim r)
 
 --------------------------------------------------------------------------------
 
---XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
-newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
+-- #if 0
+-- {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+-- --XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
+-- newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
+-- 
+-- instance Functor (SFM s) where
+--     fmap = ap . return
+-- 
+-- instance Applicative (SFM s) where
+--     pure = return
+--     (<*>) = ap
+-- 
+-- instance Monad (SFM s) where
+--     return a = SFM $ \s -> return (a, s)
+--     a >>= b = SFM $ \s -> do
+--         (y, s') <- sfm a s
+--         sfm (b y) s'
+-- 
+-- instance MonadFail (SFM s) where
+--     fail = SFM . const . Left
+-- 
+-- instance Alternative (SFM s) where
+--     empty = SFM $ const $ Left "alt empty"
+--     a <|> b = SFM $ \s -> --sfm a s <|> sfm b s
+--                 either (const $ sfm b s) Right (sfm a s)
+-- 
+-- -- get :: SFM s s
+-- -- get = SFM $ \s -> return (s, s)
+-- -- 
+-- -- put :: s -> SFM s ()
+-- -- put s = SFM $ \_ -> return ((), s)
+-- -- 
+-- -- modify :: (s -> s) -> SFM s ()
+-- -- modify f = f <$> get >>= put
+-- 
+-- instance MonadState s (SFM s) where
+--     get = SFM $ \s -> Right (s, s)
+--     put s = SFM $ \_ -> Right ((), s)
+--     state f = SFM $ \s -> Right $ f s
+-- #endif
 
-instance Functor (SFM s) where
-    fmap = ap . return
+--------------------------------------------------------------------------------
 
-instance Applicative (SFM s) where
-    pure = return
-    (<*>) = ap
+type SFM s = StateT s (Either String)
 
-instance Monad (SFM s) where
-    return a = SFM $ \s -> return (a, s)
-    a >>= b = SFM $ \s -> do
-        (y, s') <- sfm a s
-        sfm (b y) s'
+sfm :: SFM s a -> s -> Either String (a, s)
+sfm = runStateT
 
-instance MonadFail (SFM s) where
-    fail = SFM . const . Left
-
-instance Alternative (SFM s) where
-    empty = SFM $ const $ Left "alt empty"
-    a <|> b = SFM $ \s -> --sfm a s <|> sfm b s
-                either (const $ sfm b s) Right (sfm a s)
-
-get :: SFM s s
-get = SFM $ \s -> return (s, s)
-
-put :: s -> SFM s ()
-put s = SFM $ \_ -> return ((), s)
-
-modify :: (s -> s) -> SFM s ()
-modify f = f <$> get >>= put
+instance Control.Monad.Fail.MonadFail (Either String) where
+    fail = Left
 
 --------------------------------------------------------------------------------
 
@@ -93,8 +115,8 @@ applyDgp p dg st = sfm p (DgPSt goRight dg Nothing True st)
 --------------------------------------------------------------------------------
 
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
-move_ ln co dg = maybe (Left here) return (move ln co dg)
--- move_ ln co dg = maybe (Left here) return (moveNotCursed ln co dg)
+move_ ln co dg = maybe (throwError here) return (move ln co dg)
+-- move_ ln co dg = maybe (throwError here) return (moveNotCursed ln co dg)
 
 --FIXME should move only to direct neigbour
 -- (by using single step to exact position it probably works already)
@@ -121,7 +143,7 @@ step = do
     DgPSt f zp ps True st <- get --if nothing is focused, currentPos makes no sense
     case f origin zp of
         Right zp' -> put (DgPSt f zp' ps True st)
-        Left  err -> fail here --or not?
+        Left  _err -> fail here --or not?
 
 setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPos (ln, (co, _)) = do
@@ -136,8 +158,8 @@ setPosOrBlur (ln, (co, _)) = do
     DgPSt b zp ps _ st <- get
     let zp' = move ln co zp --FIXME can only move to direct neighbour!!!!!!!
     put $ case zp' of
-        Just zp' -> DgPSt b zp' ps True  st
-        Nothing  -> DgPSt b zp  ps False st
+        Just zp'' -> DgPSt b zp'' ps True  st
+        Nothing   -> DgPSt b zp   ps False st
 
 --------------------------------------------------------------------------------
 
@@ -151,10 +173,10 @@ eat :: SFM (DgPState st tok) tok
 eat = do
     DgPSt nx dg ps True st <- get
     case dgPop dg of
-        Just (v, pos, dg') -> do
-            put $ case nx pos dg' of
-                Right q -> DgPSt nx q   (Just pos) True  st
-                Left  _ -> DgPSt nx dg' (Just pos) False st --nowhere to move
+        Just (v, p, dg') -> do
+            put $ case nx p dg' of
+                Right q -> DgPSt nx q   (Just p) True  st
+                Left  _ -> DgPSt nx dg' (Just p) False st --nowhere to move
             return v
         Nothing -> fail $ show (here, ps)
 
@@ -234,7 +256,7 @@ branch isFork branches = do
         <|> return Nothing --step fail if there's nothing in desired direction
     setPos origin --eat `fork`
 --     setDir dir0 --restore direction, good for parsing boxes
-    eat --FIXME set direction!!!!!!!!!!!!!
+    _ <- eat --FIXME set direction!!!!!!!!!!!!!
     return $ catMaybes stuff
 
 -- branch'
@@ -256,6 +278,7 @@ branch isFork branches = do
 --     return (f, stuff)
 
 -- |Matches diagram with nothing remaining on current line
+pattern DgLineEnd :: Zp (a, Zp a1)
 pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
 
 -- |Succeeds only when positioned on end of line
@@ -279,6 +302,7 @@ dgPop (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
     = Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
 dgPop _ = Nothing
 
+pattern DgFocused :: b -> Zp (a, Zp (a1, b))
 pattern DgFocused x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
 
 cursor :: Dg a -> Maybe a
@@ -286,7 +310,8 @@ cursor (DgFocused x) = Just x
 cursor _             = Nothing
 
 -- |Match on current token position
-pattern DgFocusedPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), x) : _)) : _)
+pattern DgFocusedPos :: a -> a1 -> b -> Zp (a, Zp ((a1, b), b1))
+pattern DgFocusedPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), _) : _)) : _)
 
 pos :: Dg a -> Maybe (Int, (Int, Int))
 pos (DgFocusedPos ln cl cr) = Just (ln, (cl, cr))
@@ -303,6 +328,7 @@ mkDgZp = Zp [] . fmap (fmap (Zp []))
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col = (moveToLine line >=> moveToCol col) . focusDg --FIXME get rid of focusing
 
+pattern DgLine :: [(a, b)] -> a -> b -> [(a, b)] -> Zp (a, b)
 pattern DgLine us ln zp ds = Zp us ((ln, zp) : ds)
 
 --FIXME merge with moveToLine somehow?

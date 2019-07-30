@@ -24,6 +24,8 @@ import Data.Void
 -- import Data.Bifunctor
 import Data.Function
 
+import Control.Monad.State hiding (fail)
+
 import Language.Ladder.Utils
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser

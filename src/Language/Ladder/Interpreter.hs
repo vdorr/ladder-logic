@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, RankNTypes, FlexibleInstances #-}
+{-# LANGUAGE RankNTypes, FlexibleInstances #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.Interpreter where
@@ -29,7 +29,7 @@ data V addr
     | A !addr
     deriving (Show, Read, Eq)
 
--- data V2 = T | F | I Int
+-- data V2 addr = T | F | I !Int | A !addr
 --     deriving (Show, Read, Eq)
 
 --------------------------------------------------------------------------------
@@ -191,11 +191,12 @@ generateStk2'
     , Show addr
     , Show word
 --     , Show device
+    , Monad m
     )
-    => (Int -> IO word)
+    => (Int -> m word)
     -> (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
-    -> IO [ExtendedInstruction lbl word addr]
+    -> m [ExtendedInstruction lbl word addr]
 generateStk2' literalFromInt doDevice ast' = do
     let ast = dropEnd ast'
     --collapse nodes
@@ -206,20 +207,7 @@ generateStk2' literalFromInt doDevice ast' = do
     let a6 = sortOn position a5
     let a7 = tsort3 a6
 
-    code <- execWriterT $ foldlM (genStk tell doDevice) [] a7 --need failure here
---     when verbose1 $ do
---         print (here, "-----------------------")
---         for_ a1 print
---         print (here, "nodes", "-----------------------")
---         for_ nodes print
---         print (here, "after sort on position", "-----------------------")
---         for_ a6 print
---         print (here, "after tsort2", "-----------------------")
---         for_ a7 print
---         print (here, "-----------------------")
---         for_ code print
---         print (here, "-----------------------")
-    return code
+    execWriterT $ foldlM (genStk tell doDevice) [] a7 --need failure here
 
 --------------------------------------------------------------------------------
 
@@ -262,7 +250,7 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
 
     f []               st = return st
     f (EIReturn   : _) st = return st
-    f (EIJump lbl : p) st@(w:ws, os, m)
+    f (EIJump lbl : p) (w:ws, os, m)
         | w               = nextLabel lbl ([], [], m) --XXX beware! jump clears stacks!
         | otherwise       = f p (ws, os, m)
     f (EIJump _ : _) _    = error here --stack underflow FIXME proper fail
@@ -298,18 +286,18 @@ eval = f
         | (m0,(_,X _):m1) <- break ((==a) . fst) m
                                     = pure (w : ws, os, (m0 ++ (a, X w) : m1))
         | otherwise                 = Left (st, show (here, "invalid memory access", a))
-    f st@(a:b:ws, os, m) IAnd       = pure ((a && b) : ws, os, m)
-    f st@(a:b:ws, os, m) IOr        = pure ((a || b) : ws, os, m)
-    f st@(a:ws,   os, m) INot       = pure (not a : ws,  os, m)
+    f (a:b:ws, os, m) IAnd       = pure ((a && b) : ws, os, m)
+    f (a:b:ws, os, m) IOr        = pure ((a || b) : ws, os, m)
+    f (a:ws,   os, m) INot       = pure (not a : ws,  os, m)
 
-    f st@(ws,   os, m) (ILdCnA k) = pure (ws,  k : os, m)
+    f (ws,   os, m) (ILdCnA k) = pure (ws,  k : os, m)
 
-    f st@(ws,   A a : os, m)  ILdM
+    f st@(ws,   A a : os, m) ILdM
         | Just v <- lookup a m  = pure (ws, v : os, m)
         | otherwise                 = Left (st, show (here, "invalid memory access", a))
 
-    f st@(ws,   I b : I a : os, m)  IGt = pure ((a > b) : ws,  os, m)
-    f st@(ws,   I b : I a : os, m)  ILt = pure ((a < b) : ws,  os, m)
+    f (ws,   I b : I a : os, m)  IGt = pure ((a > b) : ws,  os, m)
+    f (ws,   I b : I a : os, m)  ILt = pure ((a < b) : ws,  os, m)
 
     f _                  i          = error $ show (here, i)
 
@@ -323,61 +311,47 @@ eval = f
 data RW = Rd | Wr
     deriving (Show)
 
-data DeviceDescription n impl = DDesc !n ![(RW, CellType)] !impl
+data DeviceDescription n impl = DDesc !String ![(RW, CellType)] !impl
 
 type DeviceImpl word addr = [Operand addr] -> Either String [Instruction word addr]
 
 type Devices word addr name =
---    (Integral word, Integral addr, IsString name) => 
-    [(DevType name,
-            DeviceDescription name (DeviceImpl word addr)
-            )]
+    [(DevType name, DeviceDescription name (DeviceImpl word addr))]
 
 --OUCH!!!
-instance Control.Monad.Fail.MonadFail (Either String) where
-    fail = Left
+-- instance Control.Monad.Fail.MonadFail (Either String) where
+--     fail = Left
 
---backend for this interpreter
--- devices
---     :: (Integral word, Integral addr, IsString name)
---     => [(DevType name,
---             DeviceDescription
---                 name
---                 ([Operand addr] -> Either a [Instruction word addr]))]
 devices
     :: IsString name
     => (Int -> Either String word)
     -> (addr -> Either String word)
     -> Devices word addr name
 devices mkWord litFromAddr =
-    [ (Contact_ " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
-    , (Contact_ "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
-    , (Contact_ ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
+    [ (cont " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
+    , (cont "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
+    , (cont ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
         (\[a, b] -> do
             a' <- emitOp a
             b' <- emitOp b
             Right $ a' ++ b' ++ [IGt]))
-    , (Contact_ "<", DDesc "LT" [(Rd, Word), (Rd, Word)]
+    , (cont "<", DDesc "LT" [(Rd, Word), (Rd, Word)]
         (\ops -> do
             [a, b] <- for ops emitOp
             Right $ a ++ b ++ [ILt]))
 
-    , (Coil_    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
-    , (Coil_    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
-    , (Coil_    "S", DDesc "SET"  [(Wr, Bit)]
+    , (coil    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
+    , (coil    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
+    , (coil    "S", DDesc "SET"  [(Wr, Bit)]
         (\[Var a] -> Right [ILdBit a, IOr, IStBit a]))
-    , (Coil_    "R", DDesc "RST"  [(Wr, Bit)]
+    , (coil    "R", DDesc "RST"  [(Wr, Bit)]
         (\[Var a] -> Right [INot, ILdBit a, IAnd, IStBit a]))
     ]
     where
+    cont = Contact_ . fromString 
+    coil = Coil_ . fromString 
     emitOp a = case a of
                  Lit i -> mkWord i >>= \i' -> pure [ILdCnA i']
                  Var addr -> litFromAddr addr >>= \addr' -> Right [ILdCnA addr', ILdM]
-
--- w m m'
--- 0 0 0
--- 0 1 1
--- 1 0 0
--- 1 1 0
 
 --------------------------------------------------------------------------------

@@ -120,13 +120,17 @@ compileOrDieX
           , [ExtendedInstruction Int Word16 Word8]
           )
 compileOrDieX fn = do
-    (_pragmas, blocks) <- parseOrDie5 wrapDevice3 fn
+--     ast <- parseOrDie2 (wrapDevice3 (pure . I) (pure . A)) lxs
+--     (_pragmas, blocks) <- parseOrDie5 wrapDevice3 fn
+    (_pragmas, blocks) <- parseOrDie5 deviceThing fn
     let doMem ast = runStateT (traverse (traverse allocateMemory2) ast) emptyMemory
     Right (blocks', memory) <- return $ doMem blocks
 --     print (here, memory)
     prog <- generateStk2xx pure emitDevice02 literalFromInt blocks'
 --     print (here, prog)
     return (memory, prog)
+    where
+    deviceThing = wrapDevice3 (pure . fromIntegral) (pure . fromIntegral)
 
 writeBlob
     :: FilePath
