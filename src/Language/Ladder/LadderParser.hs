@@ -34,15 +34,15 @@ import Language.Ladder.DiagramParser
 
 -- |Ladder AST type
 data Diagram continuation device label a
-    = Source a   -- ^start of power rail
+    = Source !a   -- ^start of power rail
     | Sink       -- ^where wire connects to (implied) right rail
     | End        -- ^where vertical left rail ends at the bottom
 --     | Stub       -- ^intersection of hline and node
-    | Device device a
-    | Jump   label
-    | Node   [a] --order matters here
-    | Cont   continuation a
-    | Conn   continuation
+    | Device !device !a
+    | Jump   !label
+    | Node   ![a] --order matters here
+    | Cont   !continuation !a
+    | Conn   !continuation
     deriving (Show, Functor, Eq, Foldable, Traversable)
 
 mapDg :: (c -> c') -> (d -> d') -> (s -> s') -> Diagram c d s a -> Diagram c' d' s' a
@@ -83,7 +83,7 @@ data DevType t
 data LdPCtx m text device = LdPCtx
     {
 --         ctxHasSndOp :: DevType text -> m DevOpFlag
-      ctxMkDev :: DevType text -> m (DevOpFlag, [Operand text] -> m device)
+      ctxMkDev :: !(DevType text -> m (DevOpFlag, [Operand text] -> m device))
     }
     -- '+' node positions, maybe
 

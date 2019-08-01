@@ -12,7 +12,7 @@ import Hedgehog.Range
 import System.Environment
 
 -- import Data.List
--- import Data.Ord
+import Data.Void
 import Control.Monad
 import NeatInterpolation
 import Data.Text (Text, pack, unpack)
@@ -37,7 +37,7 @@ import Language.Ladder.Interpreter
 
 import Language.Ladder.OldBackend --FIXME
 
--- import Debug.Trace
+import Tooling
 
 import TestUtils
 
@@ -80,11 +80,12 @@ isEmpty = (==mempty)
 checkSyntax :: Text -> Either String ()
 checkSyntax s
     = () <$
-    (preproc5'' s >>= runLadderParser_ (wrapDevice3 (pure.fromIntegral) (pure.fromIntegral)) ladder)
+    (preproc5'' s >>=
+        runLadderParser_ wrapDeviceForTest ladder)
 
 assertFullyConsumed :: [(Int, [((Int, Int), Tok Text)])] -> Assertion
 assertFullyConsumed tk
-    = (() <$ runLadderParser (wrapDevice3 (pure.fromIntegral) (pure.fromIntegral)) ladder tk)
+    = (() <$ runLadderParser wrapDeviceForTest ladder tk)
     @?= Right ()
 
 --------------------------------------------------------------------------------
@@ -581,6 +582,7 @@ otherTests = testGroup "Other tests"
             @?= [[I 2, I 3], [I 5, I 5]]
     ]
     where
+    vect :: TestVect String
     vect = [ (1, [("v", I 0), ("x", X False), ("y", X False)])
                , (1, [("v", I 5)])
                , (1, [("v", I 10)])
@@ -616,6 +618,18 @@ getTests = do
 
 --------------------------------------------------------------------------------
 
+parseForTestOrDie
+    :: [(Int, [((Int, Int), Tok Text)])]
+    -> IO [ ( Maybe String
+            , Cofree
+                (Diagram Void ([(CellType, Operand Text)], DeviceImpl (V addr) addr) String)
+                DgExt)]
+parseForTestOrDie = parseOrDie2 wrapDeviceForTest
+
+wrapDeviceForTest
+    :: DeviceParser Text ([(CellType, Operand Text)], DeviceImpl (V addr) addr)
+wrapDeviceForTest = wrapDevice3 (pure . I) (pure . A)
+
 testFromDirectory :: FilePath -> TestName -> (FilePath -> IO TestTree) -> IO TestTree
 testFromDirectory path name mkCase = do
     files <- filter ((".txt"==).takeExtension) <$> listDirectory path
@@ -633,14 +647,12 @@ fileTestsNeg path
                      print (here, fn, err)
                      return () --preproc failed -> test succeeeded
                  Right lxs ->
-                    case (dgTrim. snd) <$> runLadderParser parseSimpleDevice ladder lxs of
-                        Right (Zp [] []) -> assertFailure here
-                        Left err -> do
-                            print (here, fn, err)
-                            return ()
-                        err -> do
-                            print (here, fn, err)
-                            return ()
+                    case fmap dgTrim <$> runLadderParser parseSimpleDevice ladder lxs of
+                        Right (_ast, Zp [] []) -> do
+                            _ast <- parseForTestOrDie lxs
+                            assertFailure here
+                        Left _err -> return ()
+                        _err -> return ()
 
 
 fileTests :: FilePath -> IO TestTree
@@ -656,13 +668,7 @@ fileTests path
                             Right _ -> return ()
                             Left err -> fail err
                 Just t -> do
-                    ast <- parseOrDie2
-                            (wrapDevice3
-                                    (pure . I)
-                                    (pure . A) -- _ :: String -> Either String Int
-                                    --litFromAddr
-                                    )
-                            lxs --parseSimpleDevice
+                    ast <- parseForTestOrDie lxs
                     passed <- runLadderTest2 False t ast
                     passed @?= True
 
