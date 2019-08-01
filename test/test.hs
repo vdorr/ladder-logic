@@ -662,9 +662,9 @@ fileTestsNeg path
                         Left  _err -> return ()
                         Right ast   -> do
                             case compileForTest03 ast of
-                                 Left _err -> return ()
-                                 Right _ -> do
-                                     assertFailure here
+                                 Left err | length err > 0 -> return ()
+                                 Left _err  -> assertFailure here
+                                 Right _ -> assertFailure here
 
 
 fileTests :: FilePath -> IO TestTree
