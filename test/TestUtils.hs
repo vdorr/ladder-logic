@@ -72,12 +72,13 @@ compileForTest
 compileForTest = either fail pure . generateStk2xx pure emitBasicDevice literalFromInt2
 
 compileForTest03
-    :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
+    :: (Show lbl, Eq lbl, MonadError String m, Monad m)
     => [(Maybe lbl, Cofree (Diagram Void
             (([(CellType, Operand Text)], DeviceImpl (V String) String))
             lbl) DgExt)]
-    -> IO [ExtendedInstruction Int (V String) String]
-compileForTest03 = either fail pure . generateStk2xx pure emitDevice03 literalFromInt2
+    -> m [ExtendedInstruction Int (V String) String]
+compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt2
+-- compileForTest03 = either fail pure . generateStk2xx pure emitDevice03 literalFromInt2
 
 --------------------------------------------------------------------------------
 
@@ -93,7 +94,7 @@ runLadderTest2 verbose test ast = do
 --     undefined
     when verbose $ print here
 
-    prog <- compileForTest03 ast
+    prog <- either fail pure $ compileForTest03 ast
     runLadderTestX verbose test prog
 
 runLadderTest

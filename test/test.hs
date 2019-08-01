@@ -660,7 +660,11 @@ fileTestsNeg path
 --                             return ()
                     case parseOrDie2 wrapDeviceForTest lxs of
                         Left  _err -> return ()
-                        Right _x   -> assertFailure here
+                        Right ast   -> do
+                            case compileForTest03 ast of
+                                 Left _err -> return ()
+                                 Right _ -> do
+                                     assertFailure here
 
 
 fileTests :: FilePath -> IO TestTree
