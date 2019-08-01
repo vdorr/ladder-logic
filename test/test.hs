@@ -629,12 +629,18 @@ fileTestsNeg path
         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
             case preproc5' src of
-                 Left _ -> return () --preproc failed -> test succeeeded
+                 Left err -> do
+                     print (here, fn, err)
+                     return () --preproc failed -> test succeeeded
                  Right lxs ->
-                    case snd <$> runLadderParser parseSimpleDevice ladder lxs of
+                    case (dgTrim. snd) <$> runLadderParser parseSimpleDevice ladder lxs of
                         Right (Zp [] []) -> assertFailure here
-                        Left _ -> return ()
-                        _ -> return ()
+                        Left err -> do
+                            print (here, fn, err)
+                            return ()
+                        err -> do
+                            print (here, fn, err)
+                            return ()
 
 
 fileTests :: FilePath -> IO TestTree
