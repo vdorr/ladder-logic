@@ -19,6 +19,8 @@ import Language.Ladder.Utils
 import Language.Ladder.Interpreter
 import Language.Ladder.Simple
 
+import Language.Ladder.OldBackend --FIXME
+
 import Tooling
 
 --------------------------------------------------------------------------------
@@ -66,7 +68,7 @@ compileForTest
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
     => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
     -> IO [ExtendedInstruction Int (V String) String]
-compileForTest = generateStk2xx pure emitBasicDevice literalFromInt2
+compileForTest = either fail pure . generateStk2xx pure emitBasicDevice literalFromInt2
 
 compileForTest03
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
@@ -74,7 +76,7 @@ compileForTest03
             (([(CellType, Operand Text)], DeviceImpl (V String) String))
             lbl) DgExt)]
     -> IO [ExtendedInstruction Int (V String) String]
-compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt2
+compileForTest03 = either fail pure . generateStk2xx pure emitDevice03 literalFromInt2
 
 --------------------------------------------------------------------------------
 

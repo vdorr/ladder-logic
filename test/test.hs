@@ -35,6 +35,8 @@ import Language.Ladder.Utils
 import Language.Ladder.Simple
 import Language.Ladder.Interpreter
 
+import Language.Ladder.OldBackend --FIXME
+
 -- import Debug.Trace
 
 import TestUtils

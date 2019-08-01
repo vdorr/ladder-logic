@@ -81,6 +81,7 @@ data Tok a
     | FEdge            -- ^ as block input "---<"
 
 --     | Negated        -- on block i/o "---0|" or "|0---"
+--TODO count leading zeroes, or, store total number of chars - good for `lexemeLength`
     | Number       !Int --should probably be of type 'a'
     | Contact      !a   -- ^ "---[OP]---"
     | Coil         !a   -- ^ "---(OP)---"

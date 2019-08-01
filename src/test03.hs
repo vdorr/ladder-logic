@@ -28,6 +28,8 @@ import Language.Ladder.Interpreter
 import Language.Ladder.Target
 import Language.Ladder.Simple
 
+-- import Language.Ladder.OldBackend
+
 import TestUtils
 
 -- http://hackage.haskell.org/package/bits
@@ -41,12 +43,12 @@ asCArray = intercalate ", " . fmap (("0x"++) . flip showHex "") . L.unpack
 
 --------------------------------------------------------------------------------
 
-allocateMemory1
-    :: Cofree (Diagram c (Op s (Operand String)) s') a
-    -> Alloc
-        String
-        (Cofree (Diagram c (Op s (Operand (Address Int))) s') a)
-allocateMemory1 = mapDevsM (mapSimpleOpOperandA varFromOperand)
+-- allocateMemory1
+--     :: Cofree (Diagram c (Op s (Operand String)) s') a
+--     -> Alloc
+--         String
+--         (Cofree (Diagram c (Op s (Operand (Address Int))) s') a)
+-- allocateMemory1 = mapDevsM (mapSimpleOpOperandA varFromOperand)
 
 varFromOperand
     :: CellType
@@ -126,7 +128,9 @@ compileOrDieX fn = do
     let doMem ast = runStateT (traverse (traverse allocateMemory2) ast) emptyMemory
     Right (blocks', memory) <- return $ doMem blocks
 --     print (here, memory)
-    prog <- generateStk2xx pure emitDevice02 literalFromInt blocks'
+    prog <- case generateStk2xx pure emitDevice02 literalFromInt blocks' of
+                 Left err -> fail err
+                 Right x -> return x
 --     print (here, prog)
     return (memory, prog)
     where

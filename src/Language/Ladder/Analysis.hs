@@ -165,21 +165,6 @@ position (p :< _) = p
 
 --------------------------------------------------------------------------------
 
--- |Return list of annotations (usually positions) of 'Sink' nodes
-stubs
-    :: Cofree (Diagram c d s) p
-    -> [p]
-stubs (p :< a) = f a
-    where
-    f (Source a)   = stubs a
-    f  Sink        = [p]
-    f  End         = []
-    f (Device d a) = stubs a
-    f (Jump s)     = []
-    f (Node a)     = foldMap stubs a
-    f (Conn c    ) = [] --XXX i am not sure !!!
-    f (Cont c   a) = []
-
 --just remove initial Source and tree of Nodes
 --quite useless operation, i think
 forest

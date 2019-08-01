@@ -184,8 +184,6 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
 
 --------------------------------------------------------------------------------
 
-verbose1 = False
-
 generateStk2'
     :: (Show lbl, Eq lbl
     , Show addr
@@ -207,7 +205,7 @@ generateStk2' literalFromInt doDevice ast' = do
     let a6 = sortOn position a5
     let a7 = tsort3 a6
 
-    execWriterT $ foldlM (genStk tell doDevice) [] a7 --need failure here
+    execWriterT $ foldlM (genStk tell doDevice) [] a7
 
 --------------------------------------------------------------------------------
 
@@ -317,10 +315,6 @@ type DeviceImpl word addr = [Operand addr] -> Either String [Instruction word ad
 
 type Devices word addr name =
     [(DevType name, DeviceDescription name (DeviceImpl word addr))]
-
---OUCH!!!
--- instance Control.Monad.Fail.MonadFail (Either String) where
---     fail = Left
 
 devices
     :: IsString name

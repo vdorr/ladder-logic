@@ -14,10 +14,20 @@ import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Interpreter hiding (RW(..))
 import Language.Ladder.Simple --FIXME should not be imported here
+import Language.Ladder.OldBackend
 
 import Tooling
 
 -- import TestUtils
+
+--------------------------------------------------------------------------------
+
+vect01 :: TestVect String
+vect01 =
+    [ (2, [("a", X False),("b", X False),("c", X False),("d", X False)])
+    , (1, [("a", X True)])
+    , (1, [("a", X False)])
+    ]
 
 --------------------------------------------------------------------------------
 

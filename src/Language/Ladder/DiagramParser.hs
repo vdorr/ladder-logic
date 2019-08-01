@@ -163,12 +163,6 @@ setPosOrBlur (ln, (co, _)) = do
 
 --------------------------------------------------------------------------------
 
--- |Succeeds FIXME FIXME i am not sure when
-end :: SFM (DgPState st tok) ()
-end = do
-    Nothing <- (cursor . psStr) <$> get
-    return ()
-
 eat :: SFM (DgPState st tok) tok
 eat = do
     DgPSt nx dg ps True st <- get
@@ -179,6 +173,14 @@ eat = do
                 Left  _ -> DgPSt nx dg' (Just p) False st --nowhere to move
             return v
         Nothing -> fail $ show (here, ps)
+
+--------------------------------------------------------------------------------
+
+-- |Succeeds FIXME FIXME i am not sure when
+end :: SFM (DgPState st tok) ()
+end = do
+    Nothing <- (cursor . psStr) <$> get
+    return ()
 
 currentPosM :: SFM (DgPState st tok) (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
@@ -351,6 +353,7 @@ moveToCol col (DgLine us ln zp ds) = reassemble <$> move2 (dir col . fst) zp
     reassemble zp' = DgLine us ln zp' ds
 moveToCol _ _ = Nothing
 
+--FIXME get rid of focusing
 focusDg :: Dg a -> Dg a
 focusDg = fmap (fmap focus) . focus
 

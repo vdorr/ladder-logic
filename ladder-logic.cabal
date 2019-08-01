@@ -35,6 +35,7 @@ library
                      , Language.Ladder.Utils
                      , Language.Ladder.Target
                      , Language.Ladder.Simple
+                     , Language.Ladder.OldBackend
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
