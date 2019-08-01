@@ -77,7 +77,9 @@ compileForTest03
             (([(CellType, Operand Text)], DeviceImpl (V String) String))
             lbl) DgExt)]
     -> m [ExtendedInstruction Int (V String) String]
-compileForTest03 = generateStk2xx pure emitDevice03 literalFromInt2
+compileForTest03 ast = do
+    prog <- generateStk2xx pure emitDevice03 literalFromInt2 ast
+    return $ prog ++ [EIReturn]
 -- compileForTest03 = either fail pure . generateStk2xx pure emitDevice03 literalFromInt2
 
 --------------------------------------------------------------------------------
@@ -97,16 +99,16 @@ runLadderTest2 verbose test ast = do
     prog <- either fail pure $ compileForTest03 ast
     runLadderTestX verbose test prog
 
-runLadderTest
-    :: Bool
-    -> LadderTest
-    -> [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
-    -> IO Bool
-runLadderTest verbose test ast = do
-    when verbose $ print here
-
-    prog <- compileForTest ast
-    runLadderTestX verbose test prog
+-- runLadderTest
+--     :: Bool
+--     -> LadderTest
+--     -> [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
+--     -> IO Bool
+-- runLadderTest verbose test ast = do
+--     when verbose $ print here
+-- 
+--     prog <- compileForTest ast
+--     runLadderTestX verbose test prog
 
 runLadderTestX
     :: Bool

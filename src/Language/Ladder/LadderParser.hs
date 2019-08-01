@@ -228,11 +228,12 @@ eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
 hline' :: LdP d t (Cofree (Diagram c d t) DgExt)
 hline'
-    = some (hline2 <* option crossing)
---     *> (coil <|> contact <|> node <|> jump <|> eol2)
+--     = some (hline2 <* option crossing)
+--     *> (device <|> node <|> jump <|> eol2)
+--     where
+--     crossing = skipSome (isTok VLine) *> hline2
+    = some hline2
     *> (device <|> node <|> jump <|> eol2)
-    where
-    crossing = skipSome (isTok VLine) *> hline2
 
 jump :: LdP d t (Cofree (Diagram c d t) DgExt)
 jump = do
@@ -252,11 +253,11 @@ hline2 = do
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
 device = do
     pos <- currentPos
-    LdPCtx{..} <- psUser <$> get
+    usr <- psUser <$> get
     (ops, f) <-
         withOperands $ do
             dev <- coil' <|> contact'
-            Right (flag, mkDev) <- pure $ ctxMkDev dev
+            Right (flag, mkDev) <- pure $ ctxMkDev usr dev
             return (flag, mkDev)
     Right dev' <- pure $ f ops
     (pos :<) <$> (Device dev' <$> hline')

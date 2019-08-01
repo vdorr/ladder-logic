@@ -199,26 +199,19 @@ peek = do
 peekM :: SFM (DgPState st tok) (Maybe tok)
 peekM = (cursor . psStr) <$> get
 
---for VLine crossing impl
-skipSome :: (tok -> Bool) -> SFM (DgPState st tok) ()
-skipSome f
-    = peekM >>= \case
-         Just x | f x -> step >> skipSome f
-         _            -> return ()
-
--- |Step over lexeme or do nothing
-skip :: (tok -> Bool) -> SFM (DgPState st tok) ()
-skip f
-    = peekM >>= \case
-         Just x | f x -> step
-         _            -> return ()
-
--- -- |Step over lexeme or fail
--- skip' :: (tok -> Bool) -> SFM (DgPState st tok) ()
--- skip' f
+-- --for VLine crossing impl
+-- skipSome :: (tok -> Bool) -> SFM (DgPState st tok) ()
+-- skipSome f
+--     = peekM >>= \case
+--          Just x | f x -> step >> skipSome f
+--          _            -> return ()
+-- 
+-- -- |Step over lexeme or do nothing
+-- skip :: (tok -> Bool) -> SFM (DgPState st tok) ()
+-- skip f
 --     = peekM >>= \case
 --          Just x | f x -> step
---          _            -> fail here
+--          _            -> return ()
 -- 
 option :: SFM st a -> SFM st (Maybe a)
 option p = (Just <$> p) <|> pure Nothing
@@ -231,11 +224,6 @@ dgIsEmpty :: SFM (DgPState st tok) ()
 dgIsEmpty
     =   (dgNull . psStr) <$> get
     >>= (`when` fail (here ++ "not empty"))
---     = do
---         zp@(Zp zpl zpr) <- psStr <$> get
---         when (dgNull zp) $ do
---             forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)
---             error here
 
 {-
    |
