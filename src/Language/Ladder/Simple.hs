@@ -52,9 +52,6 @@ wrapDevice3 mkWord litFromAddr d
 
 --------------------------------------------------------------------------------
 
-literalFromInt :: (MonadError String m, Monad m, Bounded a, Integral a) => Int -> m a
-literalFromInt i = return $ fromIntegral i --TODO check range
-
 literalFromInt2 :: (MonadError String m, Monad m) => Int -> m (V String)
 literalFromInt2 i = return $ I $ fromIntegral i --TODO check range
 

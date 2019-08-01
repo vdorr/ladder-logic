@@ -624,7 +624,7 @@ parseForTestOrDie
             , Cofree
                 (Diagram Void ([(CellType, Operand Text)], DeviceImpl (V addr) addr) String)
                 DgExt)]
-parseForTestOrDie = parseOrDie2 wrapDeviceForTest
+parseForTestOrDie = either fail pure . parseOrDie2 wrapDeviceForTest
 
 wrapDeviceForTest
     :: DeviceParser Text ([(CellType, Operand Text)], DeviceImpl (V addr) addr)
@@ -646,13 +646,21 @@ fileTestsNeg path
                  Left err -> do
                      print (here, fn, err)
                      return () --preproc failed -> test succeeeded
-                 Right lxs ->
-                    case fmap dgTrim <$> runLadderParser parseSimpleDevice ladder lxs of
-                        Right (_ast, Zp [] []) -> do
-                            _ast <- parseForTestOrDie lxs
-                            assertFailure here
-                        Left _err -> return ()
-                        _err -> return ()
+                 Right lxs -> do
+--                     case fmap dgTrim <$> runLadderParser parseSimpleDevice ladder lxs of
+--                         Right (_ast, Zp [] []) -> do
+--                             _ast <- parseForTestOrDie lxs
+--                             print (here, fn, err)
+--                             assertFailure here
+--                         Left err -> do
+--                             print (here, fn, err)
+--                             return ()
+--                         err -> do
+--                             print (here, fn, err)
+--                             return ()
+                    case parseOrDie2 wrapDeviceForTest lxs of
+                        Left  _err -> return ()
+                        Right _x   -> assertFailure here
 
 
 fileTests :: FilePath -> IO TestTree

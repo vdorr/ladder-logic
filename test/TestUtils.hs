@@ -11,6 +11,7 @@ import Control.Applicative
 import Data.Traversable
 import Data.Semigroup
 import Data.Void
+import Control.Monad.Except
 
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
@@ -155,7 +156,9 @@ parseOrDie5
           )
 parseOrDie5 devP path = do
     lxs         <- lexFile path
-    ast         <- parseOrDie2 devP $ dropWhitespace lxs
+    ast         <- case parseOrDie2 devP $ dropWhitespace lxs of
+                        Left err -> fail err
+                        Right x -> return x
     let pragmas  = fmap unpack $ fmap mconcat <$> getLeadingPragmas $ dropPos lxs
 --     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
     return (pragmas, ast)
@@ -176,9 +179,10 @@ parseOrDie5 devP path = do
 --             Left  err -> fail $ show (here, err)
 
 parseOrDie2
-    :: DeviceParser Text dev
+    :: (MonadError String m, Monad m)
+    => DeviceParser Text dev
     -> [(Int, [((Int, Int), Tok Text)])]
-    -> IO [(Maybe String
+    -> m [(Maybe String
         , Cofree (Diagram Void dev String) DgExt)]
 parseOrDie2 devP lxs = do
     let blocks = labeledRungs lxs
@@ -189,7 +193,7 @@ parseOrDie2 devP lxs = do
     parseOrDie lxs = do
         case runLadderParser_ devP ladder lxs of
             Right ast -> return $ ldUnpack1 ast
-            Left  err -> fail $ show (here, err)
+            Left  err -> throwError $ show (here, err)
 
 lexFile :: FilePath -> IO [(Int, [((Int, Int), Tok Text)])]
 lexFile file = do

@@ -24,6 +24,10 @@ import Language.Ladder.LadderParser
 
 --------------------------------------------------------------------------------
 
+--XXX still needed?
+mapInstruction :: Applicative f =>
+                        (t1 -> f a)
+                        -> (t2 -> f w) -> Instruction t2 t1 -> f (Instruction w a)
 mapInstruction g h = f
     where
     f ITrap = pure ITrap
@@ -256,6 +260,11 @@ addCell mt@MemTrack{..} ty n
     new Bit     = let a = BitAddr  bitsSize  in (a, updated a 1 0)
     new TwoBits = let a = BitAddr  bitsSize  in (a, updated a 2 0)
     new Word    = let a = WordAddr wordsSize in (a, updated a 0 1)
+
+--------------------------------------------------------------------------------
+
+literalFromInt :: (MonadError String m, Monad m, Bounded a, Integral a) => Int -> m a
+literalFromInt i = return $ fromIntegral i --TODO check range
 
 --------------------------------------------------------------------------------
 
