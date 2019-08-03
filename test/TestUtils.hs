@@ -21,8 +21,6 @@ import Language.Ladder.Utils
 import Language.Ladder.Interpreter
 import Language.Ladder.Simple
 
--- import Language.Ladder.OldBackend --FIXME
-
 import Tooling
 
 --------------------------------------------------------------------------------
@@ -66,13 +64,11 @@ emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
     unAddr (_, Var a) = Var $ unpack a
     unAddr (_, Lit i) = Lit i
 
-#if 0
-compileForTest
-    :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
-    => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
-    -> IO [ExtendedInstruction Int (V String) String]
-compileForTest = either fail pure . generateStk2xx pure emitBasicDevice literalFromInt2
-#endif
+-- compileForTest
+--     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
+--     => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
+--     -> IO [ExtendedInstruction Int (V String) String]
+-- compileForTest = either fail pure . generateStk2xx pure emitBasicDevice literalFromInt2
 
 compileForTest03
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
@@ -105,17 +101,6 @@ runLadderTest2 verbose test ast = do
         for_ prog print
         print "---------------------------"
     runLadderTestX verbose test prog
-
--- runLadderTest
---     :: Bool
---     -> LadderTest
---     -> [(Maybe String, Cofree (Diagram Void (Op String (Operand String)) String) DgExt)]
---     -> IO Bool
--- runLadderTest verbose test ast = do
---     when verbose $ print here
--- 
---     prog <- compileForTest ast
---     runLadderTestX verbose test prog
 
 runLadderTestX
     :: Bool
@@ -173,21 +158,6 @@ parseOrDie5 devP path = do
 --     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
     return (pragmas, ast)
 
-
--- parseOrDie2
---     :: [(Int, [((Int, Int), Tok Text)])]
---     -> IO [(Maybe String, Cofree (Diagram Void (Dev String) String) DgExt)]
--- parseOrDie2 lxs = do
---     let blocks = labeledRungs lxs
---     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
--- 
---     where
---     -- |assuming comments and pragmas were filtered out
---     parseOrDie lxs = do
---         case runLadderParser_ parseSimpleDevice ladder lxs of
---             Right ast -> return $ ldUnpack ast
---             Left  err -> fail $ show (here, err)
-
 parseOrDie2
     :: (MonadError String m, Monad m)
     => DeviceParser Text dev
@@ -230,13 +200,6 @@ istopoM :: (a -> a -> Bool) -> [a] -> Maybe a
 istopoM dep (x : xs) = fst (pickFirst (dep x) xs) <|> istopoM dep xs
 istopoM _   []       = Nothing
 
--- isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe a
--- isSpatialOrTopo dep spa g = go g
---     where
---     go (x : xs : xss)
---         | spa x xs == LT || any (flip dep x) (xs:xss) = go (xs : xss)
---         | otherwise = Just x
---     go _ = Nothing
 isSpatialOrTopo :: (a -> a -> Bool) -> (a -> a -> Ordering) -> [a] -> Maybe (a, a)
 isSpatialOrTopo dep spa g = (,) <$> istopoM dep g <*> isSorted sources
     where
