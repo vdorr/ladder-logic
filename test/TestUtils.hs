@@ -21,7 +21,7 @@ import Language.Ladder.Utils
 import Language.Ladder.Interpreter
 import Language.Ladder.Simple
 
-import Language.Ladder.OldBackend --FIXME
+-- import Language.Ladder.OldBackend --FIXME
 
 import Tooling
 
@@ -200,8 +200,8 @@ parseOrDie2 devP lxs = do
 
     where
     -- |assuming comments and pragmas were filtered out
-    parseOrDie lxs = do
-        case runLadderParser_ devP ladder lxs of
+    parseOrDie lxs' = do
+        case runLadderParser_ devP ladder lxs' of
             Right ast -> return $ ldUnpack1 ast
             Left  err -> throwError $ show (here, err)
 
@@ -251,12 +251,12 @@ isSpatialOrTopo dep spa g = (,) <$> istopoM dep g <*> isSorted sources
     noPreds v = all (\w -> spa v w /= EQ && not (dep v w)) g
 
 
-iscycle :: (a -> a -> Bool) -> (a -> a -> Bool) -> a -> [a] -> Bool
-iscycle eq dep x = go x
+iscycle :: (a -> a -> Bool) -> a -> [a] -> Bool
+iscycle dep x = go x
     where
     go a as = case depend of
                    [] -> False
-                   d | any (dep x) depend -> True --flip dep?
+                   _ | any (dep x) depend -> True --flip dep?
                    _ -> any (flip go indep) depend
         where
         (depend, indep) = partition (flip dep a) as

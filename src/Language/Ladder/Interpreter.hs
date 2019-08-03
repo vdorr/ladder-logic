@@ -12,8 +12,6 @@ import Data.Void
 
 import qualified Control.Monad.Fail --FIXME
 
-import Debug.Trace
-
 import Language.Ladder.DiagramParser (DgExt)
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
@@ -139,7 +137,7 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
         f (_:stk)  Sink           = do
             return (nd:stk)
         f stk      End         = return (stk) --XXX emit Drop?
-        f (x:stk) (Device d b)    = do
+        f (_:stk) (Device d b)    = do
             emitDevice d
             go (nd:stk) b
         f (_:stk) (Jump s)        = do
@@ -157,13 +155,13 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
                      _ -> return ()
 
             let copiesOnStack = fmap (const nd) b
-            replicateM (length b - 1) $ emit [IDup]
+            replicateM_ (length b - 1) $ emit [IDup]
 
             foldlM
                 (go) --emit Dup's here? --so that stack level is kept low
                 (copiesOnStack ++ stk)
                 b
-        f (pp:stk) (Conn c)       = do
+        f (_:stk) (Conn _)       = do
             return (nd:stk)
         f stk      (Cont stubP b) = do
             case findIndex (isConn stubP) stk of
@@ -171,7 +169,7 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
                 Nothing -> error here --should not happen
             go (nd:stk) b --XXX not sure about nd on stack here
 
-        f stk n = error here -- $ show (here, stk, n)
+        f _stk _n = error here -- $ show (here, stk, n)
 
     isConn p0 (_ :< Conn p1) = p0 == p1
     isConn _   _             = False
@@ -192,11 +190,10 @@ generateStk2'
 --     , Show device
     , Monad m
     )
-    => (Int -> m word)
-    -> (device -> [Instruction word addr])
+    => (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
     -> m [ExtendedInstruction lbl word addr]
-generateStk2' literalFromInt doDevice ast' = do
+generateStk2' doDevice ast' = do
     let ast = dropEnd ast'
     --collapse nodes
     let (nodes, a0) = repositionSinks nodes <$> merge' ast

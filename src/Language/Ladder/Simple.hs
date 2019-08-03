@@ -82,7 +82,7 @@ generateStk2xx
     -> m [ExtendedInstruction Int word addr]
 generateStk2xx doOp emitDev litFromInt ast = do
     ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME liftEither
-    ast''  <- for ast' (traverse (generateStk2' litFromInt emitDev))
+    ast''  <- for ast' (traverse (generateStk2' emitDev))
     ast''' <- case resolveLabels ast'' of
                    Left err -> throwError err
                    Right x -> return x
