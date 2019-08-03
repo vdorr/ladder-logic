@@ -13,9 +13,7 @@ import Data.Binary.Get (Get)
 import Data.Word
 import Data.List
 import Data.Foldable
--- import Data.Traversable
 import qualified Data.Map.Lazy as M
--- import Data.Word
 import Control.Monad.State
 import Control.Monad.Except hiding (fail)
 
