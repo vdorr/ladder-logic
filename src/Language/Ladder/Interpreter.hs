@@ -12,6 +12,8 @@ import Data.Void
 
 import qualified Control.Monad.Fail --FIXME
 
+import Debug.Trace
+
 import Language.Ladder.DiagramParser (DgExt)
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
@@ -165,7 +167,7 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
             return (nd:stk)
         f stk      (Cont stubP b) = do
             case findIndex (isConn stubP) stk of
-                Just i  -> bringToTop (i) -- +100)
+                Just i  -> bringToTop' (i) -- +100)
                 Nothing -> error here --should not happen
             go (nd:stk) b --XXX not sure about nd on stack here
 
@@ -177,6 +179,9 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
 --     bringToTop 0 = emit [IDup] --return ()
     bringToTop 0 = return ()
     bringToTop i = emit [IPick i]
+
+--     bringToTop' 0 = emit [IDup] --return ()
+    bringToTop' i = emit [IPick i]
 
 --------------------------------------------------------------------------------
 
@@ -279,7 +284,8 @@ eval = f
         | otherwise                 = Left (st, show (here, "invalid memory access", a))
     f st@(w:ws, os, m)  (IStBit a)
         | (m0,(_,X _):m1) <- break ((==a) . fst) m
-                                    = pure (w : ws, os, (m0 ++ (a, X w) : m1))
+--                                     = pure (w : ws, os, (m0 ++ (a, X w) : m1))
+                                    = pure (ws, os, (m0 ++ (a, X w) : m1))
         | otherwise                 = Left (st, show (here, "invalid memory access", a))
     f (a:b:ws, os, m)    IAnd       = pure ((a && b) : ws, os, m)
     f (a:b:ws, os, m)    IOr        = pure ((a || b) : ws, os, m)
@@ -331,12 +337,13 @@ devices mkWord litFromAddr =
             [a, b] <- for ops emitOp
             Right $ a ++ b ++ [ILt]))
 
-    , (coil    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IStBit a]))
-    , (coil    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [INot, IStBit a, INot]))
+    , (coil    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IDup, IStBit a]))
+    , (coil    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [IDup, INot, IStBit a]))
+
     , (coil    "S", DDesc "SET"  [(Wr, Bit)]
-        (\[Var a] -> Right [ILdBit a, IOr, IStBit a]))
+        (\[Var a] -> Right [IDup, ILdBit a, IOr, IStBit a]))
     , (coil    "R", DDesc "RST"  [(Wr, Bit)]
-        (\[Var a] -> Right [INot, ILdBit a, IAnd, IStBit a]))
+        (\[Var a] -> Right [IDup, INot, ILdBit a, IAnd, IStBit a]))
     ]
     where
     cont = Contact_ . fromString 

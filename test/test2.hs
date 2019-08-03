@@ -10,6 +10,7 @@ import Hedgehog.Range
 import System.Environment
 
 import Data.Word
+import Text.Read
 
 import Language.Ladder.Interpreter
 import Language.Ladder.Target
@@ -32,6 +33,16 @@ serializeTests :: TestTree
 serializeTests = testGroup "Serialize"
     [ testProperty "Single instruction roundtrip" prop_instr_trip
     , testProperty "Instruction list roundtrip" prop_prog_trip
+--     , testProperty "Show/Read roundtrip" prop_show_trip
+--     , testCase "1" $
+--         read ("EIReturn")
+--             @?= (EIReturn :: ExtendedInstruction Int Int Int)
+    , testCase "2" $
+        "EIReturn"
+            @?= show (EIReturn :: ExtendedInstruction Int Int Int)
+    , testCase "3" $
+        "IGt"
+            @?= show (IGt :: Instruction Int Int)
     ]
 
 genInstructions :: (Num word, Num address) => Gen [ExtendedInstruction Int word address]
@@ -40,6 +51,14 @@ genInstructions = Gen.list (Range.linear 0 100) genInstruction
 genInstruction :: (Num word, Num address) => Gen (ExtendedInstruction Int word address)
 genInstruction
     = Gen.choice $ instructionTable (pure 0) (pure 0) (pure 0) (pure 0)
+
+-- prop_show_trip :: Property
+-- prop_show_trip
+--     = withTests 1000 . property $ do
+--         instr :: ExtendedInstruction Int Int Int <- forAll genInstruction
+--         tripping instr
+--             show
+--             readMaybe
 
 prop_instr_trip :: Property
 prop_instr_trip
