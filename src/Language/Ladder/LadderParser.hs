@@ -21,7 +21,6 @@ import Control.Monad hiding (fail)
 import Data.Foldable
 import Data.Functor.Identity
 import Data.Void
--- import Data.Bifunctor
 import Data.Function
 
 import Control.Monad.State hiding (fail)

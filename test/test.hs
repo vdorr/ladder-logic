@@ -35,10 +35,7 @@ import Language.Ladder.Utils
 import Language.Ladder.Simple
 import Language.Ladder.Interpreter
 
-import Language.Ladder.OldBackend --FIXME
-
 import Tooling
-
 import TestUtils
 
 --------------------------------------------------------------------------------
@@ -54,7 +51,7 @@ preproc5' = preproc . runLexer
 --------------------------------------------------------------------------------
 
 preproc5'' :: Text -> Either String [(Int, [((Int, Int), Tok Text)])]
-preproc5'' = bimap unpack id . preproc5'
+preproc5'' = first unpack . preproc5'
 
 --basic blocks
 testPreproc6 :: Text -> Either Text [(Maybe Text, [[Tok Text]])]
@@ -72,7 +69,7 @@ testLexer :: Text -> Either Text [Tok Text]
 testLexer = fmap dropPos . runLexer
 
 simpleResult :: (Bifunctor f, Eq e, Monoid e) => f e a -> f Bool a
-simpleResult = bimap (/=mempty) id
+simpleResult = first (/=mempty)
 
 isEmpty :: (Eq a, Monoid a) => a -> Bool
 isEmpty = (==mempty)
@@ -279,17 +276,17 @@ dgpTests = testGroup "Diagram parser"
 ladderTests :: TestTree
 ladderTests = testGroup "Ladder parser"
     [ testCase "test00" $
-        (fmap (const ())) <$> runLadderParser_ parseSimpleDevice ladder t00
+        (fmap (const ())) <$> runLadderParser_ wrapDevTest1 ladder t00
             @?= Right (() :< Source (() :< End))
     , testCase "test00" $ assertFullyConsumed t00
     , testCase "test01" $ fullyConsumed' test01
     , testCase "test04" $ assertFullyConsumed t04
     , testCase "test07a" $ assertFullyConsumed t07a
     , testCase "unexpected"
-        $ simpleResult (runLadderParser_ parseSimpleDevice ladder [ (1, [((1, 1), Return)]) ])
+        $ simpleResult (runLadderParser_ wrapDevTest1 ladder [ (1, [((1, 1), Return)]) ])
             @?= Left True
     , testCase "gap"
-        $ simpleResult (runLadderParser_ parseSimpleDevice ladder
+        $ simpleResult (runLadderParser_ wrapDevTest1 ladder
             [ (1, [((1, 1), VLine)])
             , (2, [((1, 1), Cross), ((2, 2), HLine 2 0), ((4, 4), HLine 2 0)])
             ])
@@ -501,12 +498,12 @@ prop_sttsort =
 
 testBox :: Int -> Text -> Either String (Dg (Tok Text))
 testBox ln input
-    = preproc5'' input >>= runLadderParser parseSimpleDevice (box001 ln) >>= (return . snd)
+    = preproc5'' input >>= runLadderParser wrapDeviceSimple (box001 ln) >>= (return . snd)
 
 boxTests :: TestTree
 boxTests = testGroup "Box parser"
     [ testCase "1" $
-        fmap (dgTrim.snd) (runLadderParser parseSimpleDevice (box001 2) box01_tokenized)
+        fmap (dgTrim.snd) (runLadderParser wrapDeviceSimple (box001 2) box01_tokenized)
             @?= Right (Zp [] [])
 --     , testCase "1b" $
 --         box01b_tokenized
@@ -647,7 +644,7 @@ fileTestsNeg path
                      print (here, fn, err)
                      return () --preproc failed -> test succeeeded
                  Right lxs -> do
---                     case fmap dgTrim <$> runLadderParser parseSimpleDevice ladder lxs of
+--                     case fmap dgTrim <$> runLadderParser wrapDevTest1 ladder lxs of
 --                         Right (_ast, Zp [] []) -> do
 --                             _ast <- parseForTestOrDie lxs
 --                             print (here, fn, err)
@@ -676,13 +673,16 @@ fileTests path
             case tst of
                 Nothing -> do
                     for_ blocks $ \(_, lxs') -> do
-                        case runLadderParser parseSimpleDevice ladder lxs' of
+                        case runLadderParser wrapDevTest1 ladder lxs' of
                             Right _ -> return ()
                             Left err -> fail err
                 Just t -> do
                     ast <- parseForTestOrDie lxs
                     passed <- runLadderTest2 False t ast
                     passed @?= True
+
+wrapDevTest1 :: DeviceParser Text (DevType Text, [Operand Text])
+wrapDevTest1 = wrapDeviceSimple2
 
 --------------------------------------------------------------------------------
 

@@ -12,6 +12,7 @@ import Data.Traversable
 import Data.Semigroup
 import Data.Void
 import Control.Monad.Except
+import Data.Foldable
 
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
@@ -65,11 +66,13 @@ emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
     unAddr (_, Var a) = Var $ unpack a
     unAddr (_, Lit i) = Lit i
 
+#if 0
 compileForTest
     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
     => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
     -> IO [ExtendedInstruction Int (V String) String]
 compileForTest = either fail pure . generateStk2xx pure emitBasicDevice literalFromInt2
+#endif
 
 compileForTest03
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
@@ -97,6 +100,10 @@ runLadderTest2 verbose test ast = do
     when verbose $ print here
 
     prog <- either fail pure $ compileForTest03 ast
+    when verbose $ do
+        print "---------------------------"
+        for_ prog print
+        print "---------------------------"
     runLadderTestX verbose test prog
 
 -- runLadderTest
@@ -146,7 +153,7 @@ runLadderTestX verbose test@T01{} prog = do
 
 ldUnpack1 :: Cofree (Diagram c op Text) a
          -> Cofree (Diagram c op String) a
-ldUnpack1 (a :< n) = a :< fmap ldUnpack1 (mapDg id (id) unpack n)
+ldUnpack1 (a :< n) = a :< fmap ldUnpack1 (mapDg id id unpack n)
 
 --------------------------------------------------------------------------------
 

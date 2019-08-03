@@ -6,6 +6,7 @@ module Language.Ladder.Simple where
 import Data.Traversable
 import Data.Text (Text)
 import Data.Void
+import Data.String
 
 import Control.Monad.Except
 
@@ -38,6 +39,23 @@ type DeviceParser name dev = DevType name
         ( DevOpFlag
         , [Operand name] -> Either String dev
         )
+
+--------------------------------------------------------------------------------
+
+-- |Accept any device
+wrapDeviceSimple :: DeviceParser name (DevType name, [Operand name])
+wrapDeviceSimple dt = Right (Optional, Right . (dt,))
+
+wrapDeviceSimple2
+    :: (Eq name, IsString name)
+    => DeviceParser name (DevType name, [Operand name])
+wrapDeviceSimple2 dt = Right (has2Ops dt, Right . (dt,))
+    where
+    cmp = fromString <$> [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
+    has2Ops (Contact_ f) = if elem f cmp then Mandatory else None
+    has2Ops _ = None
+
+--------------------------------------------------------------------------------
 
 wrapDevice3
     :: (Int -> Either String word)

@@ -1,6 +1,14 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-module Language.Ladder.OldBackend where
+module Language.Ladder.OldBackend 
+    ( Op(..)
+    , Dev(..)
+    , CmpOp(..)
+    , parseOpsM
+    , generateStk
+--     , parseSimpleDevice
+    )
+    where
 
 import Data.List
 import Data.Foldable

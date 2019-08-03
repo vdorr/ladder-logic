@@ -372,7 +372,7 @@ colocated_
     -> SFM (DgPState st tok) a
     -> SFM (DgPState st tok) b
     -> SFM (DgPState st tok) (a, b)
-colocated_ mapPos p pp = colocated mapPos p (\x -> (,) <$> pure x <*> pp)
+colocated_ mapPos p pp = colocated mapPos p (\x -> (x,) <$> pp)
 
 above, below
     :: SFM (DgPState st tok) t
