@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-#define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.Simple where
 
@@ -53,7 +51,7 @@ wrapDeviceSimple2 dt = Right (has2Ops dt, Right . (dt,))
     where
     cmp = fromString <$> [">", "<", "=", "==", "<>", "/=", "!=", "≠", "≤", "≥"]
     has2Ops (Contact_ f) = if elem f cmp then Mandatory else None
-    has2Ops _ = None
+    has2Ops _            = None
 
 --------------------------------------------------------------------------------
 
@@ -81,11 +79,12 @@ generateStk2xx
     -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
     -> m [ExtendedInstruction Int word addr]
 generateStk2xx doOp emitDev litFromInt ast = do
-    ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME liftEither
+    ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
     ast''  <- for ast' (traverse (generateStk2' emitDev))
-    ast''' <- case resolveLabels ast'' of
-                   Left err -> throwError err
-                   Right x -> return x
+    ast''' <- liftEither $ resolveLabels ast'' 
+--     of
+--                    Left err -> throwError err
+--                    Right x -> return x
     return ast'''
 
 mapOpsM
