@@ -77,7 +77,7 @@ compileForTest03
             lbl) DgExt)]
     -> m [ExtendedInstruction Int (V String) String]
 compileForTest03 ast = do
-    prog <- generateStk2xx pure emitDevice03 literalFromInt2 ast
+    prog <- generateStk2xx pure emitDevice03 ast
     return $ prog ++ [EIReturn]
 -- compileForTest03 = either fail pure . generateStk2xx pure emitDevice03 literalFromInt2
 

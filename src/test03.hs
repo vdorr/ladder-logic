@@ -128,7 +128,7 @@ compileOrDieX fn = do
     let doMem ast = runStateT (traverse (traverse allocateMemory2) ast) emptyMemory
     Right (blocks', memory) <- return $ doMem blocks
 --     print (here, memory)
-    prog <- case generateStk2xx pure emitDevice02 literalFromInt blocks' of
+    prog <- case generateStk2xx pure emitDevice02 blocks' of
                  Left err -> fail err
                  Right x -> return x
 --     print (here, prog)

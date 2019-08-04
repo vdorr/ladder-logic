@@ -68,17 +68,16 @@ wrapDevice3 mkWord litFromAddr d
 
 --------------------------------------------------------------------------------
 
-literalFromInt2 :: (MonadError String m, Monad m) => Int -> m (V String)
-literalFromInt2 i = return $ I $ fromIntegral i --TODO check range
+-- literalFromInt2 :: (MonadError String m, Monad m) => Int -> m (V String)
+-- literalFromInt2 i = return $ I $ fromIntegral i --TODO check range
 
 generateStk2xx
     :: (Show addr, Show word, Show lbl, Eq lbl, MonadError String m, Monad m)
     => (dev -> Either String x) --TODO swap (Either String) for m
     -> (x -> [Instruction word addr])
-    -> (Int -> m word)
     -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
     -> m [ExtendedInstruction Int word addr]
-generateStk2xx doOp emitDev litFromInt ast = do
+generateStk2xx doOp emitDev ast = do
     ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
     ast''  <- for ast' (traverse (generateStk2' emitDev))
     ast''' <- liftEither $ resolveLabels ast'' 
