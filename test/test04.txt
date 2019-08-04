@@ -1,3 +1,5 @@
+{ LANGUAGE BottomOperandContext }
+
 (* --- test 04 --- *)
 
 | %MX0 %MX1      %MX1

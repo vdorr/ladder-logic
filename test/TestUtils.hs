@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings, MonadComprehensions #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module TestUtils where
@@ -6,6 +7,7 @@ import Data.List
 import Text.Read
 import qualified Data.Text.IO as TIO
 import Data.Text (Text, unpack)
+import qualified Data.Text as T
 import Control.Monad
 import Control.Applicative
 import Data.Traversable
@@ -97,9 +99,9 @@ runLadderTest2 verbose test ast = do
 
     prog <- either fail pure $ compileForTest03 ast
     when verbose $ do
-        print "---------------------------"
+        putStrLn "---------------------------"
         for_ prog print
-        print "---------------------------"
+        putStrLn "---------------------------"
     runLadderTestX verbose test prog
 
 runLadderTestX
@@ -126,7 +128,7 @@ runLadderTestX verbose test@T01{} prog = do
     when verbose $ do
         print (here, testTrace)
         print (here, expected test)
-        print (here, passed, if passed then "PASSED" else "FAILED")
+        print (here, passed, if passed then "PASSED" else "FAILED" :: String)
 
     return passed
 
@@ -175,6 +177,8 @@ parseOrDie2 devP lxs = do
             Right ast -> return $ ldUnpack1 ast
             Left  err -> throwError $ show (here, err)
 
+--------------------------------------------------------------------------------
+
 lexFile :: FilePath -> IO [(Int, [((Int, Int), Tok Text)])]
 lexFile file = do
     src <- TIO.readFile file
@@ -184,11 +188,27 @@ lexFile file = do
 
 --------------------------------------------------------------------------------
 
+pickPragma :: Text -> [[Text]] -> ([[Text]], [[Text]])
+pickPragma key = partition f
+    where
+    f s = case s of
+               x : _ | key' : _ <- T.words x -> key' == key
+               _                             -> False
+
 loadLadderTest :: FilePath -> IO (Maybe LadderTest, [(Int, [((Int, Int), Tok Text)])])
 loadLadderTest file = do
     x <- lexFile file
-    let pgma = fmap (filter (/='\\') . unpack) $ fmap mconcat $ getPragma $ dropPos x
-    return (pgma >>= readMaybe, x)
+    let (pgms, _) = pickPragma "T01" $ getLeadingPragmas $ dropPos x
+--     print (here, file, pgms)
+--     let lang = filter (T.words ) pgms
+--     "LANGUAGE"
+
+--     let pgma = fmap (filter (/='\\') . unpack) $ fmap mconcat $ getPragma $ dropPos x
+--     return (pgma >>= readMaybe, x)
+    let pgms' = fmap (readMaybe . filter (/='\\') . unpack . T.concat) pgms
+    let t = [ p | Just p : _ <- for pgms' pure ]
+--     print (here, file,        pgms')
+    return (t, x)
 
 --------------------------------------------------------------------------------
 

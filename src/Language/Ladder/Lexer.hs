@@ -26,6 +26,11 @@ withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
 
 --------------------------------------------------------------------------------
 
+-- lex2 :: (s -> (Maybe Char, s)) -> s -> Either String [Tok x]
+-- lex2 uncons s = error "TODO"
+
+--------------------------------------------------------------------------------
+
 {-
 letter       : 'A'..'Z' | '_'
 number       : '0'..'9'
@@ -268,10 +273,10 @@ getPragma xs = case getLeadingPragmas xs of
 getLeadingPragmas :: [Tok a] -> [[a]]
 getLeadingPragmas = go
     where
-    go (Pragma  p : xs )   = p : go xs
-    go (Comment _ : xs)    =     go xs
+    go (Pragma  p    : xs) = p : go xs
+    go (Comment _    : xs) =     go xs
     go (Whitespace _ : xs) =     go xs
-    go (NewLine : xs)      =     go xs
+    go (NewLine      : xs) =     go xs
     go _                   = []
 
 -- should be called "dropPos" or something like that

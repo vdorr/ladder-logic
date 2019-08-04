@@ -668,7 +668,14 @@ fileTests :: FilePath -> IO TestTree
 fileTests path
     = testFromDirectory path "File tests - positive" $ \fn -> do
         return $ testCase fn $ do
-            (tst, lxs) <- fmap dropWhitespace <$> loadLadderTest (path </> fn)
+            (tst, lxs'') <- loadLadderTest (path </> fn)
+            let lxs = dropWhitespace lxs''
+            let (pgms, _) = pickPragma "LANGUAGE" $ getLeadingPragmas $ dropPos lxs''
+            let wrapper = case fmap (fmap (words . unpack)) pgms of
+                 ([["LANGUAGE", "BottomOperandContext"]] : _) -> True
+                 _ -> False
+--             print (here, fn, wrapper, pgms)
+
             let blocks = labeledRungs lxs
             case tst of
                 Nothing -> do
