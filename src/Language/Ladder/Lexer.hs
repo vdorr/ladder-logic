@@ -208,6 +208,13 @@ runLexer
     = bimap (T.pack . errorBundlePretty) id
     . parse lexerLinesP "(file)"
 
+runLexer'
+    :: Text
+    -> Either String [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+runLexer'
+    = first errorBundlePretty
+    . parse lexerLinesP "(file)"
+
 --------------------------------------------------------------------------------
 
 -- |Discard comments and pragmas

@@ -672,15 +672,15 @@ fileTests path
             let lxs = dropWhitespace lxs''
             let (pgms, _) = pickPragma "LANGUAGE" $ getLeadingPragmas $ dropPos lxs''
             let wrapper = case fmap (fmap (words . unpack)) pgms of
-                 ([["LANGUAGE", "BottomOperandContext"]] : _) -> True
-                 _ -> False
+                 (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2
+                 _ -> wrapDeviceSimple
 --             print (here, fn, wrapper, pgms)
 
             let blocks = labeledRungs lxs
             case tst of
                 Nothing -> do
                     for_ blocks $ \(_, lxs') -> do
-                        case runLadderParser wrapDevTest1 ladder lxs' of
+                        case runLadderParser wrapper ladder lxs' of
                             Right _ -> return ()
                             Left err -> fail err
                 Just t -> do

@@ -13,7 +13,7 @@ import Data.Functor.Identity
 -- import Control.Monad.State
 
 import Language.Ladder.LadderParser
-import Language.Ladder.DiagramParser hiding (get, put, modify)
+import Language.Ladder.DiagramParser
 import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------
@@ -118,8 +118,8 @@ dependencies = cata' go
         f (Device _ a ) = a
         f (Jump _     ) = mempty
         f (Node     as) = Deps [p] [] [] [] <> mconcat as
-        f (Conn c     ) = Deps [] [] [] [p]
-        f (Cont c   a ) = Deps [] [] [p] [] <> a
+        f (Conn _     ) = Deps [] [] [] [p]
+        f (Cont _   a ) = Deps [] [] [p] [] <> a
 
 --------------------------------------------------------------------------------
 
@@ -139,19 +139,19 @@ cut1
 cut1 (p :< a) = f a
     where
 
-    f (Source   a) = h Source (cut1 a)
+    f (Source   n) = h Source (cut1 n)
     f  Sink        = (p :< Sink, [])
     f  End         = (p :< End, [])
-    f (Device d a) = h (Device d) (cut1 a)
+    f (Device d n) = h (Device d) (cut1 n)
     f (Jump s    ) = (p :< Jump s, [])
 
 --     f (Node     a) = (p :< Node [p :< Conn p], x' ++ concat y)
 --         where
 --         (x, y) = unzip $ fmap cut1 a
 --         x' = (fmap (\n@(pp:<_) -> pp :< Cont p n) x)
-    f (Node     a) = (p:< Sink, [p :< Node [p :< Conn p]] ++ x' ++ concat y)
+    f (Node     m) = (p:< Sink, [p :< Node [p :< Conn p]] ++ x' ++ concat y)
         where
-        (x, y) = unzip $ fmap cut1 a
+        (x, y) = unzip $ fmap cut1 m
         x' = (fmap (\n@(pp:<_) -> pp :< Cont p n) x)
 
     f (Conn _    ) = error here
@@ -176,16 +176,6 @@ forest _               = Nothing
 
 follow :: (t -> a) -> Diagram c d s t -> Diagram c d s a
 follow g = runIdentity . traverse (Identity . g)
--- follow g = f
---     where
---     f (Source a)   = Source (g a)
---     f  Sink        = Sink
---     f  End         = End
---     f (Device d a) = Device d (g a)
---     f (Jump s)     = Jump s
---     f (Node a)     = Node (fmap g a)
---     f (Conn c    ) = Conn c
---     f (Cont c   a) = Cont c (g a)
 
 repositionSinks
     :: Eq p
@@ -205,7 +195,6 @@ merge'
     -> ([(p, [p])], Cofree (Diagram c d s) p)
 -- ^pairs of position of 'Node' still in tree and 'Node' positions merged into it and new tree
 merge' = mapAccumL (\ns (nss, p) -> (f ns p nss, p)) [] . merge
--- merge' ast = mapAccumL (\ns (nss, p) -> (ns ++ nss, p)) [] $ merge ast
     where
     f ns _ []  = ns
     f ns p nss = (p, nss) : ns

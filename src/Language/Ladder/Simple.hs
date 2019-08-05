@@ -21,7 +21,7 @@ runLadderParser_
     -> LdP d t a
     -> [(Int, [((Int, Int), Tok t)])]
     -> Either String a
-runLadderParser_ pd p s = fst <$> runLadderParser pd p s
+runLadderParser_ pd p s = fst <$> runParser pd p s
 
 runLadderParser
     :: DeviceParser t d
