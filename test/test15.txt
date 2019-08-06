@@ -11,14 +11,14 @@
     ]
   , watch    = ["cool", "heat"]
   , expected =
-    [ [X False, X False]
+    [ [X False, X True]
+    , [X False, X True]
+    , [X False, X True]
+    , [X False, X True]
     , [X False, X False]
+    , [X True, X False]
     , [X False, X False]
-    , [X False, X False]
-    , [X False, X False]
-    , [X False, X False]
-    , [X False, X False]
-    , [X False, X False]]
+    , [X False, X True]]
   \}
 }
 

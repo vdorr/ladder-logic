@@ -21,7 +21,7 @@ instance ShowErrorComponent ParseErr where
 
 --------------------------------------------------------------------------------
 
-withPos :: Parsec ParseErr Text a -> Parsec ParseErr Text ((SourcePos, SourcePos), a)
+withPos :: (Stream t, Ord e) => Parsec e t a -> Parsec e t ((SourcePos, SourcePos), a)
 withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
 
 --------------------------------------------------------------------------------
@@ -266,15 +266,15 @@ stripPos
     :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
     -> [ (Int, [((Int, Int), a)]) ]
 stripPos = fmap (bimap (unPos.sourceLine)
-    (fmap (bimap (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)) id)))
+    (fmap (first (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)))))
 
 --------------------------------------------------------------------------------
 
 -- |Look for first pragma in list of lexemes
-getPragma :: [Tok a] -> Maybe [a]
-getPragma xs = case getLeadingPragmas xs of
-    x : _ -> Just x
-    _     -> Nothing
+-- getPragma :: [Tok a] -> Maybe [a]
+-- getPragma xs = case getLeadingPragmas xs of
+--     x : _ -> Just x
+--     _     -> Nothing
 
 -- |Look for first pragma in list of lexemes
 getLeadingPragmas :: [Tok a] -> [[a]]
@@ -286,7 +286,6 @@ getLeadingPragmas = go
     go (NewLine      : xs) =     go xs
     go _                   = []
 
--- should be called "dropPos" or something like that
 -- |Discard position informations from list of lexemes
 dropPos
     :: [(p, [((p, p), Tok a)])]

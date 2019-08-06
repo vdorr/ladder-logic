@@ -10,7 +10,7 @@ import Data.List
 import Data.String
 import Data.Void
 
-import qualified Control.Monad.Fail --FIXME
+-- import qualified Control.Monad.Fail --FIXME
 
 import Language.Ladder.DiagramParser (DgExt)
 import Language.Ladder.LadderParser
@@ -19,10 +19,11 @@ import Language.Ladder.Analysis
 
 --------------------------------------------------------------------------------
 
-data CellType = Bit | TwoBits | Word -- | TON | TOF
+data CellType = Bit | TwoBits | Word
     deriving (Show, Read, Eq, Ord)
-
--- |Memory cell value, also represents its type and default value
+-- | TON | TOF
+ 
+-- | Memory cell value, also represents its type and default value
 data V addr
     = X !Bool
     | I !Int
@@ -169,7 +170,7 @@ genStk emit' emitDevice' stk0 asts = go stk0 asts
                 Nothing -> error here --should not happen
             go (nd:stk) b --XXX not sure about nd on stack here
 
-        f _stk _n = error here -- $ show (here, stk, n)
+        f _stk _n = error here -- show (here, stk, n)
 
     isConn p0 (_ :< Conn p1) = p0 == p1
     isConn _   _             = False

@@ -1,4 +1,5 @@
 (* --- test 05 --- *)
+{ LANGUAGE BottomOperandContext }
 
 | %MX0
 +--[ ]-->>MAIN

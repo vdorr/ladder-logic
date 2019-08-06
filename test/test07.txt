@@ -1,4 +1,5 @@
 (* --- test 07 --- *)
+{ LANGUAGE BottomOperandContext }
 
 |  a       b
 +--[ ]--+--( )--

@@ -318,7 +318,7 @@ emitBasicDevice d
         AndN (Var addr)  -> [ILdBit addr, INot, IAnd]
         St   (Var addr)  -> [IStBit addr]
         StN  (Var addr)  -> [INot, IStBit addr, INot]
-        _                -> error here -- $ show (here, d)
+        _                -> error here -- show (here, d)
 
 parseOpsM
     :: Cofree (Diagram c (Dev String) s) p

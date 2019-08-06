@@ -52,6 +52,7 @@ library
                      , text
                      , warp, wai, http-types, aeson, bytestring
                      , bits, bytes, base16-bytestring, binary
+                     , pretty-show
 
   hs-source-dirs:      src
                        .
@@ -117,14 +118,7 @@ test-suite             3
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             doctest.hs
-  default-extensions:  CPP, TupleSections, ScopedTypeVariables
-                     , LambdaCase, RecordWildCards, FlexibleContexts
-                     , PatternSynonyms, DeriveFunctor, TypeApplications
-                     , DeriveFoldable, DeriveTraversable
   build-depends:
-                       ladder-logic
-                     , base
+                       base
                      , doctest
-                     , text
-                     , mtl
                      , Glob
