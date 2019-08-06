@@ -3,7 +3,7 @@
 module Language.Ladder.Example where
 
 import qualified Data.Text
-import Data.Text (Text)
+import Data.Text (Text, unlines)
 import Data.Void
 
 import Language.Ladder.Simple
