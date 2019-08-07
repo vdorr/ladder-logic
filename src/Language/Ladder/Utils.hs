@@ -10,16 +10,22 @@ data Cofree f a = a :< f (Cofree f a)
 
 instance (Eq a, Eq (f (Cofree f a))) => Eq (Cofree f a) where
     a :< b == c :< d = a == c && b == d
--- 
-instance (Functor f, forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
---     show (a :< as) = "(" ++ show a ++ " :< " ++ show as ++ ")"
-    show (a :< n) = "(\n" ++ pad (show a) ++ " :< " ++ show (fmap (Nope . show) n)  ++ ")"
-        where
-        pad = take 12 . (++repeat ' ') --FIXME
 
-newtype Nope = Nope String
-instance Show Nope where
-    show (Nope s) = s
+
+instance (Functor f, forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
+    show (a :< as) = "(" ++ show a ++ " :< " ++ show as ++ ")"
+
+-- newtype PPCofree f a = PPCofree (Cofree f a)
+-- 
+-- instance (Functor f, forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
+-- --     show (a :< as) = "(" ++ show a ++ " :< " ++ show as ++ ")"
+--     show (a :< n) = "(\n" ++ pad (show a) ++ " :< " ++ show (fmap (Nope . show) n)  ++ ")"
+--         where
+--         pad = take 12 . (++repeat ' ') --FIXME
+-- 
+-- newtype Nope = Nope String
+-- instance Show Nope where
+--     show (Nope s) = s
 
 --------------------------------------------------------------------------------
 
