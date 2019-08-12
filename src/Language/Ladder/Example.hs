@@ -4,7 +4,6 @@ module Language.Ladder.Example
     (LadderAst, PPCofree(..), parseLd)
     where
 
--- import qualified Data.Text
 import Data.Text (Text)
 import Data.Void
 
@@ -77,20 +76,3 @@ instance Show Nope where
     show (Nope s) = s
 
 --------------------------------------------------------------------------------
-
--- test1 :: Text
--- test1
---     = Data.Text.unlines
---     [ "|  A    B   "
---     , "+--[ ]--( )-"
---     ]
-
--- test2 :: Text
--- test2
---     = Data.Text.unlines
---     [ "|       Start     Stop   Run "
---     , "+--+----[ ]--+----[/]----( )-"
---     , "   |         |               "
---     , "   |    Run  |               "
---     , "   +----[ ]--+               "
---     ]

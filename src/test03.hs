@@ -102,28 +102,12 @@ mapDevA doDevice = mapDgA pure doDevice pure
 
 --------------------------------------------------------------------------------
 
--- compileOrDie
---     :: FilePath
---     -> IO ( MemTrack String
---           , [ExtendedInstruction Int Int (Address Int)]
---           )
--- compileOrDie fn = do
---     (_pragmas, blocks) <- parseOrDie5 parseSimpleDevice fn
---     let doMem ast = runStateT (traverse (traverse allocateMemory1) ast) emptyMemory
---     Right (blocks', memory) <- return $ doMem blocks
--- --     print (here, memory)
---     prog <- generateStk2xx return emitBasicDevice literalFromInt blocks'
--- --     print (here, prog)
---     return (memory, prog)
-
 compileOrDieX
     :: FilePath
     -> IO ( MemTrack String
           , [ExtendedInstruction Int Word16 Word8]
           )
 compileOrDieX fn = do
---     ast <- parseOrDie2 (wrapDevice3 (pure . I) (pure . A)) lxs
---     (_pragmas, blocks) <- parseOrDie5 wrapDevice3 fn
     (_pragmas, blocks) <- parseOrDie5 deviceThing fn
     let doMem ast = runStateT (traverse (traverse allocateMemory2) ast) emptyMemory
     Right (blocks', memory) <- return $ doMem blocks

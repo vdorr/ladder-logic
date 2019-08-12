@@ -51,7 +51,6 @@ getSignal1 s ((_, slice) : _) = fmap (!!i)
 getSignals :: Eq addr => [addr] -> TestVect addr -> [[V addr]] -> [[V addr]]
 getSignals sg vect trace = 
     transpose $ fmap (\s -> getSignal1 s vect trace) sg
---     foldMap (\s -> getSignal s vect trace) sg
 
 --------------------------------------------------------------------------------
 
@@ -66,12 +65,6 @@ emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
     unAddr (_, Var a) = Var $ unpack a
     unAddr (_, Lit i) = Lit i
 
--- compileForTest
---     :: (Show lbl, Eq lbl) -- , Eq addr, Show addr)
---     => [(Maybe lbl, Cofree (Diagram Void (Op String (Operand String)) lbl) DgExt)]
---     -> IO [ExtendedInstruction Int (V String) String]
--- compileForTest = either fail pure . generateStk2xx pure emitBasicDevice literalFromInt2
-
 compileForTest03
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
     => [(Maybe lbl, Cofree (Diagram Void
@@ -81,7 +74,6 @@ compileForTest03
 compileForTest03 ast = do
     prog <- generateStk2xx pure emitDevice03 ast
     return $ prog ++ [EIReturn]
--- compileForTest03 = either fail pure . generateStk2xx pure emitDevice03 literalFromInt2
 
 --------------------------------------------------------------------------------
 
@@ -134,10 +126,6 @@ runLadderTestX verbose test@T01{} prog = do
 
 --------------------------------------------------------------------------------
 
--- ldUnpack :: Cofree (Diagram c (Dev Text) Text) a
---          -> Cofree (Diagram c (Dev String) String) a
--- ldUnpack (a :< n) = a :< fmap ldUnpack (mapDg id (fmap unpack) unpack n)
-
 ldUnpack1 :: Cofree (Diagram c op Text) a
          -> Cofree (Diagram c op String) a
 ldUnpack1 (a :< n) = a :< fmap ldUnpack1 (mapDg id id unpack n)
@@ -152,12 +140,11 @@ parseOrDie5
           , [(Maybe String, Cofree (Diagram Void dev String) DgExt)]
           )
 parseOrDie5 devP path = do
-    lxs         <- lexFile path
-    ast         <- case parseOrDie2 devP $ dropWhitespace lxs of
-                        Left err -> fail err
-                        Right x -> return x
+    lxs <- lexFile path
+    ast <- case parseOrDie2 devP $ dropWhitespace lxs of
+                        Left  err -> fail err
+                        Right x   -> return x
     let pragmas  = fmap unpack $ fmap mconcat <$> getLeadingPragmas $ dropPos lxs
---     ast'        <- traverse (traverse (either fail return . parseOpsM)) ast
     return (pragmas, ast)
 
 parseOrDie2

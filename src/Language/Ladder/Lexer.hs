@@ -73,39 +73,33 @@ pragma       : '{' anychar* '}'
 -}
 
 -- |Diagram token
---rule: control statements (jump) are followed by EOL
 data Tok a
---parts without mandatory horizontal component:
     = Cross            -- ^ "+"
     | VLine            -- ^ "|"
---sole thing that occupy whole line
     | Label        !a   -- ^ network label "LABEL:"
---horizontal things
-    | HLine        !Int !Int --number of '-' consumed, number of following '|' seen
+    | HLine        !Int !Int -- ^ number of "-" consumed, number of following '|' seen
     | REdge            -- ^ as block input "--->"
     | FEdge            -- ^ as block input "---<"
 
---     | Negated        -- on block i/o "---0|" or "|0---"
 --TODO count leading zeroes, or, store total number of chars - good for `lexemeLength`
-    | Number       !Int --should probably be of type 'a'
+    | Number       !Int -- ^integer number
+
     | Contact      !a   -- ^ "---[OP]---"
     | Coil         !a   -- ^ "---(OP)---"
 
 --as above, but could be mistaken for other things
 --     | Connector a        -- "--->NAME>"
-    | Continuation !a   -- ^ ">NAME>---" -- same as Connector
+    | Continuation !a   -- ^ ">NAME>---", same as Connector
     | Return           -- ^ "---\<RETURN>"
 --Jump additionaly is followed by end of line
     | Jump'        !a   -- ^ "--->>LABEL"
-
---others
---     | Store a            -- FBD only "---VARIABLE"
-    | Name         !a   -- ^inside of block
---whitespace
+    | Name         !a   -- ^device operand or block name
     | Comment      ![a]   -- ^ (* ... *)
     | Pragma       ![a]   -- ^ { ... }
     | NewLine
     | Whitespace   !Int
+
+--     | Store a            -- FBD only "---VARIABLE"
     deriving (Show, Eq, Functor)
 
 --------------------------------------------------------------------------------
@@ -257,7 +251,7 @@ labeledRungs t = (lbl, this) : labeledRungs rest
             xs                         -> (Nothing, xs)
 
     isLabel (_, [(_, Label _)]) = True
-    isLabel _         = False
+    isLabel _                   = False
 
 --------------------------------------------------------------------------------
 

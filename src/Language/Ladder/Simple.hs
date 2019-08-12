@@ -16,22 +16,25 @@ import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------
 
-runLadderParser_
-    :: DeviceParser t d
-    -> LdP d t a
-    -> [(Int, [((Int, Int), Tok t)])]
-    -> Either String a
-runLadderParser_ pd p s = fst <$> runParser pd p s
-
+-- |Execute diagram parser and return its result along with final stream state
 runLadderParser
-    :: DeviceParser t d
-    -> LdP d t a
-    -> [(Int, [((Int, Int), Tok t)])]
-    -> Either String (a, Dg (Tok t))
+    :: DeviceParser t d -- ^device recognizer
+    -> LdP d t a -- ^parser
+    -> [(Int, [((Int, Int), Tok t)])] -- ^input tokens
+    -> Either String (a, Dg (Tok t)) -- ^parser result and final state of parser stream
 runLadderParser = runParser
+
+-- |Like 'runLadderParser' but discards parser stream
+runLadderParser_
+    :: DeviceParser t d -- ^device recognizer
+    -> LdP d t a -- ^parser
+    -> [(Int, [((Int, Int), Tok t)])] -- ^input tokens
+    -> Either String a -- ^parser result
+runLadderParser_ pd p s = fst <$> runParser pd p s
 
 --------------------------------------------------------------------------------
 
+-- |Type of device recognizer function
 type DeviceParser name dev = DevType name
     -> Either String
         ( DevOpFlag
@@ -40,10 +43,13 @@ type DeviceParser name dev = DevType name
 
 --------------------------------------------------------------------------------
 
--- |Accept any device
+-- |Accept any device.
+-- Does not allow upper operand of neighbor device to overlap current device
 wrapDeviceSimple :: DeviceParser name (DevType name, [Operand name])
 wrapDeviceSimple dt = Right (Optional, Right . (dt,))
 
+-- |Accept comporason operators.
+-- Upper operand of neighbor device may overlap current device.
 wrapDeviceSimple2
     :: (Eq name, IsString name)
     => DeviceParser name (DevType name, [Operand name])
@@ -81,13 +87,12 @@ generateStk2xx doOp emitDev ast = do
     ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
     ast''  <- for ast' (traverse (generateStk2' emitDev))
     ast''' <- liftEither $ resolveLabels ast'' 
---     of
---                    Left err -> throwError err
---                    Right x -> return x
     return ast'''
 
+-- |Apply monadic action to every device
 mapOpsM
-    :: Monad m => (a -> m b)
+    :: Monad m
+    => (a -> m b) -- ^action to apply
     -> Cofree (Diagram c a s) p
     -> m (Cofree (Diagram c b s) p)
 mapOpsM f (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse (mapOpsM f))
