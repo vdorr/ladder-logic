@@ -15,6 +15,9 @@ import Data.Semigroup
 import Data.Void
 import Control.Monad.Except
 import Data.Foldable
+import Data.Bifunctor
+import Control.Monad.Writer.Strict
+import Data.Functor.Identity
 
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
@@ -57,7 +60,12 @@ getSignals sg vect trace =
 emitDevice03
     :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
     -> [Instruction (V String) String]
-emitDevice03 (ops, impl) = case impl (fmap unAddr ops) of
+emitDevice03 = snd . emitDevice03'
+
+emitDevice03'
+    :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
+    -> ([String], [Instruction (V String) String])
+emitDevice03' (ops, impl) = case impl (fmap unAddr ops) of
                             Left err -> error $ show (here, err)
                             Right x -> x
     where
@@ -72,8 +80,7 @@ compileForTest03
             lbl) DgExt)]
     -> m [ExtendedInstruction Int (V String) String]
 compileForTest03 ast = do
-    prog <- generateStk2xx pure emitDevice03 ast
-    return $ prog ++ [EIReturn]
+    (++ [EIReturn]) <$> generateStk2xx pure emitDevice03 ast
 
 --------------------------------------------------------------------------------
 
@@ -86,15 +93,39 @@ runLadderTest2
                     String) DgExt)]
     -> IO Bool
 runLadderTest2 verbose test ast = do
---     undefined
     when verbose $ print here
-
     prog <- either fail pure $ compileForTest03 ast
     when verbose $ do
         putStrLn "---------------------------"
         for_ prog print
         putStrLn "---------------------------"
     runLadderTestX verbose test prog
+
+runLadderTest22
+    :: Bool
+    -> LadderTest
+    -> [(Maybe String
+            , Cofree (Diagram Void 
+                    (([(CellType, Operand Text)], DeviceImpl (V String) String))
+                    String) DgExt)]
+    -> IO Bool
+runLadderTest22 verbose test ast = do
+    when verbose $ print here
+    prog <- either fail pure $ compileForTest03 ast
+    let xxx = execWriter $ traverse_ (traverse_ (mp2)) ast
+    print (here, xxx)
+
+    when verbose $ do
+        putStrLn "---------------------------"
+        for_ prog print
+        putStrLn "---------------------------"
+    runLadderTestX verbose test prog
+
+    where
+    mp2 (_ :< n) = do
+        mapDgA pure (tell.fst) pure n
+        traverse_ mp2 n
+
 
 runLadderTestX
     :: Bool

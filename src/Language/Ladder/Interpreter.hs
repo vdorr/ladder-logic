@@ -312,7 +312,7 @@ data RW = Rd | Wr
 
 data DeviceDescription n impl = DDesc !String ![(RW, CellType)] !impl
 
-type DeviceImpl word addr = [Operand addr] -> Either String [Instruction word addr]
+type DeviceImpl word addr = [Operand addr] -> Either String ([addr], [Instruction word addr])
 
 type Devices word addr name =
     [(DevType name, DeviceDescription name (DeviceImpl word addr))]
@@ -323,25 +323,25 @@ devices
     -> (addr -> Either String word)
     -> Devices word addr name
 devices mkWord litFromAddr =
-    [ (cont " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, IAnd]))
-    , (cont "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right [ILdBit a, INot, IAnd]))
+    [ (cont " ", DDesc "AND"  [(Rd, Bit)] (\[Var a] -> Right ([], [ILdBit a, IAnd])))
+    , (cont "/", DDesc "ANDN" [(Rd, Bit)] (\[Var a] -> Right ([], [ILdBit a, INot, IAnd])))
     , (cont ">", DDesc "GT" [(Rd, Word), (Rd, Word)]
         (\[a, b] -> do
             a' <- emitOp a
             b' <- emitOp b
-            Right $ a' ++ b' ++ [IGt]))
+            Right ([], a' ++ b' ++ [IGt])))
     , (cont "<", DDesc "LT" [(Rd, Word), (Rd, Word)]
         (\ops -> do
             [a, b] <- for ops emitOp
-            Right $ a ++ b ++ [ILt]))
+            Right ([], a ++ b ++ [ILt])))
 
-    , (coil    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right [IDup, IStBit a]))
-    , (coil    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right [IDup, INot, IStBit a]))
+    , (coil    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right ([], [IDup, IStBit a])))
+    , (coil    "/", DDesc "STN"  [(Wr, Bit)] (\[Var a] -> Right ([], [IDup, INot, IStBit a])))
 
     , (coil    "S", DDesc "SET"  [(Wr, Bit)]
-        (\[Var a] -> Right [IDup, ILdBit a, IOr, IStBit a]))
+        (\[Var a] -> Right ([], [IDup, ILdBit a, IOr, IStBit a])))
     , (coil    "R", DDesc "RST"  [(Wr, Bit)]
-        (\[Var a] -> Right [IDup, INot, ILdBit a, IAnd, IStBit a]))
+        (\[Var a] -> Right ([], [IDup, INot, ILdBit a, IAnd, IStBit a])))
     ]
     where
     cont = Contact_ . fromString 

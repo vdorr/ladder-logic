@@ -271,9 +271,21 @@ emitDevice02
     -> [Instruction Word16 Word8]
 emitDevice02 (ops, impl) = case impl (fmap unAddr ops) of
                             Left err -> error $ show (here, err)
-                            Right x -> x
+                            Right (_xxx, x) -> x
     where
     unAddr :: Operand (Address Int) -> Operand Word8
     unAddr (Var (WordAddr a)) = Var $ fromIntegral a
     unAddr (Var (BitAddr  a)) = Var $ fromIntegral a
     unAddr (Lit _) = undefined -- ???
+
+-- emitDevice02'
+--     :: ([Operand (Address Int)], DeviceImpl Word16 Word8)
+--     -> ([Word8], [Instruction Word16 Word8])
+-- emitDevice02' (ops, impl) = case impl (fmap unAddr ops) of
+--                             Left err -> error $ show (here, err)
+--                             Right x -> x
+--     where
+--     unAddr :: Operand (Address Int) -> Operand Word8
+--     unAddr (Var (WordAddr a)) = Var $ fromIntegral a
+--     unAddr (Var (BitAddr  a)) = Var $ fromIntegral a
+--     unAddr (Lit _) = undefined -- ???
