@@ -113,7 +113,7 @@ runLadderTest22 verbose test ast = do
     when verbose $ print here
     prog <- either fail pure $ compileForTest03 ast
     let xxx = execWriter $ traverse_ (traverse_ (mp2)) ast
-    print (here, xxx)
+    print (here, nub xxx, "<<<<<")
 
     when verbose $ do
         putStrLn "---------------------------"
@@ -122,10 +122,24 @@ runLadderTest22 verbose test ast = do
     runLadderTestX verbose test prog
 
     where
+    mp2 :: Cofree
+                        (Diagram c' ([(CellType, Operand Text)], b) s') a
+                      -> WriterT [(CellType, Text)] Identity ()
     mp2 (_ :< n) = do
-        mapDgA pure (tell.fst) pure n
+        mapDgA pure (tell.addressesOnly.fst) pure n
         traverse_ mp2 n
 
+    addressesOnly s = [(t, a)|((t, Var a)) <- s]
+
+
+runLadderTestXx
+    :: Bool
+    -> [ExtendedInstruction Int (V String) String]
+    -> ()
+    -> ()
+    -> IO Bool
+runLadderTestXx verbose prog memory vect = do
+    undefined
 
 runLadderTestX
     :: Bool
@@ -138,6 +152,8 @@ runLadderTestX verbose test@T01{} prog = do
 --TODO select signals for display independently from signals for test evaluation
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
+
+    runLadderTestXx verbose prog allSigs (testVect test)
 
     let xxy = evalTestVect''' prog allSigs (testVect test)
 

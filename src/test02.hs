@@ -29,7 +29,7 @@ main = do
 --             let ast = fmap (second (mapDg id snd id)) ast'
 --             let ast = fmap (second (mp)) ast'
 
-            passed <- runLadderTest2 True test ast
+            passed <- runLadderTest22 True test ast
             print (here, passed, if passed then "PASSED" else "FAILED")
         Nothing -> print (here, "no embedded test found")
 
