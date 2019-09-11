@@ -101,6 +101,17 @@ runLadderTest2 verbose test ast = do
         putStrLn "---------------------------"
     runLadderTestX verbose test prog
 
+
+memSlotsToTestVector :: Int -> [(CellType, addr)] -> TestVect addr
+memSlotsToTestVector n m = (1, fmap g m) : [(n - 1, [])]
+-- [(Int, [(addr, (V addr))])]
+    where
+    g (t, addr) = (addr, f t)
+    f Bit     = X False
+    f Word    = I 0
+    f TwoBits = undefined --TODO
+
+
 runLadderTest22
     :: Bool
     -> LadderTest
@@ -112,8 +123,9 @@ runLadderTest22
 runLadderTest22 verbose test ast = do
     when verbose $ print here
     prog <- either fail pure $ compileForTest03 ast
-    let xxx = execWriter $ traverse_ (traverse_ (mp2)) ast
-    print (here, nub xxx, "<<<<<")
+    let memSlots :: [(CellType, Text)] = nub $ execWriter $ traverse_ (traverse_ mp2) ast
+    print (here, memSlots, "<<<<<")
+    print (here, memSlotsToTestVector 4 memSlots, "<<<<<")
 
     when verbose $ do
         putStrLn "---------------------------"
@@ -132,13 +144,56 @@ runLadderTest22 verbose test ast = do
     addressesOnly s = [(t, a)|((t, Var a)) <- s]
 
 
+runLadderTest221
+    :: Bool
+    -> Int
+    -> [(Maybe String
+            , Cofree (Diagram Void 
+                    (([(CellType, Operand Text)], DeviceImpl (V String) String))
+                    String) DgExt)]
+    -> IO ()
+runLadderTest221 verbose num ast = do
+    when verbose $ print here
+    prog <- either fail pure $ compileForTest03 ast
+    let memSlots' :: [(CellType, Text)] = nub $ execWriter $ traverse_ (traverse_ mp2) ast
+    let memSlots = fmap (fmap unpack) memSlots'
+    print (here, memSlots, "<<<<<")
+    let vect = memSlotsToTestVector num memSlots
+    print (here, vect, "<<<<<")
+
+    when verbose $ do
+        putStrLn "---------------------------"
+        for_ prog print
+        putStrLn "---------------------------"
+--     runLadderTestX verbose test prog
+    let allSigs = fmap undefined memSlots
+    let xxy = evalTestVect''' prog allSigs vect
+
+    when verbose $ print (here, xxy)
+    let Right traces = xxy
+
+    print (here, traces)
+    
+    return ()
+
+    where
+    mp2 :: Cofree
+                        (Diagram c' ([(CellType, Operand Text)], b) s') a
+                      -> WriterT [(CellType, Text)] Identity ()
+    mp2 (_ :< n) = do
+        mapDgA pure (tell.addressesOnly.fst) pure n
+        traverse_ mp2 n
+
+    addressesOnly s = [(t, a)|((t, Var a)) <- s]
+
+
 runLadderTestXx
     :: Bool
     -> [ExtendedInstruction Int (V String) String]
-    -> ()
-    -> ()
+    -> [String]
+    -> [(Int, [(String, V String)])]
     -> IO Bool
-runLadderTestXx verbose prog memory vect = do
+runLadderTestXx verbose prog signalNames testVect = do
     undefined
 
 runLadderTestX
@@ -153,7 +208,7 @@ runLadderTestX verbose test@T01{} prog = do
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
 
-    runLadderTestXx verbose prog allSigs (testVect test)
+--     runLadderTestXx verbose prog allSigs (testVect test)
 
     let xxy = evalTestVect''' prog allSigs (testVect test)
 

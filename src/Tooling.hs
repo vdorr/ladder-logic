@@ -106,7 +106,7 @@ flattenTestVect ((d, v) : xs)
 updateMemory :: Eq addr => [(addr, V addr)] -> [(addr, V addr)] -> [(addr, V addr)]
 updateMemory old new = nubBy (on (==) fst) $ new ++ old --yeah performace be damned
 
-type TestVect addr = [(Int, [(addr, (V addr))])]
+type TestVect addr = [(Int, [(addr, V addr)])]
 -- type TestVect = [(Int, [(VarName, V)])]
 type VarName = String
 
