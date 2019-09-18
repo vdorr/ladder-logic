@@ -166,14 +166,15 @@ runLadderTest221 verbose num ast = do
         for_ prog print
         putStrLn "---------------------------"
 --     runLadderTestX verbose test prog
-    let allSigs = fmap undefined memSlots
+    let allSigs = fmap snd memSlots
     let xxy = evalTestVect''' prog allSigs vect
 
-    when verbose $ print (here, xxy)
+--     when verbose $ print (here, xxy)
     let Right traces = xxy
 
     print (here, traces)
-    
+    when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
+
     return ()
 
     where
