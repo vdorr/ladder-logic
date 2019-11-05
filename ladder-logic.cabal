@@ -17,13 +17,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Eval
-                     , Preprocess
-                     , DiagramParser
-                     , LadderParser
-                     , Compile
-                     , Ladder.Javascript
-                     , OldAstInterpreter
+  exposed-modules:     OldAstInterpreter
                      , Tooling
                      , TestUtils
                      , Language.Ladder.Zipper
