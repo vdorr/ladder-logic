@@ -38,7 +38,7 @@ cstub1 = unlines (concat (concat q))
         where
         argNames = zipWith (\i _ -> "f" ++ show i) [0::Integer .. ] ops
         argLoads = concat $ zipWith (\an thisOp -> mkget an thisOp) argNames ops
-        opCall = mkopstub op ++ "(" ++ intercalate ", " argNames ++ ");"
+        opCall = mkopstub op ++ "(" ++ intercalate ", " ("p" : argNames) ++ ");"
     opcase _ _ = error here
 
     switch val cases =
@@ -73,7 +73,6 @@ cstub1 = unlines (concat (concat q))
 
 main :: IO ()
 main = do
-    print here
-
-    print (here, instructionsToChunks i0)
+--     print here
+--     print (here, instructionsToChunks i0)
     putStrLn cstub1

@@ -140,6 +140,14 @@ writeBlob = do
 
 --------------------------------------------------------------------------------
 
+--TODO
+-- data YetMoreExtendedInstruction
+--     = SetBinVariablesCOunt Word16
+--     | SetWordVariablesCOunt Word16
+--     | OtherInstruction -- ...
+
+--------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
     print here
@@ -161,6 +169,7 @@ main = do
     print (here, args)
     case args of
         fn : fns -> do
+            putStrLn $ "compiling '" <> fn <> "'"
             (memory, prog) <- compileOrDieX fn
             print (here, memory)
             print (here, prog)
@@ -168,11 +177,17 @@ main = do
 --             print (here, memory)
 --             let prog = fmap aaaargh prog
 --             print (here, prog)
-            putStrLn $ asCArray $ programToByteString prog
             case fns of
-                outputFile : _ -> do
-                    print (here, outputFile)
-                    writeBlob outputFile prog
-                _ -> return ()
-        _    ->
+                "-o" : ofile : _rest -> do
+                    putStrLn $ "writing output to '" <> ofile <> "'"
+                    L.writeFile ofile $ programToByteString prog
+--                     undefined
+                _           -> putStrLn $ asCArray $ programToByteString prog
+--             case fns of
+--                 outputFile : _ -> do
+--                     print (here, outputFile)
+--                     writeBlob outputFile prog
+--                 _ -> return ()
+        _    -> do
+            putStrLn "nothing to do"
             return ()

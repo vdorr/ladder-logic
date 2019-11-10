@@ -5,15 +5,15 @@
 
 import qualified Data.Text.IO as TIO
 import System.Environment (getArgs)
-import Data.Bifunctor
+-- import Data.Bifunctor
 import Text.Read
 
 import Language.Ladder.Interpreter --FIXME
 import Language.Ladder.Simple --FIXME
 
 import TestUtils
-import Language.Ladder.LadderParser
-import Language.Ladder.Utils
+-- import Language.Ladder.LadderParser
+-- import Language.Ladder.Utils
 
 --------------------------------------------------------------------------------
 
@@ -38,7 +38,7 @@ main = do
         (Nothing, []) -> do
             print (here, "no embedded test found")
             runLadderTest221 True 10 ast
-        other -> do
+        _other -> do
             error $ show (here, "TODO")
 
 --     where
