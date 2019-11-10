@@ -133,14 +133,14 @@ coilType    : ...
 ladder :: LdP d t (Cofree (Diagram Void d t) DgExt)
 ladder
     = setDir goDown
-    *> ((:<) <$> currentPos <*> fmap Source vline')
+    *> (ann <$> currentPos <*> fmap Source vline')
     <* dgIsEmpty
 
 -- like 'ladder' but do not check if all lexemes consumed
 ladderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
 ladderLiberal
     = setDir goDown
-    *> ((:<) <$> currentPos <*> fmap Source vline')
+    *> (ann <$> currentPos <*> fmap Source vline')
 
 --------------------------------------------------------------------------------
 
@@ -205,7 +205,7 @@ isTok :: (Functor f, Eq (f ())) => f a -> f a -> Bool
 isTok = on (==) (fmap (const ()))
 
 node :: LdP d t (Cofree (Diagram c d t) DgExt)
-node = (:<) <$> currentPos <*> (Node <$> node')
+node = ann <$> currentPos <*> (Node <$> node')
 
 node' :: LdP d t [Cofree (Diagram c d t) DgExt]
 node'

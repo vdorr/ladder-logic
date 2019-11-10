@@ -15,6 +15,9 @@ instance (Eq a, Eq (f (Cofree f a))) => Eq (Cofree f a) where
 instance (Functor f, forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where
     show (a :< as) = "(" ++ show a ++ " :< " ++ show as ++ ")"
 
+-- |Alias for `:<`
+ann :: a -> f (Cofree f a) -> Cofree f a
+ann = (:<)
 -- newtype PPCofree f a = PPCofree (Cofree f a)
 -- 
 -- instance (Functor f, forall t. Show t => Show (f t), Show a) => Show (Cofree f a) where

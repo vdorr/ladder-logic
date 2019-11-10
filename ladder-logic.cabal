@@ -30,11 +30,13 @@ library
                      , Language.Ladder.Simple
                      , Language.Ladder.OldBackend
                      , Language.Ladder.Example
+                     , Language.Ladder.Entry
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
                      , PatternSynonyms, DeriveFunctor, TypeApplications
                      , DeriveFoldable, DeriveTraversable, ViewPatterns
+                     , OverloadedStrings, FlexibleInstances
   build-depends:       base >=4.9 && <5
                      , mtl >=2.2
                      , vector >=0.12
@@ -65,7 +67,7 @@ test-suite             1
   default-extensions:  CPP, TupleSections, ScopedTypeVariables
                      , LambdaCase, RecordWildCards, FlexibleContexts
                      , PatternSynonyms, DeriveFunctor, TypeApplications
-                     , DeriveFoldable, DeriveTraversable
+                     , DeriveFoldable, DeriveTraversable, FlexibleInstances
   ghc-options:        -fwarn-incomplete-patterns
                       -fwarn-unused-binds
                       -fwarn-unused-imports
