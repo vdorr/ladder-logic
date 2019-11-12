@@ -19,7 +19,6 @@ import Language.Ladder.Zipper
 
 -- |Returns number of remaining tokens
 dgLength :: Dg a -> Int
---dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
 dgLength (Zp l r) = sum (fmap zpLength l) + sum (fmap zpLength r)
 
 dgNull :: Dg a -> Bool
@@ -30,49 +29,6 @@ dgTrim :: Dg a -> Dg a
 dgTrim (Zp l r) = Zp (trim l) (trim r)
     where
     trim = filter (not . zpNull)
-
---------------------------------------------------------------------------------
-
--- #if 0
--- {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
--- --XXX seem too general to have such specific name, 'StateAndFailureMonad' maybe?
--- newtype SFM s a = SFM { sfm :: s -> Either String (a, s) }
--- 
--- instance Functor (SFM s) where
---     fmap = ap . return
--- 
--- instance Applicative (SFM s) where
---     pure = return
---     (<*>) = ap
--- 
--- instance Monad (SFM s) where
---     return a = SFM $ \s -> return (a, s)
---     a >>= b = SFM $ \s -> do
---         (y, s') <- sfm a s
---         sfm (b y) s'
--- 
--- instance MonadFail (SFM s) where
---     fail = SFM . const . Left
--- 
--- instance Alternative (SFM s) where
---     empty = SFM $ const $ Left "alt empty"
---     a <|> b = SFM $ \s -> --sfm a s <|> sfm b s
---                 either (const $ sfm b s) Right (sfm a s)
--- 
--- -- get :: SFM s s
--- -- get = SFM $ \s -> return (s, s)
--- -- 
--- -- put :: s -> SFM s ()
--- -- put s = SFM $ \_ -> return ((), s)
--- -- 
--- -- modify :: (s -> s) -> SFM s ()
--- -- modify f = f <$> get >>= put
--- 
--- instance MonadState s (SFM s) where
---     get = SFM $ \s -> Right (s, s)
---     put s = SFM $ \_ -> Right ((), s)
---     state f = SFM $ \s -> Right $ f s
--- #endif
 
 --------------------------------------------------------------------------------
 
@@ -321,10 +277,6 @@ mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col = (moveToLine line >=> moveToCol col) . focusDg --FIXME get rid of focusing
 
--- pattern DgLine :: [(a, b)] -> a -> b -> [(a, b)] -> Zp (a, b)
--- pattern DgLine :: [(a, b)] -> a -> b -> [(a, b)] -> Zp (a, b)
--- pattern DgLine us ln zp ds = Zp us (zp : ds)
-
 --FIXME merge with moveToLine somehow?
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
 moveToCol col (Zp us (zp : ds)) = reassemble <$> move2 (dir col . fst) zp
@@ -342,12 +294,8 @@ focusDg = fmap focus . focus
 
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
 moveToLine ln = move2 (compare (Just ln) . lnNr)
--- moveToLine' line zp@(Zp _ ( (ln, _) : _))
---     | line >= ln = moveTo stepRight ((line==).fst) zp
---     | otherwise = moveTo stepLeft ((line==).fst) zp
--- moveToLine' _ _ = Nothing
     where
-    lnNr (Zp [] []) = Nothing -- (-1) --FIXME
+    lnNr (Zp [] []                ) = Nothing
     lnNr (Zp (((lnx, _), _) : _) _) = Just lnx
     lnNr (Zp _ (((lnx, _), _) : _)) = Just lnx
 
