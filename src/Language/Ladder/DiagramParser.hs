@@ -19,7 +19,8 @@ import Language.Ladder.Zipper
 
 -- |Returns number of remaining tokens
 dgLength :: Dg a -> Int
-dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
+--dgLength (Zp l r) = sum (fmap (zpLength.snd) l) + sum (fmap (zpLength.snd) r)
+dgLength (Zp l r) = sum (fmap zpLength l) + sum (fmap zpLength r)
 
 dgNull :: Dg a -> Bool
 dgNull = (>0) . dgLength --FIXME
@@ -28,7 +29,7 @@ dgNull = (>0) . dgLength --FIXME
 dgTrim :: Dg a -> Dg a
 dgTrim (Zp l r) = Zp (trim l) (trim r)
     where
-    trim = filter (not . zpNull . snd)
+    trim = filter (not . zpNull)
 
 --------------------------------------------------------------------------------
 
@@ -86,7 +87,7 @@ instance Control.Monad.Fail.MonadFail (Either String) where
 --------------------------------------------------------------------------------
 
 -- |Diagram parser input stream (or, say, input vortex)
-type Dg a = Zp (Int, Zp ((Int, Int), a))
+type Dg a = Zp (Zp (DgExt, a))
 
 -- |Token position and extent
 type DgExt = (Int, (Int, Int))
@@ -268,8 +269,8 @@ branch isFork branches = do
 --     return (f, stuff)
 
 -- |Matches diagram with nothing remaining on current line
-pattern DgLineEnd :: Zp (a, Zp a1)
-pattern DgLineEnd <- Zp _l ((_ln, Zp _ []) : _)
+pattern DgLineEnd :: Zp (Zp a1)
+pattern DgLineEnd <- Zp _l (Zp _ [] : _)
 
 -- |Succeeds only when positioned on end of line
 eol :: SFM (DgPState st tok) ()
@@ -288,27 +289,29 @@ colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 -- |Pop focused item, return its extent and updated zipper
 dgPop :: Dg a -> Maybe (a, DgExt, Dg a)
-dgPop (Zp u ((ln, Zp l ((col, x) : rs)) : ds))
-    = Just (x, (ln, col), Zp u ((ln, Zp l rs) : ds))
+dgPop (Zp u ((Zp l (((ln, col), x) : rs)) : ds))
+    = Just (x, (ln, col), dgTrim $ Zp u ((Zp l rs) : ds))
 dgPop _ = Nothing
 
-pattern DgFocused :: b -> Zp (a, Zp (a1, b))
-pattern DgFocused x <- Zp _ ((_, Zp _ ((_, x) : _)) : _)
+pattern DgFocused :: b -> Zp (Zp (a1, b))
+pattern DgFocused x <- Zp _ ((Zp _ ((_, x) : _)) : _)
 
 cursor :: Dg a -> Maybe a
 cursor (DgFocused x) = Just x
 cursor _             = Nothing
 
 -- |Match on current token position
-pattern DgFocusedPos :: a -> a1 -> b -> Zp (a, Zp ((a1, b), b1))
-pattern DgFocusedPos ln cl cr <- Zp _ ((ln, Zp _ (((cl, cr), _) : _)) : _)
+pattern DgFocusedPos :: p -> Zp (Zp (p, a))
+pattern DgFocusedPos p <- Zp _ (Zp _ ((p, _) : _) : _)
 
-pos :: Dg a -> Maybe (Int, (Int, Int))
-pos (DgFocusedPos ln cl cr) = Just (ln, (cl, cr))
-pos _                       = Nothing
+pos :: Dg a -> Maybe DgExt
+pos (DgFocusedPos p) = Just p
+pos _                = Nothing
 
 mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
-mkDgZp = Zp [] . fmap (fmap (Zp []))
+mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
+    where
+        xxx = fmap (\(nr, ln) -> fmap (\(co, tok) -> ((nr, co), tok)) ln)
 
 --------------------------------------------------------------------------------
 
@@ -318,39 +321,35 @@ mkDgZp = Zp [] . fmap (fmap (Zp []))
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col = (moveToLine line >=> moveToCol col) . focusDg --FIXME get rid of focusing
 
-pattern DgLine :: [(a, b)] -> a -> b -> [(a, b)] -> Zp (a, b)
-pattern DgLine us ln zp ds = Zp us ((ln, zp) : ds)
+-- pattern DgLine :: [(a, b)] -> a -> b -> [(a, b)] -> Zp (a, b)
+-- pattern DgLine :: [(a, b)] -> a -> b -> [(a, b)] -> Zp (a, b)
+-- pattern DgLine us ln zp ds = Zp us (zp : ds)
 
 --FIXME merge with moveToLine somehow?
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
--- moveToCol col (Zp us ((ln, zp@(Zp l (((cl, cr), _) : _))) : ds))
--- moveToCol col (DgLine us ln zp@(Zp l (((cl, cr), _) : _)) ds)
---     | col >= cl = reassemble <$> moveTo stepRight (isIn . fst) zp
---     | otherwise = reassemble <$> moveTo stepLeft (isIn . fst) zp
---     where
---     isIn (a, b) = b >= col && a <= col
--- --     reassemble zp' = Zp us ((ln, zp') : ds)
---     reassemble zp' = DgLine us ln zp' ds
--- moveToCol _ _ = Nothing
-moveToCol col (DgLine us ln zp ds) = reassemble <$> move2 (dir col . fst) zp
+moveToCol col (Zp us (zp : ds)) = reassemble <$> move2 (dir col . fst) zp
     where
-    dir x (a, b)
+    dir x (_, (a, b))
         | x < a = LT
         | x > b = GT
         | otherwise = EQ
-    reassemble zp' = DgLine us ln zp' ds
+    reassemble zp' = Zp us (zp' : ds)
 moveToCol _ _ = Nothing
 
 --FIXME get rid of focusing
 focusDg :: Dg a -> Dg a
-focusDg = fmap (fmap focus) . focus
+focusDg = fmap focus . focus
 
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
-moveToLine ln = move2 (compare ln . fst)
+moveToLine ln = move2 (compare (Just ln) . lnNr)
 -- moveToLine' line zp@(Zp _ ( (ln, _) : _))
 --     | line >= ln = moveTo stepRight ((line==).fst) zp
 --     | otherwise = moveTo stepLeft ((line==).fst) zp
 -- moveToLine' _ _ = Nothing
+    where
+    lnNr (Zp [] []) = Nothing -- (-1) --FIXME
+    lnNr (Zp (((lnx, _), _) : _) _) = Just lnx
+    lnNr (Zp _ (((lnx, _), _) : _)) = Just lnx
 
 --------------------------------------------------------------------------------
 

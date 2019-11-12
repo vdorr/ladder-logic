@@ -263,13 +263,13 @@ dgpTests = testGroup "Diagram parser"
     , testCase "dgIsEmpty negative case" $
         simpleResult (fst <$> applyDgp dgIsEmpty someDg ()) @=? Left True
     , testCase "trim 1" $
-        dgTrim (Zp [] [(1, Zp [] [])]) @=? mkDgZp @(Tok Text) []
+        dgTrim (Zp [] [(Zp [] [])]) @=? mkDgZp @(Tok Text) []
     , testCase "trim 2" $
         dgTrim someDg
             @=? mkDgZp @(Tok Text) [(1, [((1, 1), VLine)])]
     ]
     where
-    someDg = Zp [] [(1, Zp [] [((1, 1), VLine)])]
+    someDg = Zp [] [Zp [] [((1, (1, 1)), VLine)]]
 
 --------------------------------------------------------------------------------
 
