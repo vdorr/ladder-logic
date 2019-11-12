@@ -609,8 +609,8 @@ basicTests =
 
 getTests :: IO TestTree
 getTests = do
-    ftPos <- fileTests "test"
-    ftNeg <- fileTestsNeg $ "test" </> "negative"
+    ftPos <- fileTests $ "test" </> "data"
+    ftNeg <- fileTestsNeg $ "test" </> "data" </> "negative"
     return $ testGroup "Tests" [testGroup "Basic" basicTests, ftPos, ftNeg]
 
 --------------------------------------------------------------------------------
