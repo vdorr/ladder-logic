@@ -3,7 +3,7 @@ module Language.Ladder.Zipper where
 
 --------------------------------------------------------------------------------
 
-data Zp a = Zp [a] [a]
+data Zp a = Zp ![a] ![a]
     deriving (Show, Functor, Eq) -- , Foldable)
 
 zpFromList :: [a] -> Zp a
@@ -27,7 +27,14 @@ focus zp             = zp
 
 tip :: Zp a -> Maybe a
 tip (Zp _ (x:_)) = Just x
-tip _            =  Nothing
+tip _            = Nothing
+
+pop :: Zp a -> Maybe (a, Zp a)
+pop (Zp l (x:r)) = Just (x, Zp l r)
+pop _            = Nothing
+
+push :: Zp a -> a -> Zp a
+push (Zp l r) x = Zp l (x : r)
 
 zpLookup :: Eq k => k -> Zp (k, v) -> Zp (k, v)
 zpLookup needle (Zp l r@(c@(k, _) : rs))
@@ -70,7 +77,7 @@ moveTo move test zp@(ZpR l foc r) -- = undefined
 moveTo _ _ _ = Nothing
 
 move2 :: (a -> Ordering) -> Zp a -> Maybe (Zp a)
-move2 f zp@(Zp _ (x : xs))
+move2 f zp@(Zp _ (x : _xs))
     | LT == f x   = moveTo stepLeft  ((==EQ).f) zp
     | otherwise   = moveTo stepRight ((==EQ).f) zp
 move2 _ _ = Nothing

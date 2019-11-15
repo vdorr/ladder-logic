@@ -124,7 +124,7 @@ eat :: SFM (DgPState st tok) tok
 eat = do
     DgPSt nx dg ps True st <- get
     case dgPop dg of
-        Just (v, p, dg') -> do
+        Just ((p, v), dg') -> do
             put $ case nx p dg' of
                 Right q -> DgPSt nx q   (Just p) True  st
                 Left  _ -> DgPSt nx dg' (Just p) False st --nowhere to move
@@ -243,26 +243,42 @@ colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 --------------------------------------------------------------------------------
 
+test :: Dg a -> Maybe ((DgExt, a), Dg a)
+test dg = pop dg
+    >>= \(ln, dg') -> 
+        fmap (fmap (fmap (dgTrim . push dg')))
+            pop ln
+--     >>= \(x, ln') -> 
+--         return (x, dgTrim $ push dg' ln')
+
+--Zp a -> (a -> Maybe a) -> Maybe (Zp a)
+
 -- |Pop focused item, return its extent and updated zipper
-dgPop :: Dg a -> Maybe (a, DgExt, Dg a)
-dgPop (Zp u ((Zp l (((ln, col), x) : rs)) : ds))
-    = Just (x, (ln, col), dgTrim $ Zp u ((Zp l rs) : ds))
+dgPop :: Dg a -> Maybe ((DgExt, a), Dg a)
+dgPop (Zp u ((Zp l (x : rs)) : ds))
+    = Just (x, dgTrim $ Zp u ((Zp l rs) : ds))
 dgPop _ = Nothing
 
-pattern DgFocused :: b -> Zp (Zp (a1, b))
-pattern DgFocused x <- Zp _ ((Zp _ ((_, x) : _)) : _)
+-- pattern DgFocused :: b -> Zp (Zp (a1, b))
+-- pattern DgFocused x <- Zp _ ((Zp _ ((_, x) : _)) : _)
 
 cursor :: Dg a -> Maybe a
-cursor (DgFocused x) = Just x
-cursor _             = Nothing
+-- cursor (DgFocused x) = Just x
+-- cursor _             = Nothing
+cursor = tip >=> tip >=> pure . snd
 
 -- |Match on current token position
-pattern DgFocusedPos :: p -> Zp (Zp (p, a))
-pattern DgFocusedPos p <- Zp _ (Zp _ ((p, _) : _) : _)
+-- pattern DgFocusedPos :: p -> Zp (Zp (p, a))
+-- pattern DgFocusedPos p <- Zp _ (Zp _ ((p, _) : _) : _)
 
 pos :: Dg a -> Maybe DgExt
-pos (DgFocusedPos p) = Just p
-pos _                = Nothing
+-- pos (DgFocusedPos p) = Just p
+-- pos _                = Nothing
+-- pos = fmap fst . (tip >=> tip)
+pos = tip >=> tip >=> pure . fst
+
+-- line :: Dg a -> Maybe Int
+-- line = pos >=> pure . fst
 
 mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
 mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
@@ -295,9 +311,10 @@ focusDg = fmap focus . focus
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
 moveToLine ln = move2 (compare (Just ln) . lnNr)
     where
-    lnNr (Zp [] []                ) = Nothing
-    lnNr (Zp (((lnx, _), _) : _) _) = Just lnx
-    lnNr (Zp _ (((lnx, _), _) : _)) = Just lnx
+    lnNr = tip >=> pure . fst . fst
+--     lnNr (Zp [] []                ) = Nothing
+--     lnNr (Zp (((lnx, _), _) : _) _) = Just lnx
+--     lnNr (Zp _ (((lnx, _), _) : _)) = Just lnx
 
 --------------------------------------------------------------------------------
 
