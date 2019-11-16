@@ -60,7 +60,7 @@ testPreproc6
     = fmap ( (fmap (fmap (fmap (fmap snd)))) . labeledRungs) . preproc5'
 
 testPreproc4 :: Text -> Either Text [[Tok Text]]
-testPreproc4 = fmap (dropPos2) . preproc5'
+testPreproc4 = fmap dropPos2 . preproc5'
 
 testPreproc5 :: Text -> Either Text [Tok Text]
 testPreproc5 = fmap concat . testPreproc4
