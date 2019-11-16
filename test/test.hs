@@ -43,23 +43,24 @@ import TestUtils
 --discards whitespace tokens
 preproc5'
     :: Text
-    -> Either Text [(Int, [((Int, Int), Tok Text)])]
+    -> Either Text [[((Int, (Int, Int)), Tok Text)]]
 preproc5' = preproc . runLexer
     where
-    preproc = fmap (stripPos . dropWhitespace)
+    preproc = fmap (stripPos3 . dropWhitespace2)
 
 --------------------------------------------------------------------------------
 
-preproc5'' :: Text -> Either String [(Int, [((Int, Int), Tok Text)])]
+preproc5'' :: Text -> Either String [[((Int, (Int, Int)), Tok Text)]]
 preproc5'' = first unpack . preproc5'
 
 --basic blocks
 testPreproc6 :: Text -> Either Text [(Maybe Text, [[Tok Text]])]
 testPreproc6
-    = fmap (fmap (fmap (fmap (snd . fmap (fmap snd))))) . fmap labeledRungs . preproc5'
+--     = fmap (fmap (fmap (fmap (snd . fmap (fmap snd))))) . fmap labeledRungs . preproc5'
+    = fmap ( (fmap (fmap (fmap (fmap snd)))) . labeledRungs) . preproc5'
 
 testPreproc4 :: Text -> Either Text [[Tok Text]]
-testPreproc4 = fmap (fmap (snd . fmap (fmap snd))) . preproc5'
+testPreproc4 = fmap (dropPos2) . preproc5'
 
 testPreproc5 :: Text -> Either Text [Tok Text]
 testPreproc5 = fmap concat . testPreproc4
@@ -80,7 +81,7 @@ checkSyntax s
     (preproc5'' s >>=
         runLadderParser_ wrapDeviceForTest ladder)
 
-assertFullyConsumed :: [(Int, [((Int, Int), Tok Text)])] -> Assertion
+assertFullyConsumed :: [[(DgExt, Tok Text)]] -> Assertion
 assertFullyConsumed tk
     = (() <$ runLadderParser wrapDeviceForTest ladder tk)
     @?= Right ()
@@ -266,7 +267,7 @@ dgpTests = testGroup "Diagram parser"
         dgTrim (Zp [] [(Zp [] [])]) @=? mkDgZp @(Tok Text) []
     , testCase "trim 2" $
         dgTrim someDg
-            @=? mkDgZp @(Tok Text) [(1, [((1, 1), VLine)])]
+            @=? mkDgZp @(Tok Text) [[((1, (1, 1)), VLine)]]
     ]
     where
     someDg = Zp [] [Zp [] [((1, (1, 1)), VLine)]]
@@ -283,12 +284,12 @@ ladderTests = testGroup "Ladder parser"
     , testCase "test04" $ assertFullyConsumed t04
     , testCase "test07a" $ assertFullyConsumed t07a
     , testCase "unexpected"
-        $ simpleResult (runLadderParser_ wrapDevTest1 ladder [ (1, [((1, 1), Return)]) ])
+        $ simpleResult (runLadderParser_ wrapDevTest1 ladder [ [((1, (1, 1)), Return)] ])
             @?= Left True
     , testCase "gap"
         $ simpleResult (runLadderParser_ wrapDevTest1 ladder
-            [ (1, [((1, 1), VLine)])
-            , (2, [((1, 1), Cross), ((2, 2), HLine 2 0), ((4, 4), HLine 2 0)])
+            [ [((1, (1, 1)), VLine)]
+            , [((2, (1, 1)), Cross), ((2, (2, 2)), HLine 2 0), ((2, (4, 4)), HLine 2 0)]
             ])
         @?= Left True
     , testCase "testN01"
@@ -616,7 +617,7 @@ getTests = do
 --------------------------------------------------------------------------------
 
 parseForTestOrDie
-    :: [(Int, [((Int, Int), Tok Text)])]
+    :: [[((Int, (Int, Int)), Tok Text)]]
     -> IO [ ( Maybe String
             , Cofree
                 (Diagram Void ([(CellType, Operand Text)], DeviceImpl (V addr) addr) String)
@@ -669,7 +670,7 @@ fileTests path
     = testFromDirectory path "File tests - positive" $ \fn -> do
         return $ testCase fn $ do
             (tst, lxs'') <- loadLadderTest (path </> fn)
-            let lxs = dropWhitespace lxs''
+            let lxs = dropWhitespace2 lxs''
             let (pgms, _) = pickPragma "LANGUAGE" $ getLeadingPragmas $ dropPos lxs''
             let wrapper = case fmap (fmap (words . unpack)) pgms of
                  (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2

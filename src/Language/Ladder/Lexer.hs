@@ -191,19 +191,19 @@ lexerP :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
 -- lexerP = space *> many (withPos lexeme <* space) <* eof
 lexerP = many (withPos lexeme) <* eof
 
-lexerLinesP :: Parsec ParseErr Text [(SourcePos, [((SourcePos, SourcePos), Tok Text)])]
-lexerLinesP = breakLines <$> lexerP
+lexerLinesP :: Parsec ParseErr Text [[((SourcePos, SourcePos), Tok Text)]]
+lexerLinesP = (fmap snd . breakLines) <$> lexerP
 
 runLexer
     :: Text
-    -> Either Text [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+    -> Either Text [ [((SourcePos, SourcePos), Tok Text)] ]
 runLexer
     = bimap (T.pack . errorBundlePretty) id
     . parse lexerLinesP "(file)"
 
 runLexer'
     :: Text
-    -> Either String [ (SourcePos, [((SourcePos, SourcePos), Tok Text)]) ]
+    -> Either String [ [((SourcePos, SourcePos), Tok Text)] ]
 runLexer'
     = first errorBundlePretty
     . parse lexerLinesP "(file)"
@@ -215,6 +215,12 @@ dropWhitespace
     :: [(p, [((p, p), Tok a)])]
     -> [(p, [((p, p), Tok a)])]
 dropWhitespace = filter (not.null.snd) . fmap (fmap (filter (not.isWsTok.snd)))
+
+-- |Discard comments and pragmas
+dropWhitespace2
+    :: [[(p, Tok a)]]
+    -> [[(p, Tok a)]]
+dropWhitespace2 = filter (not.null) . fmap (filter (not.isWsTok.snd))
 
 -- |Break list of tokens into list of lists of tokens with same line number
 breakLines
@@ -238,18 +244,18 @@ isWsTok _            = False
 -- does not look for labels floating among logic, that is left to parser
 -- produced list of (labeled) networks
 labeledRungs
-    :: [(p, [((p, p), Tok a)])]
-    -> [(Maybe a, [(p, [((p, p), Tok a)])])]
+    :: [[(p, Tok a)]]
+    -> [(Maybe a, [[(p, Tok a)]])]
 labeledRungs [] = []
 labeledRungs t = (lbl, this) : labeledRungs rest
     where
     (this, rest) = break isLabel t'
     (lbl, t')
         = case t of
-            ((_, [(_, Label x)]) : xs) -> (Just x, xs)
+            ([(_, Label x)] : xs) -> (Just x, xs)
             xs                         -> (Nothing, xs)
 
-    isLabel (_, [(_, Label _)]) = True
+    isLabel [(_, Label _)] = True
     isLabel _                   = False
 
 --------------------------------------------------------------------------------
@@ -260,6 +266,20 @@ stripPos
     -> [ (Int, [((Int, Int), a)]) ]
 stripPos = fmap (bimap (unPos.sourceLine)
     (fmap (first (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)))))
+
+stripPos2
+    :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
+    -> [[((Int, (Int, Int)), a)]]
+stripPos2 = fmap (fmap (first line) . snd)
+    where
+    line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
+
+stripPos3
+    :: [ [((SourcePos, SourcePos), a)] ]
+    -> [[((Int, (Int, Int)), a)]]
+stripPos3 = fmap (fmap (first line))
+    where
+    line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
 
 --------------------------------------------------------------------------------
 
@@ -281,8 +301,13 @@ getLeadingPragmas = go
 
 -- |Discard position informations from list of lexemes
 dropPos
-    :: [(p, [((p, p), Tok a)])]
+    :: [[(p, Tok a)]]
     -> [Tok a]
-dropPos = foldMap (fmap snd . snd)
+dropPos = foldMap (fmap snd)
+
+dropPos2
+    :: [[(p, Tok a)]]
+    -> [[Tok a]]
+dropPos2 = fmap (fmap snd)
 
 --------------------------------------------------------------------------------

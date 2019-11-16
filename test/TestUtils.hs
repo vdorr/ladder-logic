@@ -244,7 +244,7 @@ parseOrDie5
           )
 parseOrDie5 devP path = do
     lxs <- lexFile path
-    ast <- case parseOrDie2 devP $ dropWhitespace lxs of
+    ast <- case parseOrDie2 devP $ dropWhitespace2 lxs of
                         Left  err -> fail err
                         Right x   -> return x
     let pragmas  = fmap unpack $ fmap mconcat <$> getLeadingPragmas $ dropPos lxs
@@ -253,7 +253,7 @@ parseOrDie5 devP path = do
 parseOrDie2
     :: (MonadError String m, Monad m)
     => DeviceParser Text dev
-    -> [(Int, [((Int, Int), Tok Text)])]
+    -> [[((Int, (Int, Int)), Tok Text)]]
     -> m [(Maybe String
         , Cofree (Diagram Void dev String) DgExt)]
 parseOrDie2 devP lxs = do
@@ -269,10 +269,10 @@ parseOrDie2 devP lxs = do
 
 --------------------------------------------------------------------------------
 
-lexFile :: FilePath -> IO [(Int, [((Int, Int), Tok Text)])]
+lexFile :: FilePath -> IO [[((Int, (Int, Int)), Tok Text)]]
 lexFile file = do
     src <- TIO.readFile file
-    case stripPos <$> runLexer src of
+    case stripPos3 <$> runLexer src of
         Left  err -> fail $ show (here, err)
         Right x   -> return x
 
@@ -285,7 +285,7 @@ pickPragma key = partition f
                x : _ | key' : _ <- T.words x -> key' == key
                _                             -> False
 
-loadLadderTest :: FilePath -> IO (Maybe LadderTest, [(Int, [((Int, Int), Tok Text)])])
+loadLadderTest :: FilePath -> IO (Maybe LadderTest, [[((Int, (Int, Int)), Tok Text)]])
 loadLadderTest file = do
     x <- lexFile file
     let (pgms, _) = pickPragma "T01" $ getLeadingPragmas $ dropPos x

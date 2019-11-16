@@ -20,7 +20,7 @@ import Language.Ladder.Utils
 runLadderParser
     :: DeviceParser t d -- ^device recognizer
     -> LdP d t a -- ^parser
-    -> [(Int, [((Int, Int), Tok t)])] -- ^input tokens
+    -> [[((Int, (Int, Int)), Tok t)]] -- ^input tokens
     -> Either String (a, Dg (Tok t)) -- ^parser result and final state of parser stream
 runLadderParser = runParser
 
@@ -28,7 +28,7 @@ runLadderParser = runParser
 runLadderParser_
     :: DeviceParser t d -- ^device recognizer
     -> LdP d t a -- ^parser
-    -> [(Int, [((Int, Int), Tok t)])] -- ^input tokens
+    -> [[((Int, (Int, Int)), Tok t)]] -- ^input tokens
     -> Either String a -- ^parser result
 runLadderParser_ pd p s = fst <$> runParser pd p s
 

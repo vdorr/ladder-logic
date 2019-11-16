@@ -280,10 +280,14 @@ pos = tip >=> tip >=> pure . fst
 -- line :: Dg a -> Maybe Int
 -- line = pos >=> pure . fst
 
-mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
-mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
-    where
-        xxx = fmap (\(nr, ln) -> fmap (\(co, tok) -> ((nr, co), tok)) ln)
+-- mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
+-- mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
+--     where
+--         xxx = fmap (\(nr, ln) -> fmap (\(co, tok) -> ((nr, co), tok)) ln)
+mkDgZp :: [[((Int, (Int, Int)), tok)]] -> Dg tok
+mkDgZp = Zp [] . (fmap (Zp []))
+--     where
+--         xxx = fmap (\(nr, ln) -> fmap (\(co, tok) -> ((nr, co), tok)) ln)
 
 --------------------------------------------------------------------------------
 
@@ -295,14 +299,20 @@ move line col = (moveToLine line >=> moveToCol col) . focusDg --FIXME get rid of
 
 --FIXME merge with moveToLine somehow?
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
-moveToCol col (Zp us (zp : ds)) = reassemble <$> move2 (dir col . fst) zp
+-- moveToCol col (Zp us (zp : ds)) = reassemble <$> move2 (dir col . fst) zp
+--     where
+--     dir x (_, (a, b))
+--         | x < a = LT
+--         | x > b = GT
+--         | otherwise = EQ
+--     reassemble zp' = Zp us (zp' : ds)
+-- moveToCol _ _ = Nothing
+moveToCol col dg = pop dg >>= \(ln, dg') -> push dg' <$> move2 dir ln
     where
-    dir x (_, (a, b))
-        | x < a = LT
-        | x > b = GT
+    dir ((_, (a, b)), _)
+        | col < a   = LT
+        | col > b   = GT
         | otherwise = EQ
-    reassemble zp' = Zp us (zp' : ds)
-moveToCol _ _ = Nothing
 
 --FIXME get rid of focusing
 focusDg :: Dg a -> Dg a
