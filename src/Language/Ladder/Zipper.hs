@@ -20,6 +20,9 @@ zpNull :: Zp a -> Bool
 zpNull (Zp [] []) = True
 zpNull _          = False
 
+zpFilter :: (a -> Bool) -> Zp a -> Zp a
+zpFilter p (Zp l r) = Zp (filter p l) (filter p r)
+
 -- |Bring something into focus (cursed)
 focus :: Zp a -> Zp a
 focus (Zp (x:xs) []) = Zp xs [x]

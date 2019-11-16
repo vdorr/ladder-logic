@@ -26,9 +26,7 @@ dgNull = (>0) . dgLength --FIXME
 
 -- |Drop empty lines
 dgTrim :: Dg a -> Dg a
-dgTrim (Zp l r) = Zp (trim l) (trim r)
-    where
-    trim = filter (not . zpNull)
+dgTrim = zpFilter (not . zpNull)
 
 --------------------------------------------------------------------------------
 
@@ -243,21 +241,16 @@ colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 --------------------------------------------------------------------------------
 
-test :: Dg a -> Maybe ((DgExt, a), Dg a)
-test dg = pop dg
+-- |Pop focused item, return its extent and updated zipper
+dgPop :: Dg a -> Maybe ((DgExt, a), Dg a)
+dgPop dg = pop dg
     >>= \(ln, dg') -> 
         fmap (fmap (fmap (dgTrim . push dg')))
             pop ln
---     >>= \(x, ln') -> 
---         return (x, dgTrim $ push dg' ln')
-
---Zp a -> (a -> Maybe a) -> Maybe (Zp a)
-
--- |Pop focused item, return its extent and updated zipper
-dgPop :: Dg a -> Maybe ((DgExt, a), Dg a)
-dgPop (Zp u ((Zp l (x : rs)) : ds))
-    = Just (x, dgTrim $ Zp u ((Zp l rs) : ds))
-dgPop _ = Nothing
+-- dgPop :: Dg a -> Maybe ((DgExt, a), Dg a)
+-- dgPop (Zp u ((Zp l (x : rs)) : ds))
+--     = Just (x, dgTrim $ Zp u ((Zp l rs) : ds))
+-- dgPop _ = Nothing
 
 -- pattern DgFocused :: b -> Zp (Zp (a1, b))
 -- pattern DgFocused x <- Zp _ ((Zp _ ((_, x) : _)) : _)
@@ -282,12 +275,8 @@ pos = tip >=> tip >=> pure . fst
 
 -- mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
 -- mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
---     where
---         xxx = fmap (\(nr, ln) -> fmap (\(co, tok) -> ((nr, co), tok)) ln)
-mkDgZp :: [[((Int, (Int, Int)), tok)]] -> Dg tok
-mkDgZp = Zp [] . (fmap (Zp []))
---     where
---         xxx = fmap (\(nr, ln) -> fmap (\(co, tok) -> ((nr, co), tok)) ln)
+mkDgZp :: [[(DgExt, tok)]] -> Dg tok
+mkDgZp = zpFromList . fmap zpFromList
 
 --------------------------------------------------------------------------------
 
