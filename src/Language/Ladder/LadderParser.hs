@@ -104,7 +104,7 @@ runParser
                 String
                 (DevOpFlag, [Operand t] -> Either String d))
     -> LdP d t a
-    -> [[((Int, (Int, Int)), Tok t)]]
+    -> [[(DgExt, Tok t)]]
     -> Either String (a, Dg (Tok t))
 runParser mkDev p s
     = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace2 s)) (LdPCtx mkDev)

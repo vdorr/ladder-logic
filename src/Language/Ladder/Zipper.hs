@@ -1,24 +1,39 @@
+{-# LANGUAGE TypeFamilies #-}
 
 module Language.Ladder.Zipper where
+
+import Data.Foldable
+import GHC.Exts
 
 --------------------------------------------------------------------------------
 
 data Zp a = Zp ![a] ![a]
     deriving (Show, Functor, Eq) -- , Foldable)
 
-zpFromList :: [a] -> Zp a
-zpFromList = Zp []
+instance Foldable Zp where
+    foldMap f (Zp l r) = foldMap f $ reverse l ++ r
+    null (Zp [] []) = True
+    null _          = False
+    length (Zp l r) = length l + length r
 
-zpToList :: Zp a -> [a]
-zpToList (Zp l r) = reverse l ++ r
+instance IsList (Zp a) where 
+    type Item (Zp a) = a
+    fromList = Zp []
+    toList (Zp l r) = reverse l ++ r
 
-zpLength :: Zp a -> Int
-zpLength (Zp l r) = length l + length r
+    -- zpFromList :: [a] -> Zp a
+-- zpFromList = Zp []
 
-zpNull :: Zp a -> Bool
--- zpNull = (<=0) . zpLength
-zpNull (Zp [] []) = True
-zpNull _          = False
+-- zpToList :: Zp a -> [a]
+-- zpToList (Zp l r) = reverse l ++ r
+
+-- zpLength :: Zp a -> Int
+-- zpLength (Zp l r) = length l + length r
+
+-- zpNull :: Zp a -> Bool
+-- -- zpNull = (<=0) . zpLength
+-- zpNull (Zp [] []) = True
+-- zpNull _          = False
 
 zpFilter :: (a -> Bool) -> Zp a -> Zp a
 zpFilter p (Zp l r) = Zp (filter p l) (filter p r)

@@ -1,4 +1,4 @@
-{-# LANGUAGE QuasiQuotes, OverloadedStrings, TypeApplications #-}
+{-# LANGUAGE QuasiQuotes, OverloadedStrings, TypeApplications, OverloadedLists #-}
 
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -20,7 +20,8 @@ import Data.Text (Text, pack, unpack)
 import Data.Bifunctor
 import Data.Function
 import Data.Traversable
-import Data.Foldable hiding (toList)
+import Data.Foldable -- hiding (toList)
+import GHC.Exts hiding (toList)
 
 import System.Directory
 import System.FilePath
@@ -217,37 +218,37 @@ genToken =
 zipperTests :: TestTree
 zipperTests = testGroup "Zipper"
     [ testCase "from/to list" $
-        zpToList <$> (stepRight $ zpFromList [1::Int,2,3,4])
+        toList <$> (stepRight $ fromList [1::Int,2,3,4])
             @=? Just [1,2,3,4]
     , testCase "length" $
-        zpLength <$> (stepRight $ zpFromList [0::Int,1,2,3])
+        length <$> (stepRight $ fromList [0::Int,1,2,3])
             @=? Just 4
     , testCase "bad move left" $
-        stepLeft (zpFromList [1::Int,2])
+        stepLeft (fromList [1::Int,2])
             @=? Nothing
     , testCase "bad move right" $
-        (stepRight >=> stepRight) (zpFromList [1::Int])
+        (stepRight >=> stepRight) (fromList [1::Int])
             @=? Nothing
     , testCase "okay move" $
-        (stepRight (zpFromList [1::Int,2]) >>= tip)
+        (stepRight (fromList [1::Int,2]) >>= tip)
             @=? Just 2
     , testCase "move there and back" $
-        (stepRight (zpFromList [1::Int,2]) >>= stepLeft >>= tip)
+        (stepRight (fromList [1::Int,2]) >>= stepLeft >>= tip)
             @=? Just 1
     , testCase "okay focus" $
         tip (focus (Zp [2::Int,1] []))
             @=? Just 2
     , testCase "nothing to focus to" $
-        tip (focus (zpFromList []))
+        tip (focus (fromList []))
             @=? Nothing @()
     , testCase "zpLookup, found" $
-        zpLookup 2 (zpFromList [(1::Int, ()), (2, ()), (3, ())])
+        zpLookup 2 (fromList [(1::Int, ()), (2, ()), (3, ())])
             @=? Zp [(1, ())] [(2, ()), (3, ())]
     , testCase "zpLookup, not found" $
-        zpLookup 4 (zpFromList [(1::Int, ()), (2, ()), (3, ())])
+        zpLookup 4 (fromList [(1::Int, ()), (2, ()), (3, ())])
             @=? Zp [(3, ()), (2, ()), (1, ())] []
     , testCase "fmap + show" $
-        show (fmap not $ zpFromList [True])
+        show (fmap not ([True] :: Zp Bool))
             @=? "Zp [] [False]"
     ]
 

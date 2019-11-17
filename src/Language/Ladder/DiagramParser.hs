@@ -9,6 +9,7 @@ import Control.Applicative
 import Control.Monad hiding (fail)
 import Data.Maybe
 import Data.Traversable
+import GHC.Exts
 
 import Control.Monad.Except hiding (fail)
 import Control.Monad.State hiding (fail)
@@ -19,14 +20,14 @@ import Language.Ladder.Zipper
 
 -- |Returns number of remaining tokens
 dgLength :: Dg a -> Int
-dgLength (Zp l r) = sum (fmap zpLength l) + sum (fmap zpLength r)
+dgLength = sum . fmap length
 
 dgNull :: Dg a -> Bool
 dgNull = (>0) . dgLength --FIXME
 
 -- |Drop empty lines
 dgTrim :: Dg a -> Dg a
-dgTrim = zpFilter (not . zpNull)
+dgTrim = zpFilter (not . null)
 
 --------------------------------------------------------------------------------
 
@@ -276,7 +277,7 @@ pos = tip >=> tip >=> pure . fst
 -- mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
 -- mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
 mkDgZp :: [[(DgExt, tok)]] -> Dg tok
-mkDgZp = zpFromList . fmap zpFromList
+mkDgZp = fromList . fmap fromList
 
 --------------------------------------------------------------------------------
 
