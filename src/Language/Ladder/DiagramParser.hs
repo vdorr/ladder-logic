@@ -98,14 +98,15 @@ step = do
     origin                <- currentPos
     DgPSt f zp ps True st <- get --if nothing is focused, currentPos makes no sense
     case f origin zp of
-        Right zp' -> put (DgPSt f zp' ps True st)
+        Right zp'  -> put (DgPSt f zp' ps True st)
         Left  _err -> fail here --or not?
 
 setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
-setPos (ln, (co, _)) = do
-    DgPSt b zp ps _  st <- get
-    Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
-    put (DgPSt b zp' ps True st)
+setPos = setPosOrBlur
+-- setPos (ln, (co, _)) = do
+--     DgPSt b zp ps _  st <- get
+--     Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
+--     put (DgPSt b zp' ps True st)
 
 -- |Clear 'psFocused' flag if there is not lexeme at desired position
 -- used by vertical diagram combinators
