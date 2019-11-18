@@ -36,8 +36,8 @@ type SFM s = StateT s (Either String)
 sfm :: SFM s a -> s -> Either String (a, s)
 sfm = runStateT
 
-instance Control.Monad.Fail.MonadFail (Either String) where
-    fail = Left
+-- instance Control.Monad.Fail.MonadFail (Either String) where
+--     fail = Left
 
 --------------------------------------------------------------------------------
 
@@ -85,7 +85,7 @@ goLeft  (ln, (co, _)) = move_ ln     (co-1)
 --------------------------------------------------------------------------------
 
 lastPos :: SFM (DgPState st tok) DgExt
-lastPos = psLastBite <$> get >>= maybe (fail here) return
+lastPos = psLastBite <$> get >>= maybe (lift $ Left here) return
 
 setDir :: MoveToNext tok -> SFM (DgPState st tok) ()
 setDir f = modify $ \(DgPSt _ zp ps fc st) -> DgPSt f zp ps fc st
@@ -96,10 +96,11 @@ setDir f = modify $ \(DgPSt _ zp ps fc st) -> DgPSt f zp ps fc st
 step :: SFM (DgPState st tok) ()
 step = do
     origin                <- currentPos
-    DgPSt f zp ps True st <- get --if nothing is focused, currentPos makes no sense
+    DgPSt f zp ps focused st <- get --if nothing is focused, currentPos makes no sense
+    guard focused
     case f origin zp of
         Right zp'  -> put (DgPSt f zp' ps True st)
-        Left  _err -> fail here --or not?
+        Left  _err -> lift $ Left here --or not?
 
 setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPos = setPosOrBlur
@@ -122,36 +123,35 @@ setPosOrBlur (ln, (co, _)) = do
 
 eat :: SFM (DgPState st tok) tok
 eat = do
-    DgPSt nx dg ps True st <- get
+    DgPSt nx dg ps focused st <- get
+    guard focused
     case dgPop dg of
         Just ((p, v), dg') -> do
             put $ case nx p dg' of
                 Right q -> DgPSt nx q   (Just p) True  st
                 Left  _ -> DgPSt nx dg' (Just p) False st --nowhere to move
             return v
-        Nothing -> fail $ show (here, ps)
+        Nothing -> lift $ Left $ show (here, ps)
 
 --------------------------------------------------------------------------------
 
 -- |Succeeds FIXME FIXME i am not sure when
 end :: SFM (DgPState st tok) ()
-end = do
-    Nothing <- (cursor . psStr) <$> get
-    return ()
+end = void peek <|> (lift $ Left "not empty")
 
 currentPosM :: SFM (DgPState st tok) (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
 
 currentPos :: SFM (DgPState st tok) DgExt
-currentPos = do
-    Just p <- currentPosM
-    return p
+currentPos = currentPosM >>= \case
+                       Just p -> return p
+                       _ -> lift $ Left "empty"
 
 --TODO implement in terms of 'peekM'
 peek :: SFM (DgPState st tok) tok
-peek = do
-    Just p <- peekM
-    return p
+peek = peekM >>= \case
+                       Just p -> return p
+                       _ -> lift $ Left "empty"
 
 peekM :: SFM (DgPState st tok) (Maybe tok)
 peekM = (cursor . psStr) <$> get
@@ -170,8 +170,6 @@ peekM = (cursor . psStr) <$> get
 --          Just x | f x -> step
 --          _            -> return ()
 -- 
-option :: SFM st a -> SFM st (Maybe a)
-option p = (Just <$> p) <|> pure Nothing
 
 --------------------------------------------------------------------------------
 
@@ -179,8 +177,9 @@ option p = (Just <$> p) <|> pure Nothing
 dgIsEmpty :: SFM (DgPState st tok) ()
 -- dgIsEmpty :: Show tok => SFM (DgPState st tok) ()
 dgIsEmpty
-    =   (dgNull . psStr) <$> get
-    >>= (`when` fail (here ++ "not empty"))
+--     =   (dgNull . psStr) <$> get
+--     >>= (`when` fail (here ++ "not empty"))
+    = fmap (dgNull . psStr) get >>= guard
 
 {-
    |
@@ -196,11 +195,10 @@ branch
     ->  SFM (DgPState st tok) [a]
 branch isFork branches = do
     origin <- currentPos
-    True   <- isFork <$> peek
-    stuff  <- for branches $ \(dir, p) -> do
-        setDir dir
-        (setPos origin *> step *> (Just <$> p))
-        <|> return Nothing --step fail if there's nothing in desired direction
+    fmap isFork peek >>= guard
+    stuff  <- for branches $ \(dir, p)
+        -> optional (setDir dir *> setPos origin *> step *> p)
+--         <|> return Nothing --step fail if there's nothing in desired direction
     setPos origin --eat `fork`
 --     setDir dir0 --restore direction, good for parsing boxes
     _ <- eat --FIXME set direction!!!!!!!!!!!!!
@@ -233,7 +231,7 @@ eol :: SFM (DgPState st tok) ()
 eol = do
     psStr <$> get >>= \case
         DgLineEnd -> return ()
-        _         -> fail here
+        _         -> lift $ Left $ here
 
 colRight :: DgExt -> DgExt
 colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
@@ -312,10 +310,7 @@ focusDg = fmap focus . focus
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
 moveToLine ln = move2 (compare (Just ln) . lnNr)
     where
-    lnNr = tip >=> pure . fst . fst
---     lnNr (Zp [] []                ) = Nothing
---     lnNr (Zp (((lnx, _), _) : _) _) = Just lnx
---     lnNr (Zp _ (((lnx, _), _) : _)) = Just lnx
+    lnNr = tip >=> pure . fst . fst --extract line number
 
 --------------------------------------------------------------------------------
 

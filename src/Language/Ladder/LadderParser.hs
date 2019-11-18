@@ -176,7 +176,7 @@ withOperands device
     where
     above' = flip above_
     optOper ((Mandatory, a), op) = ((,a).(op:)) <$> (pure <$> operand)
-    optOper ((Optional , a), op) = ((,a).(op:)) <$> (toList <$> option operand)
+    optOper ((Optional , a), op) = ((,a).(op:)) <$> (toList <$> optional operand)
     optOper ((None     , a), op) = ((,a).(op:)) <$> pure []
 
 -- withOperands
