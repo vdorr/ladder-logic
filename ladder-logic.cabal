@@ -36,7 +36,7 @@ library
                      , LambdaCase, RecordWildCards, FlexibleContexts
                      , PatternSynonyms, DeriveFunctor, TypeApplications
                      , DeriveFoldable, DeriveTraversable, ViewPatterns
-                     , OverloadedStrings, FlexibleInstances
+                     , OverloadedStrings, FlexibleInstances, BlockArguments
   build-depends:       base >=4.9 && <5
                      , mtl >=2.2
                      , vector >=0.12
@@ -68,6 +68,7 @@ test-suite             1
                      , LambdaCase, RecordWildCards, FlexibleContexts
                      , PatternSynonyms, DeriveFunctor, TypeApplications
                      , DeriveFoldable, DeriveTraversable, FlexibleInstances
+                     , BlockArguments
   ghc-options:        -fwarn-incomplete-patterns
                       -fwarn-unused-binds
                       -fwarn-unused-imports

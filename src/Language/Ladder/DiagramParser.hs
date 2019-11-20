@@ -4,7 +4,7 @@
 module Language.Ladder.DiagramParser where
 
 import Prelude hiding (fail)
-import Control.Monad.Fail
+-- import Control.Monad.Fail
 import Control.Applicative
 import Control.Monad hiding (fail)
 import Data.Maybe
@@ -137,7 +137,10 @@ eat = do
 
 -- |Succeeds FIXME FIXME i am not sure when
 end :: SFM (DgPState st tok) ()
-end = void peek <|> (lift $ Left "not empty")
+-- end = void peek <|> (lift $ Left "not empty")
+end = (cursor . psStr) <$> get >>= \case
+                                         Nothing -> return ()
+                                         _ -> lift $ Left "not empty"
 
 currentPosM :: SFM (DgPState st tok) (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
@@ -179,7 +182,9 @@ dgIsEmpty :: SFM (DgPState st tok) ()
 dgIsEmpty
 --     =   (dgNull . psStr) <$> get
 --     >>= (`when` fail (here ++ "not empty"))
-    = fmap (dgNull . psStr) get >>= guard
+--     = fmap (not . dgNull . psStr) get >>= guard
+    =   (dgNull . psStr) <$> get
+    >>= (`when` (lift $ Left $ here ++ "not empty"))
 
 {-
    |
@@ -195,7 +200,7 @@ branch
     ->  SFM (DgPState st tok) [a]
 branch isFork branches = do
     origin <- currentPos
-    fmap isFork peek >>= guard
+    fmap isFork peek >>= (`unless` (lift $ Left $ here ++ "not branch"))
     stuff  <- for branches $ \(dir, p)
         -> optional (setDir dir *> setPos origin *> step *> p)
 --         <|> return Nothing --step fail if there's nothing in desired direction

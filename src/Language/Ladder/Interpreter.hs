@@ -332,7 +332,10 @@ devices mkWord litFromAddr =
             Right ([], a' ++ b' ++ [IGt])))
     , (cont "<", DDesc "LT" [(Rd, Word), (Rd, Word)]
         (\ops -> do
-            [a, b] <- for ops emitOp
+            ops' <- for ops emitOp
+            (a, b) <- case ops' of
+                 [a, b] -> return (a, b)
+                 _ -> Left here
             Right ([], a ++ b ++ [ILt])))
 
     , (coil    " ", DDesc "ST"   [(Wr, Bit)] (\[Var a] -> Right ([], [IDup, IStBit a])))

@@ -148,9 +148,12 @@ variable :: LdP d t (Operand t)
 variable = Var <$> name
 
 number :: LdP d t (Operand t)
-number = do
-    Number n <- eat
-    return (Lit n)
+-- number = do
+--     Number n <- eat
+--     return (Lit n)
+number = eat >>= \case
+    Number n -> return (Lit n)
+    _ -> lift $ Left "expected number"
 
 operand :: LdP d t (Operand t)
 operand = variable <|> number
@@ -190,14 +193,14 @@ withOperands device
 --------------------------------------------------------------------------------
 
 hline :: LdP d t ()
-hline = do
-    HLine _ _ <- eat
-    return ()
-
+hline = eat >>= \case
+    HLine _ _ -> return ()
+    _ -> lift $ Left "expected horizontal line"
+    
 vline :: LdP d t ()
-vline = do
-    VLine <- eat
-    return ()
+vline = eat >>= \case
+    VLine -> return ()
+    _ -> lift $ Left "expected vertical line"
 
 --------------------------------------------------------------------------------
 
@@ -237,13 +240,17 @@ hline'
 jump :: LdP d t (Cofree (Diagram c d t) DgExt)
 jump = do
     pos <- currentPos
-    Jump' name <- eat
-    return $ pos :< Jump name
-
+    eat >>= \case
+        Jump' name -> return $ pos :< Jump name
+        _ -> lift $ Left "expected jump"
+    
 -- "-||`EOL`" is not allowed
 hline2 :: LdP d t ()
 hline2 = do
-    HLine _ vl <- eat
+    vl <- eat >>= \case
+        HLine _ vl -> return vl
+        _ -> lift $ Left "expected horizontal line"
+
 --XXX replicateM_ vl (skip' (==VLine)) ?? fail if VLine already eaten
     when (vl > 0) $ do
         (ln, (co, _)) <- currentPos
@@ -254,22 +261,29 @@ device = do
     pos <- currentPos
     usr <- psUser <$> get
     (ops, f) <-
-        withOperands $ do
+        withOperands do
             dev <- coil' <|> contact'
-            Right (flag, mkDev) <- pure $ ctxMkDev usr dev
-            return (flag, mkDev)
-    Right dev' <- pure $ f ops
+--             Right (flag, mkDev) <- pure $ ctxMkDev usr dev
+--             return (flag, mkDev)
+            case ctxMkDev usr dev of
+                 Left _-> lift $ Left here
+                 Right (flag, mkDev) -> return (flag, mkDev)
+--     Right dev' <- pure $ f ops
+    dev' <- case f ops of
+         Left _ -> lift $ Left here
+         Right d ->  return d
     (pos :<) <$> (Device dev' <$> hline')
+--     undefined
 
 coil' :: LdP d t (DevType t)
-coil' = do
-    Coil f <- eat
-    return (Coil_ f)
+coil' = eat >>= \case
+        Coil f -> return (Coil_ f)
+        _ -> lift $ Left "expected coil"
 
 contact' :: LdP d t (DevType t)
-contact' = do
-    Contact f <- eat
-    return (Contact_ f)
+contact' = eat >>= \case
+        Contact f -> return (Contact_ f)
+        _ -> lift $ Left "expected contact"
 
 -- device :: LdP (Dev t) t (DevOpFlag, DevType t)
 --        -> LdP (Dev t) t (Cofree (Diagram c (Dev t) t) DgExt)
@@ -326,20 +340,20 @@ clearance (example of incorrect box):
 -}
 
 cross :: LdP d t ()
-cross = do
-    Cross <- eat
-    return ()
+cross = eat >>= \case
+        Cross -> return ()
+        _ -> lift $ Left "expected '+'"
 
 edge :: LdP d t (Tok t)
 edge
     = eat >>= \t -> case t of
         REdge -> return t
         FEdge -> return t
-        _ -> fail here --SFM $ \_ -> Left here
+        _ -> lift $ Left here --SFM $ \_ -> Left here
 
-name = do
-    Name lbl <- eat
-    return lbl
+name = eat >>= \case
+        Name lbl -> return lbl
+        _ -> lift $ Left "expected name"
 
 -- -- |parse left side of a box
 -- leftSide = do
