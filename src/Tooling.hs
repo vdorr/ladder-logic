@@ -7,9 +7,9 @@ import Data.List
 import Data.Function
 import Data.Foldable
 
-import Language.Ladder.DiagramParser
-import Language.Ladder.LadderParser
-import Language.Ladder.Utils
+-- import Language.Ladder.DiagramParser
+-- import Language.Ladder.LadderParser
+-- import Language.Ladder.Utils
 import Language.Ladder.Interpreter
 -- import Language.Ladder.Analysis
 

@@ -17,6 +17,8 @@ main = do
         : "-XPatternSynonyms"
         : "-XDeriveTraversable"
         : "-XCPP"
+        : "-XQuantifiedConstraints"
+        : "-XBlockArguments"
         : "-XOverloadedStrings"
 --         : "-package ladder-logic"
         : sourceFiles

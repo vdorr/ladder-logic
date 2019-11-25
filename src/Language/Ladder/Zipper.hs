@@ -2,7 +2,7 @@
 
 module Language.Ladder.Zipper where
 
-import Data.Foldable
+-- import Data.Foldable
 import GHC.Exts
 
 --------------------------------------------------------------------------------
@@ -20,20 +20,6 @@ instance IsList (Zp a) where
     type Item (Zp a) = a
     fromList = Zp []
     toList (Zp l r) = reverse l ++ r
-
-    -- zpFromList :: [a] -> Zp a
--- zpFromList = Zp []
-
--- zpToList :: Zp a -> [a]
--- zpToList (Zp l r) = reverse l ++ r
-
--- zpLength :: Zp a -> Int
--- zpLength (Zp l r) = length l + length r
-
--- zpNull :: Zp a -> Bool
--- -- zpNull = (<=0) . zpLength
--- zpNull (Zp [] []) = True
--- zpNull _          = False
 
 zpFilter :: (a -> Bool) -> Zp a -> Zp a
 zpFilter p (Zp l r) = Zp (filter p l) (filter p r)
@@ -72,7 +58,10 @@ zpLookup _ haystack = haystack
 -- zpAppend x (Zp l r) = Zp (reverse r ++ l) [x]
 
 -- pattern ZpR' x <- Zp _ (x : _)
+pattern ZpR :: [a] -> a -> [a] -> Zp a
 pattern ZpR l f r = Zp l (f : r)
+
+pattern ZpL :: [a] -> a -> [a] -> Zp a
 pattern ZpL l f r = Zp (f : l) r
 
 stepLeft :: Zp a -> Maybe (Zp a)
@@ -89,7 +78,7 @@ moveTo
     -> (a -> Bool) -- ^predicate
     -> Zp a
     -> Maybe (Zp a)
-moveTo move test zp@(ZpR l foc r) -- = undefined
+moveTo move test zp@(ZpR _ foc _) -- = undefined
     | test foc  = pure zp
     | otherwise = move zp >>= moveTo move test
 moveTo _ _ _ = Nothing

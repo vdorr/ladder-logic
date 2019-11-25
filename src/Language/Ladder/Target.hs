@@ -244,7 +244,7 @@ addCell mt@MemTrack{..} ty n
     = case M.lookup n variables of
         Just (addr, ty')
             | ty == ty' -> return (addr, mt)
-            | otherwise -> throwError $ show ("type mismatch", ty, ty')
+            | otherwise -> throwError $ show ("type mismatch"::String, ty, ty')
         Nothing -> return $ new ty
 
     where

@@ -28,7 +28,6 @@ library
                      , Language.Ladder.Utils
                      , Language.Ladder.Target
                      , Language.Ladder.Simple
-                     , Language.Ladder.OldBackend
                      , Language.Ladder.Example
                      , Language.Ladder.Entry
   -- other-modules:
@@ -37,6 +36,7 @@ library
                      , PatternSynonyms, DeriveFunctor, TypeApplications
                      , DeriveFoldable, DeriveTraversable, ViewPatterns
                      , OverloadedStrings, FlexibleInstances, BlockArguments
+                     , QuantifiedConstraints
   build-depends:       base >=4.9 && <5
                      , mtl >=2.2
                      , vector >=0.12

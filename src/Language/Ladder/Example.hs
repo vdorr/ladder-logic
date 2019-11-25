@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings, QuantifiedConstraints #-}
 
 module Language.Ladder.Example
     (LadderAst, PPCofree(..), parseLd)

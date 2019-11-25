@@ -275,16 +275,16 @@ eval = f
     f st@(  ws, os, m)  (IPick i)
         | i >= 0 && i < length ws   = pure (ws !! i : ws, os, m)
         | otherwise
-            = Left (st, show ("stk idx out of range", i, ws))
+            = Left (st, show ("stk idx out of range"::String, i, ws))
     f    (_:ws, os, m)   IDrop      = pure (ws, os, m)
     f st@(ws,   os, m)  (ILdBit a)
         | Just (X v) <- lookup a m  = pure (v : ws, os, m)
-        | otherwise                 = Left (st, show (here, "invalid memory access", a))
+        | otherwise                 = Left (st, show (here, "invalid memory access"::String, a))
     f st@(w:ws, os, m)  (IStBit a)
         | (m0,(_,X _):m1) <- break ((==a) . fst) m
 --                                     = pure (w : ws, os, (m0 ++ (a, X w) : m1))
                                     = pure (ws, os, (m0 ++ (a, X w) : m1))
-        | otherwise                 = Left (st, show (here, "invalid memory access", a))
+        | otherwise                 = Left (st, show (here, "invalid memory access"::String, a))
     f (a:b:ws, os, m)    IAnd       = pure ((a && b) : ws, os, m)
     f (a:b:ws, os, m)    IOr        = pure ((a || b) : ws, os, m)
     f (a:ws,   os, m)    INot       = pure (not a : ws,  os, m)
@@ -293,7 +293,7 @@ eval = f
 
     f st@(ws,   A a : os, m) ILdM
         | Just v <- lookup a m  = pure (ws, v : os, m)
-        | otherwise                 = Left (st, show (here, "invalid memory access", a))
+        | otherwise                 = Left (st, show (here, "invalid memory access"::String, a))
 
     f (ws,   I b : I a : os, m)  IGt = pure ((a > b) : ws,  os, m)
     f (ws,   I b : I a : os, m)  ILt = pure ((a < b) : ws,  os, m)

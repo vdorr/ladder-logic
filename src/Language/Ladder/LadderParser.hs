@@ -15,7 +15,7 @@ module Language.Ladder.LadderParser
     ) where
 
 import Prelude hiding (fail)
-import Control.Monad.Fail
+-- import Control.Monad.Fail
 import Control.Applicative --hiding (fail)
 import Control.Monad hiding (fail)
 import Data.Foldable
@@ -148,9 +148,6 @@ variable :: LdP d t (Operand t)
 variable = Var <$> name
 
 number :: LdP d t (Operand t)
--- number = do
---     Number n <- eat
---     return (Lit n)
 number = eat >>= \case
     Number n -> return (Lit n)
     _ -> lift $ Left "expected number"
@@ -172,9 +169,9 @@ operand = variable <|> number
 withOperands :: LdP d t (DevOpFlag, a)
               -> LdP d t ([Operand t], a)
 -- withOperands3 p = below (above_ p operand) optOper
-withOperands device
+withOperands deviceParser
         =        operand
-        `above'` device
+        `above'` deviceParser
         `below`  optOper
     where
     above' = flip above_
@@ -239,9 +236,9 @@ hline'
 
 jump :: LdP d t (Cofree (Diagram c d t) DgExt)
 jump = do
-    pos <- currentPos
+    p <- currentPos
     eat >>= \case
-        Jump' name -> return $ pos :< Jump name
+        Jump' lbl -> return $ p :< Jump lbl
         _ -> lift $ Left "expected jump"
     
 -- "-||`EOL`" is not allowed
@@ -258,7 +255,7 @@ hline2 = do
 
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
 device = do
-    pos <- currentPos
+    p <- currentPos
     usr <- psUser <$> get
     (ops, f) <-
         withOperands do
@@ -272,7 +269,7 @@ device = do
     dev' <- case f ops of
          Left _ -> lift $ Left here
          Right d ->  return d
-    (pos :<) <$> (Device dev' <$> hline')
+    (p :<) <$> (Device dev' <$> hline')
 --     undefined
 
 coil' :: LdP d t (DevType t)
@@ -351,6 +348,7 @@ edge
         FEdge -> return t
         _ -> lift $ Left here --SFM $ \_ -> Left here
 
+name :: LdP d t t
 name = eat >>= \case
         Name lbl -> return lbl
         _ -> lift $ Left "expected name"
@@ -380,7 +378,7 @@ name = eat >>= \case
 
 box001 :: Int -> LdP d t ()
 box001 ln = do
-    setPos (ln, (1, 1))
+    setPos (ln, (1, ()))
     box
 
 -- portName :: Int -> DgP a -> DgP (Text, a)
@@ -393,6 +391,7 @@ box001 ln = do
 --     setPos next
 --     return (lbl, x)
 
+lwall :: LdP d t ()
 lwall = vline <|> void edge
 
 -- negIn = do
@@ -411,7 +410,7 @@ box = do
     setDir goUp
 --     VLine <- eat
 --     currentPosM >>= (traceShowM . (here, "left wall", ))
-    some lwall -- <|> negIn
+    void $ some lwall -- <|> negIn
 --     currentPosM >>= (traceShowM . (here, "left top corner",))
     setDir goRight
     cross
@@ -424,7 +423,7 @@ box = do
 
 --     currentPosM >>= (traceShowM . (here,"right wall",))
     --TODO parse box instance name
-    some $ do
+    void $ some do
 --         (ln, co) <- currentPos
         vline
 --         setPos (ln, co+1)
@@ -452,7 +451,7 @@ box = do
     cross
 
 --     currentPosM >>= (traceShowM . (here,"remaining left wall",))
-    many lwall --0 or more
+    void $ many lwall --0 or more
 
     return ()
 

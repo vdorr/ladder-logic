@@ -73,8 +73,8 @@ testLexer = fmap dropPos . runLexer
 simpleResult :: (Bifunctor f, Eq e, Monoid e) => f e a -> f Bool a
 simpleResult = first (/=mempty)
 
-isEmpty :: (Eq a, Monoid a) => a -> Bool
-isEmpty = (==mempty)
+-- isEmpty :: (Eq a, Monoid a) => a -> Bool
+-- isEmpty = (==mempty)
 
 checkSyntax :: Text -> Either String ()
 checkSyntax s

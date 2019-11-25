@@ -15,7 +15,7 @@ import Data.Semigroup
 import Data.Void
 import Control.Monad.Except
 import Data.Foldable
-import Data.Bifunctor
+-- import Data.Bifunctor
 import Control.Monad.Writer.Strict
 import Data.Functor.Identity
 
@@ -124,8 +124,8 @@ runLadderTest22 verbose test ast = do
     when verbose $ print here
     prog <- either fail pure $ compileForTest03 ast
     let memSlots :: [(CellType, Text)] = nub $ execWriter $ traverse_ (traverse_ mp2) ast
-    print (here, memSlots, "<<<<<")
-    print (here, memSlotsToTestVector 4 memSlots, "<<<<<")
+    print (here, memSlots, "<<<<<"::String)
+    print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
 
     when verbose $ do
         putStrLn "---------------------------"
@@ -138,7 +138,7 @@ runLadderTest22 verbose test ast = do
                         (Diagram c' ([(CellType, Operand Text)], b) s') a
                       -> WriterT [(CellType, Text)] Identity ()
     mp2 (_ :< n) = do
-        mapDgA pure (tell.addressesOnly.fst) pure n
+        void $ mapDgA pure (tell.addressesOnly.fst) pure n
         traverse_ mp2 n
 
     addressesOnly s = [(t, a)|((t, Var a)) <- s]
@@ -157,9 +157,9 @@ runLadderTest221 verbose num ast = do
     prog <- either fail pure $ compileForTest03 ast
     let memSlots' :: [(CellType, Text)] = nub $ execWriter $ traverse_ (traverse_ mp2) ast
     let memSlots = fmap (fmap unpack) memSlots'
-    print (here, memSlots, "<<<<<")
+    print (here, memSlots, "<<<<<"::String)
     let vect = memSlotsToTestVector num memSlots
-    print (here, vect, "<<<<<")
+    print (here, vect, "<<<<<"::String)
 
     when verbose $ do
         putStrLn "---------------------------"
@@ -182,20 +182,20 @@ runLadderTest221 verbose num ast = do
                         (Diagram c' ([(CellType, Operand Text)], b) s') a
                       -> WriterT [(CellType, Text)] Identity ()
     mp2 (_ :< n) = do
-        mapDgA pure (tell.addressesOnly.fst) pure n
+        void $ mapDgA pure (tell.addressesOnly.fst) pure n
         traverse_ mp2 n
 
     addressesOnly s = [(t, a)|((t, Var a)) <- s]
 
 
-runLadderTestXx
-    :: Bool
-    -> [ExtendedInstruction Int (V String) String]
-    -> [String]
-    -> [(Int, [(String, V String)])]
-    -> IO Bool
-runLadderTestXx verbose prog signalNames testVect = do
-    undefined
+-- runLadderTestXx
+--     :: Bool
+--     -> [ExtendedInstruction Int (V String) String]
+--     -> [String]
+--     -> [(Int, [(String, V String)])]
+--     -> IO Bool
+-- runLadderTestXx verbose prog signalNames testVect = do
+--     undefined
 
 runLadderTestX
     :: Bool

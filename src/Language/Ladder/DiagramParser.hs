@@ -22,8 +22,10 @@ import Language.Ladder.Zipper
 dgLength :: Dg a -> Int
 dgLength = sum . fmap length
 
+-- | null or not null idontknow
 dgNull :: Dg a -> Bool
-dgNull = (>0) . dgLength --FIXME
+-- dgNull = and . fmap null
+dgNull = or . fmap (not . null)
 
 -- |Drop empty lines
 dgTrim :: Dg a -> Dg a
