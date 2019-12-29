@@ -7,7 +7,7 @@ import System.Environment (getArgs)
 import Data.Foldable
 -- import Data.Void
 
-import Language.Ladder.Zipper
+-- import Language.Ladder.Zipper
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
@@ -27,22 +27,22 @@ main :: IO ()
 main = do
     [file] <- getArgs
     src <- TIO.readFile file
-    case stripPos <$> runLexer src of
+    case stripPos3 <$> runLexer src of
         Left err -> TIO.putStrLn err
         Right lxs -> do
 
-            let lxs' = dropWhitespace lxs
+            let lxs' = dropWhitespace2 lxs
             let blocks = labeledRungs lxs'
 
             forM_ blocks $ \(lbl, lxs'') -> do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
-                for_ (zpToList zp) (print . (here,))
+                for_ (toList zp) (print . (here,))
                 case runLadderParser deviceThing ladderLiberal lxs'' of
                     Left err -> print (here, err)
                     Right (_ast, zp1) -> do
                         print (here, "--------------------------------------------------")
-                        for_ (zpToList zp1) (print . (here,))
+                        for_ (toList zp1) (print . (here,))
                         print (here, "--------------------------------------------------")
                         TIO.putStrLn src
                         print (here, "--------------------------------------------------")
