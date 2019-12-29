@@ -12,7 +12,7 @@ import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Simple
-import Language.Ladder.Interpreter
+-- import Language.Ladder.Interpreter
 
 --------------------------------------------------------------------------------
 
@@ -34,17 +34,22 @@ main = do
             let lxs' = dropWhitespace2 lxs
             let blocks = labeledRungs lxs'
 
+            print (here, "--------------------------------------------------")
+            TIO.putStrLn src
+            print (here, "--------------------------------------------------")
+
             forM_ blocks $ \(lbl, lxs'') -> do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 for_ (toList zp) (print . (here,))
                 case runLadderParser deviceThing ladderLiberal lxs'' of
                     Left err -> print (here, err)
-                    Right (_ast, zp1) -> do
+                    Right (ast1, zp1) -> do
                         print (here, "--------------------------------------------------")
                         for_ (toList zp1) (print . (here,))
                         print (here, "--------------------------------------------------")
-                        TIO.putStrLn src
+                        print (here, ast1)
                         print (here, "--------------------------------------------------")
     where
-    deviceThing = wrapDevice3 (pure . I) (pure . A)
+--     deviceThing = wrapDevice3 (pure . I) (pure . A)
+    deviceThing = wrapDeviceSimple

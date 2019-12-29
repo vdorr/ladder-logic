@@ -1,0 +1,32 @@
+
+{ T01
+  \{ testVect =
+    [ (2, [("Start", X False),("Stop", X False),("Run", X False),("Forced", X False)])
+    , (1, [("Start", X True)])
+    , (2, [("Start", X False)])
+    , (1, [("Stop", X True)])
+    , (2, [("Stop", X False)])
+    ]
+  , watch    = ["Run"]
+  , expected =
+    [ [X False]
+    , [X False]
+    , [X True]
+    , [X True]
+    , [X True]
+    , [X False]
+    , [X False]
+    , [X False]]
+  \}
+}
+
+|       Start     Stop   Run
++--+----[ ]--+----[/]----( )-
+   |         |
+   |    Run  |
+   +----[ ]--+
+   |         |
+   |  Forced |
+   +----[ ]--+
+
+(* from https://en.wikipedia.org/wiki/Ladder_logic *)

@@ -34,7 +34,7 @@ import Language.Ladder.DiagramParser
 -- |Ladder AST type
 data Diagram continuation device label a
     = Source !a   -- ^start of power rail
-    | Sink       -- ^where wire connects to (implied) right rail
+    | Sink       -- ^where wire connects to (implied) right rail or intersect node
     | End        -- ^where vertical left rail ends at the bottom
 --     | Stub       -- ^intersection of hline and node
     | Device !device !a
