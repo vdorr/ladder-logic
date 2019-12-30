@@ -42,10 +42,9 @@ library
                      , vector >=0.12
                      , megaparsec
                      , parser-combinators
-                     , algebraic-graphs
                      , containers
                      , text
-                     , warp, wai, http-types, aeson, bytestring
+                     , bytestring
                      , bits, bytes, base16-bytestring, binary
                      , pretty-show
 

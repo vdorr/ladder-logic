@@ -14,12 +14,22 @@ import Language.Ladder.LadderParser
 import Language.Ladder.Simple
 -- import Language.Ladder.Interpreter
 
+import Language.Ladder.Utils
+
+import Control.Monad.State
+import qualified Data.Map as M
+
 --------------------------------------------------------------------------------
 
 -- testAst :: Cofree (Diagram Void (Dev String) String) DgExt -> IO ()
 -- testAst ast' = do
 --     generateStk2 ast'
 --     return ()
+
+--------------------------------------------------------------------------------
+
+sinks (p :< Sink) = print p
+sinks (p :< other) = for_ other sinks
 
 --------------------------------------------------------------------------------
 
@@ -50,6 +60,7 @@ main = do
                         print (here, "--------------------------------------------------")
                         print (here, ast1)
                         print (here, "--------------------------------------------------")
+                        sinks ast1
     where
 --     deviceThing = wrapDevice3 (pure . I) (pure . A)
     deviceThing = wrapDeviceSimple
