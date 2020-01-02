@@ -1,0 +1,23 @@
+(* --- test 20a --- *)
+
+{ T01
+  \{ testVect =
+               [ (1, [("a", X False),("b", X False),("c", X False),("d", X False)])
+               , (1, [("a", X True)])
+               , (1, [("a", X False)])
+               , (1, [("a", X True)])
+               ]
+  , watch    = ["b"]
+  , expected = [[X False], [X True], [X False], [X True]]
+  \}
+}
+
+// TODO check order of evaluation by writing same coil twice
+
+|  a
++--[ ]------------+
+|                 |
+|  b              |
++--[ ]--+         |
+|       |  d      |  c      
+|       +--( )--  +--( )--  
