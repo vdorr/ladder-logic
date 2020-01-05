@@ -20,6 +20,7 @@ import Control.Monad.State
 -- import qualified Data.Map as M
 -- import Data.Bifunctor
 import Data.List
+import Data.Function
 
 --------------------------------------------------------------------------------
 
@@ -48,11 +49,18 @@ import Data.List
     or 'Node' (position deps) is evaluated
 -}
 
+data PP m = PP
+    { ppPos :: DgExt
+    , ppNodes :: [DgExt]
+    , ppCont :: StateT (EmitState m) m ()
+    }
+
 -- 'postponed' is appended when -see above
 data EmitState m = EmitState
     { 
 --         postponed :: [(DgExt, m ())] -- original location and continuation
-        postponedUntil :: [(DgExt, m ())] -- location after which we can run cont, cont
+        postponedUntil
+            :: [PP m] -- location after which we can run cont, cont
         , unevaluatedNodes :: [DgExt]
         , evaluatedSinks :: [DgExt]
     }
@@ -63,45 +71,102 @@ data EmitState m = EmitState
 getSinks (p :< Sink) = modify (<> pure p)
 getSinks (_ :< other) = for_ other getSinks
 
+getNodes (p :< n@(Node w)) = modify (<> pure p) *> for_ w getNodes
+getNodes (_ :< other) = for_ other getNodes
 
+getNodes' ast = execState (getNodes ast) []
 
-hello ast = undefined
+hello ast = execStateT (go ast) (EmitState [] unEvNodes [])
 
     where
 
+    unEvNodes = execState (getNodes ast) []
+
 --     go (p :< Sink) = undefined
     go x@(p :< Node w) = do
-        --check if i need to evaluate other line first
-        --check data dependency
+
+--check data dependency
         let deps :: [DgExt] = foldMap (checkDataDep sinks) w
-        q <- gets evaluatedSinks
-        let qq = intersect q deps
-        case qq of
-             [] -> undefined
-             deps -> do
-                 liftIO $ print $ maximum deps
-                 undefined
+        evaluated <- gets evaluatedSinks
+        let dataDeps = deps \\ evaluated
+
+
+--         case dataDeps of
+--              [] -> do --no unevaluated dependecies, good, proceed
+-- --                 undefined 
+--                 return ()
+--              deps -> do --postpone
+--                  liftIO $ print $ maximum deps
+-- --                  undefined
+--                  return ()
+
+--check if i need to evaluate other line first
+--         rr <- gets unevaluatedNodes
+        rr <- getUnevaluatedAndNotPostponedNodes
+        let locationDeps = filter (< p) rr
+
+--         case locationDeps of
+--             [] -> do -- good, emit
+-- --                 undefined
+--                 return ()
+--             d -> do -- postpone until `maximum d`
+--                 let r = maximum d
+--                 liftIO $ print r
+-- --                 undefined
+--                 return ()
+
+        case dataDeps <> locationDeps of
+            [] -> do
+                modify $ \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
+                emit x
+            deps -> do
+                let r = maximum deps
+                liftIO $ print (here, p, r)
+                postpone x r
+--                 undefined
+
+    go othr@(_ :< other) = emit othr --for_ other go
+
+    --hate this hack :(
+    getUnevaluatedAndNotPostponedNodes = do
         rr <- gets unevaluatedNodes
-        let u = filter (< p) rr
-        case u of
-            [] -> undefined -- good, emit
-            d -> do -- postpone until `maximum d`
-                let r = maximum d
-                liftIO $ print r
-                undefined
-        emit x
-    go (_ :< other) = undefined --for_ other go
+        q <- gets (foldMap ppNodes . postponedUntil)
+        return $ rr \\ q
+
+    postpone ast1 p = do
+        modify $ \st
+            -> st {postponedUntil=pure (PP p (getNodes' ast1) (go ast1)) <> postponedUntil st}
+
+    runPostponed p = do
+        q <- gets postponedUntil
+        let qq = filter ((p==).ppPos) q
+        modify $ \st
+            -> st { postponedUntil = deleteFirstsBy (on (==) ppPos) (postponedUntil st) qq}
+        for_ qq (ppCont)
 
     emit (p :< Sink) = do
-        undefined
-    emit _ = undefined
+        modify $ \st -> st {evaluatedSinks=p:evaluatedSinks st}
+        liftIO $ print "sink"
+--         undefined
+        runPostponed p
+        return ()
+
+--     emit _ = undefined
+    emit (p :< Source a) = liftIO (print "src") *> go a
+--     emit (Sink     ) = liftIO (print "")
+    emit (p :< End      ) = liftIO (print "end")
+    emit (p :< Device _device a) = liftIO (print "dev") *> go a
+    emit (p :< Jump   _label) = liftIO (print "jump") *> undefined
+    emit (p :< Node   w) = liftIO (print "node") *> for_ w go *> runPostponed p
+--     emit (p :< Cont   _continuation _a) = liftIO (print "")
+    emit (p :< Conn   _continuation) = liftIO (print "") *> undefined
 
     sinks = execState (getSinks ast) []
-    hasDep p = elem p sinks --or "intersectsWithSink"
+--     hasDep p = elem p sinks --or "intersectsWithSink"
         --FIXME should be according to (5)
         --FIXME return location
 
-    allLinesAboveEvaluated p = undefined
+--     allLinesAboveEvaluated p = undefined
         --FIXME return location of end of line sink
         -- look for element of unevaluatedNodes strictly northeast of p
         -- or, even better, largest of all lying northeast of p
@@ -142,6 +207,8 @@ main = do
                         print (here, ast1)
                         print (here, "--------------------------------------------------")
 --                         sinks ast1
+                        hello ast1
+                        return ()
     where
 --     deviceThing = wrapDevice3 (pure . I) (pure . A)
     deviceThing = wrapDeviceSimple
