@@ -12,7 +12,7 @@
   \}
 }
 
-// TODO check order of evaluation by writing same coil twice
+(* TODO check order of evaluation by writing same coil twice *)
 
 |  a
 +--[ ]--+

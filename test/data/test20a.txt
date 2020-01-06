@@ -3,19 +3,21 @@
 { T01
   \{ testVect =
                [ (1, [("a", X False),("b", X False),("c", X False),("d", X False)])
-               , (1, [("a", X True)])
-               , (1, [("a", X False)])
-               , (1, [("a", X True)])
+               , (1, [("a", X True), ("b", X False)])
+               , (1, [("a", X False), ("b", X True)])
+               , (1, [("a", X True), ("b", X False)])
                ]
-  , watch    = ["b"]
-  , expected = [[X False], [X True], [X False], [X True]]
+  , watch    = ["c", "d"]
+  , expected = [[X False, X False], [X True, X False], [X False, X True], [X True, X False]]
   \}
 }
 
-// TODO check order of evaluation by writing same coil twice
+(* TODO check order of evaluation by writing same coil twice *)
 
+|
 |  a
 +--[ ]--+
+|       |
 |  b    |
 +--[ ]------------+
 |       |  c      |  d
