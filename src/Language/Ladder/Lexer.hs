@@ -233,8 +233,8 @@ breakLines [] = []
 
 -- |Returns True if lexeme is comment or pragma
 isWsTok :: Tok a -> Bool
-isWsTok Pragma {}    = True
-isWsTok Comment{}    = True
+isWsTok Pragma    {} = True
+isWsTok Comment   {} = True
 isWsTok Whitespace{} = True
 isWsTok NewLine      = True
 isWsTok _            = False

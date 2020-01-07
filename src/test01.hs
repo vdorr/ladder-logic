@@ -53,11 +53,11 @@ import Data.Proxy
 data PP m = PP
     { ppPos :: DgExt
     , ppNodes :: [DgExt]
-    , ppCont :: StateT (EmitState m) m ()
+    , ppCont :: StateT (TraverseState m) m ()
     }
 
 -- 'postponed' is appended when -see above
-data EmitState m = EmitState
+data TraverseState m = TraverseState
     { postponedUntil :: [PP m] -- location after which we can run cont, cont
     , unevaluatedNodes :: [DgExt]
     , evaluatedSinks :: [DgExt]
@@ -79,7 +79,7 @@ checkDataDep sinks x
 
 --------------------------------------------------------------------------------
 
-hello ast = execStateT (go ast) (EmitState [] unEvNodes [])
+hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
 
     where
 
@@ -194,12 +194,12 @@ hello ast = execStateT (go ast) (EmitState [] unEvNodes [])
 
 --------------------------------------------------------------------------------
 
-cheers
+traverseDiagram
     :: Monad m
     => (DgExt -> Diagram continuation device label () -> m a)
     -> Cofree (Diagram continuation device label) DgExt
-    -> m (EmitState m)
-cheers emit ast = execStateT (go ast) (EmitState [] unEvNodes [])
+    -> m (TraverseState m)
+traverseDiagram emit ast = execStateT (go ast) (TraverseState [] unEvNodes [])
 
     where
 
@@ -274,6 +274,25 @@ emitPrint p (Conn   _continuation) = undefined
 
 --------------------------------------------------------------------------------
 
+data EmitState = EmitState
+    { esStack :: [DgExt]
+    }
+
+blargh ast = runStateT (traverseDiagram go ast) (EmitState [])
+
+    where
+
+    go p  Sink             = liftIO (print ("sink", p))
+    go p (Source a       ) = liftIO (print ("src", p))
+    go p  End              = liftIO (print ("end", p))
+    go p (Device device a) = liftIO (print ("dev", device, p))
+    go p (Jump   _label  ) = liftIO (print ("jump", p)) *> undefined
+    go p (Node   w       ) = liftIO (print ("node", p))
+    go p (Cont   _continuation _a) = undefined
+    go p (Conn   _continuation) = undefined
+
+--------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
     [file] <- getArgs
@@ -302,7 +321,7 @@ main = do
                         print (here, ast1)
                         print (here, "--------------------------------------------------")
 --                         sinks ast1
-                        u <- cheers emitPrint ast1
+                        u <- traverseDiagram emitPrint ast1
                         print $ length $ postponedUntil u
                         print $ length $ unevaluatedNodes u
                         print $ length $ evaluatedSinks u

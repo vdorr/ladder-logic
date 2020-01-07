@@ -1,8 +1,8 @@
-(* --- test 20a --- *)
+(* --- test 20g --- *)
 
 { T01
   \{ testVect =
-               [ (1, [("a", X False),("b", X False),("c", X False),("d", X False)])
+               [ (1, [("a", X False),("b", X False),("c", X False),("d", X False),("e", X False),("f", X False)])
                , (1, [("a", X True)])
                , (1, [("a", X False)])
                , (1, [("a", X True)])
@@ -16,9 +16,11 @@
 
 |  a
 +--[ ]----------------------+
-|  a                        |
+|                           |
+|  b                        |
 +--[ ]--+                   |
+|       |                   |
 |  c    |                   |
 +--[ ]--|---------+         |
-|       |  c      |  d      |  d
+|       |  e      |  f      |  d
 |       +--( )--  +--( )--  +--( )--
