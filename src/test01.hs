@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -Wunused-imports  -Wall #-}
-{-# LANGUAGE CPP, TupleSections, FlexibleContexts, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, TupleSections, FlexibleContexts, ScopedTypeVariables, BlockArguments #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO
@@ -50,15 +50,15 @@ import Data.Proxy
     or 'Node' (position deps) is evaluated
 -}
 
-data PP m = PP
+data PP m a = PP
     { ppPos :: DgExt
     , ppNodes :: [DgExt]
-    , ppCont :: StateT (TraverseState m) m ()
+    , ppCont :: a -> StateT (TraverseState m a) m ()
     }
 
 -- 'postponed' is appended when -see above
-data TraverseState m = TraverseState
-    { postponedUntil :: [PP m] -- location after which we can run cont, cont
+data TraverseState m a = TraverseState
+    { postponedUntil :: [PP m a] -- location after which we can run cont, cont
     , unevaluatedNodes :: [DgExt]
     , evaluatedSinks :: [DgExt]
     }
@@ -156,7 +156,8 @@ hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
 
     postpone ast1 p = do
         modify $ \st
-            -> st {postponedUntil=pure (PP p (getNodes' ast1) (go ast1)) <> postponedUntil st}
+            -> st {postponedUntil
+                    =pure (PP p (getNodes' ast1) (\() -> go ast1)) <> postponedUntil st}
 
     runPostponed p = do
         q <- gets postponedUntil
@@ -166,7 +167,7 @@ hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
 --         for_ qq ppCont
         for_ qq $ \pp -> do
             liftIO $ print ("COMPLETING >>")
-            ppCont pp
+            ppCont pp ()
             liftIO $ print ("<< COMPLETED")
 
     sinks = execState (getSinks ast) []
@@ -194,34 +195,34 @@ hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
 
 --------------------------------------------------------------------------------
 
-traverseDiagram
-    :: Monad m
-    => (DgExt -> Diagram continuation device label () -> m a)
-    -> Cofree (Diagram continuation device label) DgExt
-    -> m (TraverseState m)
-traverseDiagram emit ast = execStateT (go ast) (TraverseState [] unEvNodes [])
+-- traverseDiagram
+--     :: Monad m
+--     => (DgExt -> Diagram continuation device label () -> m a)
+--     -> Cofree (Diagram continuation device label) DgExt
+--     -> m (TraverseState m)
+traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes [])
 
     where
 
-    go x@(p :< Node w) = do
+    go q x@(p :< Node w) = do
         dataDeps <- getDataDeps w
         locationDeps <- getUnevaluatedAndNotPostponedNodesAt p
         case dataDeps <> locationDeps of
             [] -> do
                 markNodeAsEvaluated p
-                emit' x
-                for_ w go
-                runPostponed p
+                q' <- emit' q x
+                for_ w (go q')
+                runPostponed q' p
             deps -> do
                 let r = maximum deps
                 postpone x r
-    go x@(p :< Sink) = do
+    go q x@(p :< Sink) = do
         markSinkAsEvaluated p
-        emit' x
-        runPostponed p
-    go othr@(_ :< x) = emit' othr *> for_ x go
+        q' <- emit' q x
+        runPostponed q' p
+    go q othr@(_ :< x) = emit' q othr *> for_ x (go q)
 
-    emit' (p :< x) = lift $ emit p $ fmap (const ()) x
+    emit' q (p :< x) = lift $ emit q p $ fmap (const ()) x
 
 --look for unevaluted nodes on which node depends
     getDataDeps w = do
@@ -243,25 +244,26 @@ traverseDiagram emit ast = execStateT (go ast) (TraverseState [] unEvNodes [])
 
     postpone ast1 p
         = modify $ \st
-            -> st {postponedUntil=pure (PP p (getNodes' ast1) (go ast1)) <> postponedUntil st}
+            -> st {postponedUntil=pure (PP p (getNodes' ast1) (\q -> go q ast1)) <> postponedUntil st}
 
-    runPostponed p = do
+    runPostponed qqq p = do
         q <- gets postponedUntil
         let qq = filter ((p==).ppPos) q
         modify $ \st
             -> st { postponedUntil = deleteFirstsBy (on (==) ppPos) (postponedUntil st) qq}
-        for_ qq ppCont
+        for_ qq \pp -> do
+            ppCont pp qqq
 
     sinks = execState (getSinks ast) []
 
-emitPrint p  Sink             = print ("sink", p)
-emitPrint p (Source a       ) = print ("src", p)
-emitPrint p  End              = print ("end", p)
-emitPrint p (Device device a) = print ("dev", device, p)
-emitPrint p (Jump   _label  ) = print ("jump", p) *> undefined
-emitPrint p (Node   w       ) = print ("node", p)
-emitPrint p (Cont   _continuation _a) = undefined
-emitPrint p (Conn   _continuation) = undefined
+emitPrint q p  Sink             = print ("sink", p) *> pure (q + 1)
+emitPrint q p (Source a       ) = print ("src", p) *> pure (q + 1)
+emitPrint q p  End              = print ("end", p) *> pure (q + 1)
+emitPrint q p (Device device a) = print ("dev", device, p) *> pure (q + 1)
+emitPrint q p (Jump   _label  ) = print ("jump", p) *> undefined
+emitPrint q p (Node   w       ) = print ("node", p) *> pure (q + 1)
+emitPrint q p (Cont   _continuation _a) = undefined
+emitPrint q p (Conn   _continuation) = undefined
 
 -- emitPrint (p :< Sink           ) = print ("sink", p)
 -- emitPrint (p :< Source a       ) = print ("src", p)
@@ -279,18 +281,18 @@ data EmitState = EmitState
     , esCnt :: Integer
     }
 
-blargh ast = runStateT (traverseDiagram go ast) (EmitState [])
-
-    where
-
-    go p  Sink             = liftIO (print ("sink", p))
-    go p (Source a       ) = liftIO (print ("src", p))
-    go p  End              = liftIO (print ("end", p))
-    go p (Device device a) = liftIO (print ("dev", device, p))
-    go p (Jump   _label  ) = liftIO (print ("jump", p)) *> undefined
-    go p (Node   w       ) = liftIO (print ("node", p))
-    go p (Cont   _continuation _a) = undefined
-    go p (Conn   _continuation) = undefined
+-- blargh ast = runStateT (traverseDiagram go ast) (EmitState [])
+-- 
+--     where
+-- 
+--     go p  Sink             = liftIO (print ("sink", p))
+--     go p (Source a       ) = liftIO (print ("src", p))
+--     go p  End              = liftIO (print ("end", p))
+--     go p (Device device a) = liftIO (print ("dev", device, p))
+--     go p (Jump   _label  ) = liftIO (print ("jump", p)) *> undefined
+--     go p (Node   w       ) = liftIO (print ("node", p))
+--     go p (Cont   _continuation _a) = undefined
+--     go p (Conn   _continuation) = undefined
 
 --------------------------------------------------------------------------------
 
@@ -322,7 +324,7 @@ main = do
                         print (here, ast1)
                         print (here, "--------------------------------------------------")
 --                         sinks ast1
-                        u <- traverseDiagram emitPrint ast1
+                        u <- traverseDiagram emitPrint 0 ast1
                         print $ length $ postponedUntil u
                         print $ length $ unevaluatedNodes u
                         print $ length $ evaluatedSinks u
