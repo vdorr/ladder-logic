@@ -276,6 +276,7 @@ emitPrint p (Conn   _continuation) = undefined
 
 data EmitState = EmitState
     { esStack :: [DgExt]
+    , esCnt :: Integer
     }
 
 blargh ast = runStateT (traverseDiagram go ast) (EmitState [])
