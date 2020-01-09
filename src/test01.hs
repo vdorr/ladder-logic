@@ -211,8 +211,8 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
             [] -> do
                 markNodeAsEvaluated p
                 q' <- emit' q x
-                for_ w (go q')
                 runPostponed q' p
+                for_ w (go q')
             deps -> do
                 let r = maximum deps
                 postpone x r
@@ -220,7 +220,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
         markSinkAsEvaluated p
         q' <- emit' q x
         runPostponed q' p
-    go q othr@(_ :< x) = emit' q othr *> for_ x (go q)
+    go q othr@(_ :< x) = emit' q othr >>= \q' -> for_ x (go q')
 
     emit' q (p :< x) = lift $ emit q p $ fmap (const ()) x
 
@@ -256,14 +256,37 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
 
     sinks = execState (getSinks ast) []
 
-emitPrint q p  Sink             = print ("sink", p) *> pure (q + 1)
-emitPrint q p (Source a       ) = print ("src", p) *> pure (q + 1)
-emitPrint q p  End              = print ("end", p) *> pure (q + 1)
-emitPrint q p (Device device a) = print ("dev", device, p) *> pure (q + 1)
-emitPrint q p (Jump   _label  ) = print ("jump", p) *> undefined
-emitPrint q p (Node   w       ) = print ("node", p) *> pure (q + 1)
+hndlCnt f
+    = gets esCnt
+    >>= \cnt -> f (cnt)
+        >> modify (\st -> st { esCnt = 1 + cnt})
+        >> return (1 + cnt)
+
+emitPrint q p  Sink             = hndlCnt \cnt -> liftIO (print ("sink", p, q, cnt))
+emitPrint q p (Source a       ) = hndlCnt \cnt -> liftIO (print ("src", p, q, cnt))
+emitPrint q p  End              = hndlCnt \cnt -> liftIO (print ("end", p, q, cnt))
+emitPrint q p (Device device a)
+    = hndlCnt \cnt -> liftIO (print ("dev", device, p, q, cnt))
+emitPrint q p (Jump   _label  ) = hndlCnt \cnt -> liftIO (print ("jump", p, q, cnt))
+emitPrint q p (Node   w       ) = hndlCnt \cnt -> liftIO (print ("node", p, q, cnt))
 emitPrint q p (Cont   _continuation _a) = undefined
 emitPrint q p (Conn   _continuation) = undefined
+
+-- hndlCnt f
+--     = gets esCnt
+--     >>= f
+--     >>= \q -> modify (\st -> st { esCnt = 1 + esCnt st})
+--     >> return q
+
+-- emitPrint q p  Sink             = hndlCnt \cnt -> (liftIO (print ("sink", p, q, cnt)) *> pure (q + 1))
+-- emitPrint q p (Source a       ) = hndlCnt \cnt -> liftIO (print ("src", p, q, cnt)) *> pure (q + 1)
+-- emitPrint q p  End              = hndlCnt \cnt -> liftIO (print ("end", p, q, cnt)) *> pure (q + 1)
+-- emitPrint q p (Device device a)
+--     = hndlCnt \cnt -> liftIO (print ("dev", device, p, q, cnt)) *> pure (q + 1)
+-- emitPrint q p (Jump   _label  ) = hndlCnt \cnt -> liftIO (print ("jump", p, q, cnt)) *> undefined
+-- emitPrint q p (Node   w       ) = hndlCnt \cnt -> liftIO (print ("node", p, q, cnt)) *> pure (q + 1)
+-- emitPrint q p (Cont   _continuation _a) = undefined
+-- emitPrint q p (Conn   _continuation) = undefined
 
 -- emitPrint (p :< Sink           ) = print ("sink", p)
 -- emitPrint (p :< Source a       ) = print ("src", p)
@@ -324,10 +347,11 @@ main = do
                         print (here, ast1)
                         print (here, "--------------------------------------------------")
 --                         sinks ast1
-                        u <- traverseDiagram emitPrint 0 ast1
-                        print $ length $ postponedUntil u
-                        print $ length $ unevaluatedNodes u
-                        print $ length $ evaluatedSinks u
+                        runStateT (traverseDiagram emitPrint 0 ast1) (EmitState [] 0)
+--                         u <- traverseDiagram emitPrint 0 ast1
+--                         print $ length $ postponedUntil u
+--                         print $ length $ unevaluatedNodes u
+--                         print $ length $ evaluatedSinks u
                         return ()
     where
 --     deviceThing = wrapDevice3 (pure . I) (pure . A)
