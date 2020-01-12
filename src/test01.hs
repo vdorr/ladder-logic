@@ -63,13 +63,13 @@ data TraverseState m a = TraverseState
     , evaluatedSinks :: [DgExt]
     }
 
-getSinks (p :< Sink) = modify (<> pure p)
-getSinks (_ :< other) = for_ other getSinks
+collectSinks (p :< Sink) = modify (<> pure p)
+collectSinks (_ :< other) = for_ other collectSinks
 
-getNodes (p :< Node w) = modify (<> pure p) *> for_ w getNodes
-getNodes (_ :< other) = for_ other getNodes
+collectNodes (p :< Node w) = modify (<> pure p) *> for_ w collectNodes
+collectNodes (_ :< other) = for_ other collectNodes
 
-getNodes' ast = execState (getNodes ast) []
+collectNodes' ast = execState (collectNodes ast) []
 
 
 checkDataDep sinks x 
@@ -142,7 +142,7 @@ hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
 
     markNodeAsEvaluated p = modify $ \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
 
-    unEvNodes = execState (getNodes ast) []
+    unEvNodes = execState (collectNodes ast) []
 
     --hate this hack :(
     getUnevaluatedAndNotPostponedNodes = do
@@ -157,7 +157,7 @@ hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
     postpone ast1 p = do
         modify $ \st
             -> st {postponedUntil
-                    =pure (PP p (getNodes' ast1) (\() -> go ast1)) <> postponedUntil st}
+                    =pure (PP p (collectNodes' ast1) (\() -> go ast1)) <> postponedUntil st}
 
     runPostponed p = do
         q <- gets postponedUntil
@@ -170,7 +170,7 @@ hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
             ppCont pp ()
             liftIO $ print ("<< COMPLETED")
 
-    sinks = execState (getSinks ast) []
+    sinks = execState (collectSinks ast) []
 --     hasDep p = elem p sinks --or "intersectsWithSink"
         --FIXME should be according to (5)
         --FIXME return location
@@ -214,7 +214,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
                 runPostponed q' p
                 for_ w (go q')
             deps -> do
-                let r = maximum deps
+                let r = maximum deps --pospone until most distant dependecy
                 postpone x r
     go q x@(p :< Sink) = do
         markSinkAsEvaluated p
@@ -222,18 +222,27 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
         runPostponed q' p
     go q othr@(_ :< x) = emit' q othr >>= \q' -> for_ x (go q')
 
-    emit' q (p :< x) = lift $ emit q p $ fmap (const ()) x
+--     emit' q (p :< x) = lift $ emit q p $ fmap (const ()) x
+    emit' q (p :< x) = lift $ emit q p x
 
 --look for unevaluted nodes on which node depends
+--XXX why evaluatedSinks? why not all sinks?
+--returns not yet evaluated dependencies
+--     getDataDeps w = collectIncidentSinks <$> gets evaluatedSinks <*> pure w
     getDataDeps w = do
         let deps = foldMap (checkDataDep sinks) w
-        evaluated <- gets evaluatedSinks --XXX why evaluatedSinks? why not all sinks?
+        evaluated <- gets evaluatedSinks
         return $ deps \\ evaluated
+
+--     collectIncidentSinks :: _
+--     collectIncidentSinks sinks' w =
+--         let deps = foldMap (checkDataDep sinks) w
+--             in deps \\ sinks'
 
     markSinkAsEvaluated p = modify $ \st -> st {evaluatedSinks=pure p <> evaluatedSinks st}
     markNodeAsEvaluated p = modify $ \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
 
-    unEvNodes = execState (getNodes ast) []
+    unEvNodes = execState (collectNodes ast) []
 
     --hate this hack :(
     getUnevaluatedAndNotPostponedNodes
@@ -244,7 +253,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
 
     postpone ast1 p
         = modify $ \st
-            -> st {postponedUntil=pure (PP p (getNodes' ast1) (\q -> go q ast1)) <> postponedUntil st}
+            -> st {postponedUntil=pure (PP p (collectNodes' ast1) (\q -> go q ast1)) <> postponedUntil st}
 
     runPostponed qqq p = do
         q <- gets postponedUntil
@@ -254,7 +263,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
         for_ qq \pp -> do
             ppCont pp qqq
 
-    sinks = execState (getSinks ast) []
+    sinks = execState (collectSinks ast) []
 
 hndlCnt f
     = gets esCnt
@@ -262,13 +271,14 @@ hndlCnt f
         >> modify (\st -> st { esCnt = 1 + cnt})
         >> return (1 + cnt)
 
+
+emitPrint q p (Node   w       ) = hndlCnt \cnt -> liftIO (print ("node", p, q, cnt))
 emitPrint q p  Sink             = hndlCnt \cnt -> liftIO (print ("sink", p, q, cnt))
 emitPrint q p (Source a       ) = hndlCnt \cnt -> liftIO (print ("src", p, q, cnt))
 emitPrint q p  End              = hndlCnt \cnt -> liftIO (print ("end", p, q, cnt))
 emitPrint q p (Device device a)
     = hndlCnt \cnt -> liftIO (print ("dev", device, p, q, cnt))
 emitPrint q p (Jump   _label  ) = hndlCnt \cnt -> liftIO (print ("jump", p, q, cnt))
-emitPrint q p (Node   w       ) = hndlCnt \cnt -> liftIO (print ("node", p, q, cnt))
 emitPrint q p (Cont   _continuation _a) = undefined
 emitPrint q p (Conn   _continuation) = undefined
 
@@ -302,6 +312,7 @@ emitPrint q p (Conn   _continuation) = undefined
 data EmitState = EmitState
     { esStack :: [DgExt]
     , esCnt :: Integer
+    , esSinks :: [DgExt]
     }
 
 -- blargh ast = runStateT (traverseDiagram go ast) (EmitState [])
@@ -347,7 +358,9 @@ main = do
                         print (here, ast1)
                         print (here, "--------------------------------------------------")
 --                         sinks ast1
-                        runStateT (traverseDiagram emitPrint 0 ast1) (EmitState [] 0)
+                        runStateT
+                            (traverseDiagram emitPrint 0 ast1)
+                            (EmitState [] 0 (execState (collectSinks ast1) []))
 --                         u <- traverseDiagram emitPrint 0 ast1
 --                         print $ length $ postponedUntil u
 --                         print $ length $ unevaluatedNodes u
