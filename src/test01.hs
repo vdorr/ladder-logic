@@ -265,12 +265,17 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
 
     sinks = execState (collectSinks ast) []
 
-hndlCnt f
-    = gets esCnt
-    >>= \cnt -> f (cnt)
-        >> modify (\st -> st { esCnt = 1 + cnt})
-        >> return (1 + cnt)
+-- hndlCnt f
+--     = gets esCnt
+--     >>= \cnt -> f (cnt)
+--         >> modify (\st -> st { esCnt = 1 + cnt})
+--         >> return (1 + cnt)
 
+hndlCnt f = do
+    cnt <- gets esCnt
+    f cnt
+    modify (\st -> st { esCnt = 1 + cnt})
+    return (1 + cnt)
 
 emitPrint q p (Node   w       ) = hndlCnt \cnt -> liftIO (print ("node", p, q, cnt))
 emitPrint q p  Sink             = hndlCnt \cnt -> liftIO (print ("sink", p, q, cnt))
@@ -282,32 +287,49 @@ emitPrint q p (Jump   _label  ) = hndlCnt \cnt -> liftIO (print ("jump", p, q, c
 emitPrint q p (Cont   _continuation _a) = undefined
 emitPrint q p (Conn   _continuation) = undefined
 
--- hndlCnt f
---     = gets esCnt
---     >>= f
---     >>= \q -> modify (\st -> st { esCnt = 1 + esCnt st})
---     >> return q
-
--- emitPrint q p  Sink             = hndlCnt \cnt -> (liftIO (print ("sink", p, q, cnt)) *> pure (q + 1))
--- emitPrint q p (Source a       ) = hndlCnt \cnt -> liftIO (print ("src", p, q, cnt)) *> pure (q + 1)
--- emitPrint q p  End              = hndlCnt \cnt -> liftIO (print ("end", p, q, cnt)) *> pure (q + 1)
--- emitPrint q p (Device device a)
---     = hndlCnt \cnt -> liftIO (print ("dev", device, p, q, cnt)) *> pure (q + 1)
--- emitPrint q p (Jump   _label  ) = hndlCnt \cnt -> liftIO (print ("jump", p, q, cnt)) *> undefined
--- emitPrint q p (Node   w       ) = hndlCnt \cnt -> liftIO (print ("node", p, q, cnt)) *> pure (q + 1)
--- emitPrint q p (Cont   _continuation _a) = undefined
--- emitPrint q p (Conn   _continuation) = undefined
-
--- emitPrint (p :< Sink           ) = print ("sink", p)
--- emitPrint (p :< Source a       ) = print ("src", p)
--- emitPrint (p :< End            ) = print ("end", p)
--- emitPrint (p :< Device device a) = print ("dev", device, p)
--- emitPrint (p :< Jump   _label  ) = print ("jump", p) *> undefined
--- emitPrint (p :< Node   w       ) = print ("node", p)
--- emitPrint (p :< Cont   _continuation _a) = undefined
--- emitPrint (p :< Conn   _continuation) = undefined
-
 --------------------------------------------------------------------------------
+
+em0 q p (Node   []      ) = hndlCnt \_ -> return () -- "optimization"
+em0 q p (Node   w       ) = hndlCnt \cnt -> do
+--     liftIO (print ("node", p, q, cnt))
+    sinks <- gets esSinks
+    stk <- gets esStack
+    let deps :: [DgExt] = foldMap (checkDataDep sinks) w
+--now `or` stack top with all `deps`
+    for_ deps \d -> do
+        let Just idx = findIndex (==d) stk
+        liftIO $ print (">>>>> PICK ", idx)
+        liftIO $ print (">>>>> OR", p, d)
+    push p --now result of this node is on stack
+    liftIO $ print ("node", length w, length deps)
+em0 q p  Sink             = hndlCnt \cnt -> do
+    push p
+    liftIO (print ("sink", p, q, cnt))
+em0 q p (Source a       ) = hndlCnt \cnt -> do
+    liftIO $ print (">>>>> PUSH #1")
+    liftIO (print ("src", p, q, cnt))
+-- em0 q p  End              = hndlCnt \cnt -> liftIO (print ("end", p, q, cnt))
+em0 q p  End              = hndlCnt \cnt -> return ()
+em0 q p (Device device a) = hndlCnt \cnt -> do
+    pop
+    push p
+    liftIO (print (">>>>> EVAL", device))
+    liftIO (print ("dev", device, p, q, cnt))
+em0 q p (Jump   _label  ) = undefined -- hndlCnt \cnt -> liftIO (print ("jump", p, q, cnt))
+em0 q p (Cont   _continuation _a) = undefined
+em0 q p (Conn   _continuation) = undefined
+
+push x = do
+    stk <- gets esStack
+    modify \st -> st { esStack = x:stk}
+
+pop :: Monad m => StateT EmitState m ()
+pop = do
+    stk <- gets esStack
+    case stk of
+        _:stk' -> modify \st -> st -- { esStack = stk' }
+        [] -> undefined
+
 
 data EmitState = EmitState
     { esStack :: [DgExt]
@@ -356,10 +378,12 @@ main = do
                         for_ (toList zp1) (print . (here,))
                         print (here, "--------------------------------------------------")
                         print (here, ast1)
+                        putStrLn ""
                         print (here, "--------------------------------------------------")
+                        putStrLn ""
 --                         sinks ast1
                         runStateT
-                            (traverseDiagram emitPrint 0 ast1)
+                            (traverseDiagram em0 0 ast1)
                             (EmitState [] 0 (execState (collectSinks ast1) []))
 --                         u <- traverseDiagram emitPrint 0 ast1
 --                         print $ length $ postponedUntil u
