@@ -215,7 +215,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
                 for_ w (go q')
             deps -> do
                 let r = maximum deps --pospone until most distant dependecy
-                postpone x r
+                postpone x r q
     go q x@(p :< Sink) = do
         markSinkAsEvaluated p
         q' <- emit' q x
@@ -251,9 +251,10 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
     getUnevaluatedAndNotPostponedNodesAt p
         = filter (< p) <$> getUnevaluatedAndNotPostponedNodes
 
-    postpone ast1 p
-        = modify $ \st
-            -> st {postponedUntil=pure (PP p (collectNodes' ast1) (\q -> go q ast1)) <> postponedUntil st}
+    postpone ast1 p q
+        = modify \st
+            -> st {postponedUntil
+            =pure (PP p (collectNodes' ast1) (\q -> go q ast1)) <> postponedUntil st}
 
     runPostponed qqq p = do
         q <- gets postponedUntil
