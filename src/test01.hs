@@ -214,7 +214,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
                 runPostponed undefined p
                 for_ w (go q')
             deps -> do
-                let r = maximum deps --pospone until most distant dependecy
+                let r = maximum deps --postpone until most distant dependecy
                 postpone x r q
     go q x@(p :< Sink) = do
         markSinkAsEvaluated p
@@ -251,10 +251,10 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
     getUnevaluatedAndNotPostponedNodesAt p
         = filter (< p) <$> getUnevaluatedAndNotPostponedNodes
 
-    postpone ast1 p q
+    postpone ast1 p qqq
         = modify \st
             -> st {postponedUntil
-            =pure (PP p (collectNodes' ast1) (\q -> go q ast1)) <> postponedUntil st}
+            =pure (PP p (collectNodes' ast1) (\_ -> go qqq ast1)) <> postponedUntil st}
 
     runPostponed qqq p = do
         q <- gets postponedUntil
@@ -290,40 +290,56 @@ hndlCnt f = do
 
 --------------------------------------------------------------------------------
 
-emWrap q p x = em0 q p x *> pure p
+emWrap q p x = em0 x *> pure p
+    where
 
-em0 q p (Node   []      ) = return () -- "optimization"
-em0 q p (Node   w       ) = do
---     liftIO (print ("node", p, q, cnt))
-    sinks <- gets esSinks
-    stk <- gets esStack
-    let deps :: [DgExt] = foldMap (checkDataDep sinks) w
---now `or` stack top with all `deps`
-    for_ deps \d -> do
-        let Just idx = findIndex (==d) stk
+    em0 (Node   []      ) = return () -- "optimization"
+    em0 (Node   w       ) = do
+    --     liftIO (print ("node", p, q, cnt))
+        sinks <- gets esSinks
+--         stk <- gets esStack
+        let deps :: [DgExt] = foldMap (checkDataDep sinks) w
+    --now `or` stack top with all `deps`
+        for_ deps \d -> do
+--             let Just idx = findIndex (==d) stk
+--             liftIO $ print (">>>>> PICK ", idx)
+            bringToTop d
+            pop --first `OR` operand
+            pop --second `OR` operand
+            liftIO $ print (">>>>> OR", p, d)
+        for_ w \_ ->
+            push p --now result of this node is on stack
+--         liftIO $ print ("node", length w, length deps)
+    em0  Sink             = do
+        stk <- gets esStack
+        let Just idx = findIndex (==q) stk
         liftIO $ print (">>>>> PICK ", idx)
-        liftIO $ print (">>>>> OR", p, d)
-    push p --now result of this node is on stack
-    liftIO $ print ("node", length w, length deps)
-em0 q p  Sink             = do
-    stk <- gets esStack
-    let Just idx = findIndex (==q) stk
-    liftIO $ print (">>>>> PICK ", idx)
-    push p
-    liftIO (print ("sink", p, q))
-em0 q p (Source a       ) = do
-    liftIO $ print (">>>>> PUSH #1")
-    liftIO (print ("src", p, q))
--- em0 q p  End              = hndlCnt \cnt -> liftIO (print ("end", p, q, cnt))
-em0 q p  End              = return ()
-em0 q p (Device device a) = do
-    pop
-    push p
-    liftIO (print (">>>>> EVAL", device))
-    liftIO (print ("dev", device, p, q))
-em0 q p (Jump   _label  ) = undefined -- hndlCnt \cnt -> liftIO (print ("jump", p, q, cnt))
-em0 q p (Cont   _continuation _a) = undefined
-em0 q p (Conn   _continuation) = undefined
+        push p
+--         pop
+--         bringToTop q
+--         liftIO (print ("sink", p, q))
+    em0 (Source a       ) = do
+        push p
+        liftIO $ print (">>>>> PUSH #1")
+--         liftIO (print ("src", p, q))
+    em0  End              = return ()
+    em0 (Device device a) = do
+        bringToTop q
+        pop
+        pop
+        push p
+        liftIO (print (">>>>> EVAL", device))
+--         liftIO (print ("dev", device, p, q))
+    em0 (Jump   _label  ) = undefined
+    em0 (Cont   _continuation _a) = undefined
+    em0 (Conn   _continuation) = undefined
+
+    bringToTop pp = do
+        stk <- gets esStack
+        liftIO $ print ("bringToTop", pp, stk)
+        let Just idx = findIndex (==pp) stk
+        liftIO $ print (">>>>> PICK ", idx)
+        push pp
 
 push x = do
     stk <- gets esStack
@@ -333,7 +349,7 @@ pop :: Monad m => StateT EmitState m ()
 pop = do
     stk <- gets esStack
     case stk of
-        _:stk' -> modify \st -> st -- { esStack = stk' }
+        _:stk' -> modify \st -> st { esStack = stk' }
         [] -> undefined
 
 
