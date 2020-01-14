@@ -264,9 +264,9 @@ main = do
                     Right (ast1@(p0 :< _), zp1) -> do
                         print (here, "--------------------------------------------------")
                         for_ (toList zp1) (print . (here,))
-                        print (here, "--------------------------------------------------")
-                        print (here, ast1)
-                        putStrLn ""
+--                         print (here, "--------------------------------------------------")
+--                         print (here, ast1)
+--                         putStrLn ""
                         print (here, "--------------------------------------------------")
                         putStrLn ""
 --                         sinks ast1
