@@ -21,14 +21,8 @@ import Control.Monad.State
 -- import Data.Bifunctor
 import Data.List
 import Data.Function
-import Data.Proxy
-
---------------------------------------------------------------------------------
-
--- testAst :: Cofree (Diagram Void (Dev String) String) DgExt -> IO ()
--- testAst ast' = do
---     generateStk2 ast'
---     return ()
+-- import Data.Proxy
+-- import Data.Text (Text)
 
 --------------------------------------------------------------------------------
 
@@ -63,143 +57,39 @@ data TraverseState m a = TraverseState
     , evaluatedSinks :: [DgExt]
     }
 
+collectSinks :: (MonadState (f a) m, Semigroup (f a),
+            Applicative f) =>
+            Cofree (Diagram continuation device label) a -> m ()
 collectSinks (p :< Sink) = modify (<> pure p)
 collectSinks (_ :< other) = for_ other collectSinks
 
+collectNodes :: (MonadState (f a) m, Semigroup (f a),
+            Applicative f) =>
+            Cofree (Diagram continuation device label) a -> m ()
 collectNodes (p :< Node w) = modify (<> pure p) *> for_ w collectNodes
 collectNodes (_ :< other) = for_ other collectNodes
 
-collectNodes' ast = execState (collectNodes ast) []
+collectNodes' :: (Applicative f, Monoid (f a)) =>
+                Cofree (Diagram continuation device label) a -> f a
+collectNodes' ast = execState (collectNodes ast) mempty
 
-
+checkDataDep :: (Foldable t, Eq a, Monad m, Monoid (m a)) =>
+                t a -> Cofree (Diagram continuation device label) a -> m a
 checkDataDep sinks x 
-    | (p :< Node w) <- x, elem p sinks = return p 
+    | (p :< Node _) <- x, elem p sinks = return p 
     | otherwise                        = mempty
--- checkDatatDep _ _ = Nothing
 
 --------------------------------------------------------------------------------
 
-hello ast = execStateT (go ast) (TraverseState [] unEvNodes [])
-
-    where
-
-    go x@(p :< Node w) = do
-
---check data dependency
---         let deps = foldMap (checkDataDep sinks) w
---         evaluated <- gets evaluatedSinks
---         let dataDeps = deps \\ evaluated
-        dataDeps <- getDataDeps w
-
---         case dataDeps of
---              [] -> do --no unevaluated dependecies, good, proceed
--- --                 undefined 
---                 return ()
---              deps -> do --postpone
---                  liftIO $ print $ maximum deps
--- --                  undefined
---                  return ()
-
---check if i need to evaluate other line first
---         rr <- gets unevaluatedNodes
---         rr <- getUnevaluatedAndNotPostponedNodes
---         let locationDeps = filter (< p) rr
-        locationDeps <- getUnevaluatedAndNotPostponedNodesAt p
-
---         case locationDeps of
---             [] -> do -- good, emit
--- --                 undefined
---                 return ()
---             d -> do -- postpone until `maximum d`
---                 let r = maximum d
---                 liftIO $ print r
--- --                 undefined
---                 return ()
-
-        case dataDeps <> locationDeps of
-            [] -> do
---                 modify $ \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
-                markNodeAsEvaluated p
-                emit x
-                runPostponed p
-            deps -> do
-                let r = maximum deps
-                liftIO $ print (here, "POSTPONED", p, "until", r)
-                postpone x r
---                 undefined
-    go x@(p :< Sink) = do
-        modify $ \st -> st {evaluatedSinks=pure p <> evaluatedSinks st}
-        emit x
-        runPostponed p
-
-    go othr@(_ :< other) = emit othr --for_ other go
-
---look for unevaluted nodes on which node depends
-    getDataDeps w = do
-        let deps = foldMap (checkDataDep sinks) w
-        evaluated <- gets evaluatedSinks
-        return $ deps \\ evaluated
-
-    markNodeAsEvaluated p = modify $ \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
-
-    unEvNodes = execState (collectNodes ast) []
-
-    --hate this hack :(
-    getUnevaluatedAndNotPostponedNodes = do
---         rr <- gets unevaluatedNodes
---         q <- gets (foldMap ppNodes . postponedUntil)
---         return $ rr \\ q
-        (\\) <$> gets unevaluatedNodes <*> gets (foldMap ppNodes . postponedUntil)
-
-    getUnevaluatedAndNotPostponedNodesAt p
-        = filter (< p) <$> getUnevaluatedAndNotPostponedNodes
-
-    postpone ast1 p = do
-        modify $ \st
-            -> st {postponedUntil
-                    =pure (PP p (collectNodes' ast1) (\() -> go ast1)) <> postponedUntil st}
-
-    runPostponed p = do
-        q <- gets postponedUntil
-        let qq = filter ((p==).ppPos) q
-        modify $ \st
-            -> st { postponedUntil = deleteFirstsBy (on (==) ppPos) (postponedUntil st) qq}
---         for_ qq ppCont
-        for_ qq $ \pp -> do
-            liftIO $ print ("COMPLETING >>")
-            ppCont pp ()
-            liftIO $ print ("<< COMPLETED")
-
-    sinks = execState (collectSinks ast) []
---     hasDep p = elem p sinks --or "intersectsWithSink"
-        --FIXME should be according to (5)
-        --FIXME return location
-
---     allLinesAboveEvaluated p = undefined
-        --FIXME return location of end of line sink
-        -- look for element of unevaluatedNodes strictly northeast of p
-        -- or, even better, largest of all lying northeast of p
-
-    emit (p :< Sink) = do
---         modify $ \st -> st {evaluatedSinks=p:evaluatedSinks st}
-        liftIO $ print ("sink", p)
---         runPostponed p
---         return ()
-    emit (p :< Source a) = liftIO (print ("src", p)) *> go a
-    emit (p :< End      ) = liftIO (print ("end", p))
-    emit (p :< Device device a) = liftIO (print ("dev", device, p)) *> go a
-    emit (p :< Jump   _label) = liftIO (print ("jump", p)) *> undefined
-    emit (p :< Node   w) = liftIO (print ("node", p)) *> for_ w go -- *> runPostponed p
-    emit (p :< Cont   _continuation _a) = undefined
-    emit (p :< Conn   _continuation) = undefined
-
---------------------------------------------------------------------------------
-
--- traverseDiagram
---     :: Monad m
---     => (DgExt -> Diagram continuation device label () -> m a)
---     -> Cofree (Diagram continuation device label) DgExt
---     -> m (TraverseState m)
+traverseDiagram
+    :: Monad m =>
+    (a1
+        -> DgExt
+        -> Diagram continuation device label (Cofree (Diagram continuation device label) DgExt)
+        -> m a1)
+    -> a1
+    -> Cofree (Diagram continuation device label) DgExt
+    -> m (TraverseState m a2)
 traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes [])
 
     where
@@ -211,33 +101,26 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
             [] -> do
                 markNodeAsEvaluated p
                 q' <- emit' q x
-                runPostponed undefined p
+                runPostponed p
                 for_ w (go q')
             deps -> do
                 let r = maximum deps --postpone until most distant dependecy
                 postpone x r q
     go q x@(p :< Sink) = do
         markSinkAsEvaluated p
-        q' <- emit' q x
-        runPostponed undefined p
+        void $ emit' q x
+        runPostponed p
     go q othr@(_ :< x) = emit' q othr >>= \q' -> for_ x (go q')
 
---     emit' q (p :< x) = lift $ emit q p $ fmap (const ()) x
     emit' q (p :< x) = lift $ emit q p x
 
 --look for unevaluted nodes on which node depends
 --XXX why evaluatedSinks? why not all sinks?
 --returns not yet evaluated dependencies
---     getDataDeps w = collectIncidentSinks <$> gets evaluatedSinks <*> pure w
     getDataDeps w = do
         let deps = foldMap (checkDataDep sinks) w
         evaluated <- gets evaluatedSinks
         return $ deps \\ evaluated
-
---     collectIncidentSinks :: _
---     collectIncidentSinks sinks' w =
---         let deps = foldMap (checkDataDep sinks) w
---             in deps \\ sinks'
 
     markSinkAsEvaluated p = modify $ \st -> st {evaluatedSinks=pure p <> evaluatedSinks st}
     markNodeAsEvaluated p = modify $ \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
@@ -256,7 +139,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
             -> st {postponedUntil
             =pure (PP p (collectNodes' ast1) (\_ -> go qqq ast1)) <> postponedUntil st}
 
-    runPostponed qqq p = do
+    runPostponed p = do
         q <- gets postponedUntil
         let qq = filter ((p==).ppPos) q
         modify $ \st
@@ -266,111 +149,87 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
 
     sinks = execState (collectSinks ast) []
 
--- hndlCnt f
---     = gets esCnt
---     >>= \cnt -> f (cnt)
---         >> modify (\st -> st { esCnt = 1 + cnt})
---         >> return (1 + cnt)
-
-hndlCnt f = do
---     cnt <- gets esCnt
-    f undefined
---     modify (\st -> st { esCnt = 1 + cnt})
---     return (1 + cnt)
-
--- emitPrint q p (Node   w       ) = hndlCnt \cnt -> liftIO (print ("node", p, q, cnt))
--- emitPrint q p  Sink             = hndlCnt \cnt -> liftIO (print ("sink", p, q, cnt))
--- emitPrint q p (Source a       ) = hndlCnt \cnt -> liftIO (print ("src", p, q, cnt))
--- emitPrint q p  End              = hndlCnt \cnt -> liftIO (print ("end", p, q, cnt))
--- emitPrint q p (Device device a)
---     = hndlCnt \cnt -> liftIO (print ("dev", device, p, q, cnt))
--- emitPrint q p (Jump   _label  ) = hndlCnt \cnt -> liftIO (print ("jump", p, q, cnt))
--- emitPrint q p (Cont   _continuation _a) = undefined
--- emitPrint q p (Conn   _continuation) = undefined
-
 --------------------------------------------------------------------------------
 
-emWrap q p x = em0 x *> pure p
+emWrap :: (Show q, Show qq, Show label) => DgExt
+                      -> DgExt
+                      -> Diagram continuation (q, qq) label
+                           (Cofree (Diagram continuation1 device label1) DgExt)
+                      -> StateT (EmitState DgExt) IO DgExt
+emWrap q p x = go x *> pure p
     where
 
-    em0 (Node   []      ) = return () -- "optimization"
-    em0 (Node   w       ) = do
-    --     liftIO (print ("node", p, q, cnt))
+    go (Node   []      ) = do
+--         pop
+--         liftIO $ print (">>>>> DROP")
+        return () -- "optimization"
+    go (Node   w       ) = do
         sinks <- gets esSinks
---         stk <- gets esStack
         let deps :: [DgExt] = foldMap (checkDataDep sinks) w
+        bringToTop q p --renaming to current node - pass through
     --now `or` stack top with all `deps`
         for_ deps \d -> do
---             let Just idx = findIndex (==d) stk
---             liftIO $ print (">>>>> PICK ", idx)
-            bringToTop d
+            bringToTop d d
             pop --first `OR` operand
             pop --second `OR` operand
             liftIO $ print (">>>>> OR", p, d)
-        for_ w \_ ->
+            push p --intermediate result
+        for_ (drop 1 w) \_ -> do
+            liftIO $ print (">>>>> DUP")
             push p --now result of this node is on stack
---         liftIO $ print ("node", length w, length deps)
-    em0  Sink             = do
-        stk <- gets esStack
-        let Just idx = findIndex (==q) stk
-        liftIO $ print (">>>>> PICK ", idx)
-        push p
---         pop
---         bringToTop q
---         liftIO (print ("sink", p, q))
-    em0 (Source a       ) = do
+    go  Sink             = do
+        nodes <- gets esNodes
+        if elem p nodes
+        then do
+            bringToTop q p
+        else do
+            pop
+            liftIO $ print (">>>>> DROP", p)
+    go (Source _a       ) = do
         push p
         liftIO $ print (">>>>> PUSH #1")
---         liftIO (print ("src", p, q))
-    em0  End              = return ()
-    em0 (Device device a) = do
-        bringToTop q
+    go  End              = do
+        pop -- ????
+        liftIO $ print (">>>>> DROP")
+    go (Device device _a) = do
+        bringToTop q q
         pop
-        pop
-        push p
         liftIO (print (">>>>> EVAL", device))
---         liftIO (print ("dev", device, p, q))
-    em0 (Jump   _label  ) = undefined
-    em0 (Cont   _continuation _a) = undefined
-    em0 (Conn   _continuation) = undefined
+        push p
+    go (Jump   label  ) = do
+        bringToTop q q
+        liftIO (print (">>>>> CJMP", label))
+        undefined
+    go (Cont   _continuation _a) = undefined
+    go (Conn   _continuation) = undefined
 
-    bringToTop pp = do
+    bringToTop pp name = do
         stk <- gets esStack
-        liftIO $ print ("bringToTop", pp, stk)
-        let Just idx = findIndex (==pp) stk
-        liftIO $ print (">>>>> PICK ", idx)
-        push pp
+        case break ((==pp) . fst) stk of
+            (_pre, []) -> undefined --not found
+            ([], _) -> pop --pop current a push it with new name
+            (pre, (v, _) : rest) -> do
+                liftIO $ print (">>>>> PICK ", length pre)
+                modify \st -> st { esStack = pre <> ((v, True) : rest) }
+        push name
 
-push x = do
-    stk <- gets esStack
-    modify \st -> st { esStack = x:stk}
+    push v = do
+--         stk <- gets esStack
+        modify \st -> st { esStack = (v, False):esStack st}
 
-pop :: Monad m => StateT EmitState m ()
-pop = do
-    stk <- gets esStack
-    case stk of
-        _:stk' -> modify \st -> st { esStack = stk' }
-        [] -> undefined
+--     pop :: Monad m => StateT (EmitState p) m ()
+    pop = do
+        stk <- gets esStack
+        case stk of
+            _:stk' -> modify \st -> st { esStack = dropWhile (snd) stk' }
+            [] -> undefined
 
 
-data EmitState = EmitState
-    { esStack :: [DgExt]
-    , esCnt :: Integer
-    , esSinks :: [DgExt]
+data EmitState p = EmitState
+    { esStack :: [(p, Bool)] -- flag if used and can dropped
+    , esSinks :: [p]
+    , esNodes :: [p]
     }
-
--- blargh ast = runStateT (traverseDiagram go ast) (EmitState [])
--- 
---     where
--- 
---     go p  Sink             = liftIO (print ("sink", p))
---     go p (Source a       ) = liftIO (print ("src", p))
---     go p  End              = liftIO (print ("end", p))
---     go p (Device device a) = liftIO (print ("dev", device, p))
---     go p (Jump   _label  ) = liftIO (print ("jump", p)) *> undefined
---     go p (Node   w       ) = liftIO (print ("node", p))
---     go p (Cont   _continuation _a) = undefined
---     go p (Conn   _continuation) = undefined
 
 --------------------------------------------------------------------------------
 
@@ -404,10 +263,16 @@ main = do
                         print (here, "--------------------------------------------------")
                         putStrLn ""
 --                         sinks ast1
-                        runStateT
+                        (_, u) <- runStateT
                             (traverseDiagram emWrap p0 ast1)
 --                             (traverseDiagram em0 0 ast1)
-                            (EmitState [] 0 (execState (collectSinks ast1) []))
+                            (EmitState
+                                []
+                                (execState (collectSinks ast1) [])
+                                (execState (collectNodes ast1) [])
+                                )
+                        print $ length $ esStack u
+
 --                         u <- traverseDiagram emitPrint 0 ast1
 --                         print $ length $ postponedUntil u
 --                         print $ length $ unevaluatedNodes u
