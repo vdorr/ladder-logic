@@ -124,8 +124,8 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
         evaluated <- gets evaluatedSinks
         return $ deps \\ evaluated
 
-    markSinkAsEvaluated p = modify $ \st -> st {evaluatedSinks=pure p <> evaluatedSinks st}
-    markNodeAsEvaluated p = modify $ \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
+    markSinkAsEvaluated p = modify \st -> st {evaluatedSinks=pure p <> evaluatedSinks st}
+    markNodeAsEvaluated p = modify \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
 
     unEvNodes = execState (collectNodes ast) []
 
@@ -138,16 +138,14 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
 
     postpone ast1 p qqq
         = modify \st
-            -> st {postponedUntil
-            =pure (PP p (collectNodes' ast1) (go qqq ast1)) <> postponedUntil st}
+            -> st {postponedUntil = PP p (collectNodes' ast1) (go qqq ast1) : postponedUntil st}
 
     runPostponed p = do
         q <- gets postponedUntil
         let qq = filter ((p==).ppPos) q
-        modify $ \st
+        modify \st
             -> st { postponedUntil = deleteFirstsBy (on (==) ppPos) (postponedUntil st) qq}
-        for_ qq \pp -> do
-            ppCont pp
+        for_ qq ppCont
 
     sinks = execState (collectSinks ast) []
 
@@ -157,7 +155,7 @@ emWrap :: (Eq pos, Show pos, Show q, Show qq, Show label) => pos
                       -> pos
                       -> Diagram continuation (q, qq) label
                            (Cofree (Diagram continuation1 device label1) pos)
-                      -> StateT (EmitState pos) IO pos
+                      -> StateT (EmitState pos [String]) IO pos
 emWrap q p x = go x *> pure p
     where
 
@@ -205,6 +203,8 @@ emWrap q p x = go x *> pure p
     go (Cont   _continuation _a) = undefined
     go (Conn   _continuation) = undefined
 
+    emits s = modify \st -> st { esCode = esCode st ++ s }
+
     bringToTop pp name = do
         stk <- gets esStack
         case break ((==pp) . fst) stk of
@@ -215,9 +215,7 @@ emWrap q p x = go x *> pure p
                 modify \st -> st { esStack = pre <> ((v, True) : rest) }
         push name
 
-    push v = do
---         stk <- gets esStack
-        modify \st -> st { esStack = (v, False):esStack st}
+    push v = modify \st -> st { esStack = (v, False):esStack st}
 
 --     pop :: Monad m => StateT (EmitState p) m ()
     pop = do
@@ -227,10 +225,11 @@ emWrap q p x = go x *> pure p
             [] -> undefined
 
 
-data EmitState p = EmitState
+data EmitState p w = EmitState
     { esStack :: [(p, Bool)] -- flag if used and can dropped
     , esSinks :: [p]
     , esNodes :: [p]
+    , esCode :: w
     }
 
 --------------------------------------------------------------------------------
@@ -250,7 +249,7 @@ main = do
 --             TIO.putStrLn src
             putStrLn $ "     ┊ " ++ file
             putStrLn $ "═════╪" ++ replicate 80 '═'
-            for_ (zip [1..] (T.lines src)) \(i::Int, ln) ->
+            for_ (zip [1::Int ..] (T.lines src)) \(i, ln) ->
                 printf "%4i ┊%s\n" i ln
             putStrLn $ "═════╧" ++ replicate 80 '═'
             print (here, "--------------------------------------------------")
@@ -277,7 +276,9 @@ main = do
                                 []
                                 (execState (collectSinks ast1) [])
                                 (execState (collectNodes ast1) [])
+                                []
                                 )
+                        for_ (esCode u) print
                         print $ length $ esStack u
 
 --                         u <- traverseDiagram emitPrint 0 ast1
