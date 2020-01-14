@@ -46,17 +46,17 @@ import Text.Printf
     or 'Node' (position deps) is evaluated
 -}
 
-data PP m a = PP
-    { ppPos :: DgExt
-    , ppNodes :: [DgExt]
-    , ppCont :: a -> StateT (TraverseState m a) m ()
+data PP p m a = PP
+    { ppPos :: p
+    , ppNodes :: [p]
+    , ppCont :: a -> StateT (TraverseState p m a) m ()
     }
 
 -- 'postponed' is appended when -see above
-data TraverseState m a = TraverseState
-    { postponedUntil :: [PP m a] -- location after which we can run cont, cont
-    , unevaluatedNodes :: [DgExt]
-    , evaluatedSinks :: [DgExt]
+data TraverseState p m a = TraverseState
+    { postponedUntil :: [PP p m a] -- location after which we can run cont, cont
+    , unevaluatedNodes :: [p]
+    , evaluatedSinks :: [p]
     }
 
 collectSinks :: (MonadState (f a) m, Semigroup (f a),
@@ -84,14 +84,14 @@ checkDataDep sinks x
 --------------------------------------------------------------------------------
 
 traverseDiagram
-    :: Monad m =>
+    :: (Ord pos, Eq pos, Monad m) =>
     (a1
-        -> DgExt
-        -> Diagram continuation device label (Cofree (Diagram continuation device label) DgExt)
+        -> pos
+        -> Diagram continuation device label (Cofree (Diagram continuation device label) pos)
         -> m a1)
     -> a1
-    -> Cofree (Diagram continuation device label) DgExt
-    -> m (TraverseState m a2)
+    -> Cofree (Diagram continuation device label) pos
+    -> m (TraverseState pos m a2)
 traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes [])
 
     where
