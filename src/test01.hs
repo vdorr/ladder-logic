@@ -46,19 +46,6 @@ import Text.Printf
     or 'Node' (position deps) is evaluated
 -}
 
-data PP p m a = PP
-    { ppPos :: p
-    , ppNodes :: [p]
-    , ppCont :: a -> StateT (TraverseState p m a) m ()
-    }
-
--- 'postponed' is appended when -see above
-data TraverseState p m a = TraverseState
-    { postponedUntil :: [PP p m a] -- location after which we can run cont, cont
-    , unevaluatedNodes :: [p]
-    , evaluatedSinks :: [p]
-    }
-
 collectSinks :: (MonadState (f a) m, Semigroup (f a),
             Applicative f) =>
             Cofree (Diagram continuation device label) a -> m ()
@@ -82,6 +69,19 @@ checkDataDep sinks x
     | otherwise                        = mempty
 
 --------------------------------------------------------------------------------
+
+data PP p m a = PP
+    { ppPos :: p
+    , ppNodes :: [p]
+    , ppCont :: StateT (TraverseState p m a) m ()
+    }
+
+-- 'postponed' is appended when -see above
+data TraverseState p m a = TraverseState
+    { postponedUntil :: [PP p m a] -- location after which we can run cont, cont
+    , unevaluatedNodes :: [p]
+    , evaluatedSinks :: [p]
+    }
 
 traverseDiagram
     :: (Ord pos, Eq pos, Monad m) =>
@@ -139,7 +139,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
     postpone ast1 p qqq
         = modify \st
             -> st {postponedUntil
-            =pure (PP p (collectNodes' ast1) (\_ -> go qqq ast1)) <> postponedUntil st}
+            =pure (PP p (collectNodes' ast1) (go qqq ast1)) <> postponedUntil st}
 
     runPostponed p = do
         q <- gets postponedUntil
@@ -147,7 +147,7 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
         modify $ \st
             -> st { postponedUntil = deleteFirstsBy (on (==) ppPos) (postponedUntil st) qq}
         for_ qq \pp -> do
-            ppCont pp undefined
+            ppCont pp
 
     sinks = execState (collectSinks ast) []
 
