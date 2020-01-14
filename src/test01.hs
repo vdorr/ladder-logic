@@ -12,7 +12,7 @@ import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Simple
--- import Language.Ladder.Interpreter
+import Language.Ladder.Interpreter
 
 import Language.Ladder.Utils
 
@@ -83,15 +83,15 @@ data TraverseState p m a = TraverseState
     , evaluatedSinks :: [p]
     }
 
-traverseDiagram
-    :: (Ord pos, Eq pos, Monad m) =>
-    (a1
-        -> pos
-        -> Diagram continuation device label (Cofree (Diagram continuation device label) pos)
-        -> m a1)
-    -> a1
-    -> Cofree (Diagram continuation device label) pos
-    -> m (TraverseState pos m a2)
+-- traverseDiagram
+--     :: (Ord pos, Eq pos, Monad m) =>
+--     (a1
+--         -> pos
+--         -> Diagram continuation device label (Cofree (Diagram continuation device label) pos)
+--         -> m a1)
+--     -> a1
+--     -> Cofree (Diagram continuation device label) pos
+--     -> m (TraverseState pos m a2)
 traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes [])
 
     where
@@ -151,12 +151,12 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
 
 --------------------------------------------------------------------------------
 
-emWrap :: (Eq pos, Show pos, Show q, Show qq, Show label) => pos
-                      -> pos
-                      -> Diagram continuation (q, qq) label
-                           (Cofree (Diagram continuation1 device label1) pos)
-                      -> StateT (EmitState pos [String]) IO pos
-emWrap q p x = go x *> pure p
+-- emWrap :: (Eq pos, Show pos, Show q, Show qq, Show label, Monad m) => pos
+--                       -> pos
+--                       -> Diagram continuation (q, qq) label
+--                            (Cofree (Diagram continuation1 device label1) pos)
+--                       -> StateT (EmitState pos [String]) m pos
+emWrap emitDevice q p x = go x *> pure p
     where
 
     go (Node   []      ) = do
@@ -172,38 +172,44 @@ emWrap q p x = go x *> pure p
             bringToTop d d
             pop --first `OR` operand
             pop --second `OR` operand
-            liftIO $ print (">>>>> OR", p, d)
+--             emit [show (">>>>> OR", p, d)]
+            emit [ EISimple IOr ]
             push p --intermediate result
         for_ (drop 1 w) \_ -> do
-            liftIO $ print (">>>>> DUP")
+--             emit [show (">>>>> DUP")]
+            emit [ EISimple IDup ]
             push p --now result of this node is on stack
     go  Sink             = do
         nodes <- gets esNodes
         if elem p nodes
-        then do
-            bringToTop q p
+        then bringToTop q p
         else do
             pop
-            liftIO $ print (">>>>> DROP", p)
+--             emit [show (">>>>> DROP", p)]
+            emit [ EISimple IDrop ]
     go (Source _a       ) = do
         push p
-        liftIO $ print (">>>>> PUSH #1")
+--         emit [show (">>>>> PUSH #1")]
+        emit [ EISimple ILdOn ]
     go  End              = do
         pop -- ????
-        liftIO $ print (">>>>> DROP")
+--         emit [show (">>>>> DROP")]
+        emit [ EISimple IDrop ]
     go (Device device _a) = do
         bringToTop q q
         pop
-        liftIO (print (">>>>> EVAL", device))
+--         emit [show (">>>>> EVAL", device)]
+        emit $ emitDevice device
         push p
     go (Jump   label  ) = do
         bringToTop q q
-        liftIO (print (">>>>> CJMP", label))
-        undefined
+--         emit [show (">>>>> CJMP", label)]
+        emit [ EIJump label ]
+        pop
     go (Cont   _continuation _a) = undefined
     go (Conn   _continuation) = undefined
 
-    emits s = modify \st -> st { esCode = esCode st ++ s }
+    emit s = modify \st -> st { esCode = esCode st ++ s }
 
     bringToTop pp name = do
         stk <- gets esStack
@@ -211,17 +217,17 @@ emWrap q p x = go x *> pure p
             (_pre, []) -> undefined --not found
             ([], _) -> pop --pop current a push it with new name
             (pre, (v, _) : rest) -> do
-                liftIO $ print (">>>>> PICK ", length pre)
+--                 emit [show (">>>>> PICK ", length pre)]
+                emit [ EISimple (IPick (length pre)) ]
                 modify \st -> st { esStack = pre <> ((v, True) : rest) }
         push name
 
     push v = modify \st -> st { esStack = (v, False):esStack st}
 
---     pop :: Monad m => StateT (EmitState p) m ()
     pop = do
         stk <- gets esStack
         case stk of
-            _:stk' -> modify \st -> st { esStack = dropWhile (snd) stk' }
+            _:stk' -> modify \st -> st { esStack = dropWhile snd stk' }
             [] -> undefined
 
 
@@ -233,6 +239,44 @@ data EmitState p w = EmitState
     }
 
 --------------------------------------------------------------------------------
+
+test1 lxs = do
+    return ()
+
+test2 lxs = do
+
+    case runLadderParser_ (wrapDevice3 (pure . I) (pure . A)) ladderLiberal lxs of
+        Left  err -> print (here, err)
+        Right ast@(p0 :< _) -> do
+            print here
+
+            (_, u) <- runStateT
+                (traverseDiagram
+--                     (emWrap (pure.show))
+                    (emWrap implSimple)
+                    p0
+                    ast
+                    )
+                (EmitState
+                    []
+                    (execState (collectSinks ast) [])
+                    (execState (collectNodes ast) [])
+                    []
+                    )
+--             for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
+            for_ (esCode u) print
+            print $ length $ esStack u
+
+implSimple :: ([(CellType, Operand T.Text)], DeviceImpl (V addr0) addr0)
+             -> [ExtendedInstruction T.Text word0 address0]
+implSimple = undefined
+
+niceSrc file src = do
+    putStrLn $ "     ┊ " ++ file
+    putStrLn $ "═════╪" ++ replicate 80 '═'
+    for_ (zip [1::Int ..] (T.lines src)) \(i, ln) ->
+        printf "%4i ┊%s\n" i ln
+    putStrLn $ "═════╧" ++ replicate 80 '═'
 
 main :: IO ()
 main = do
@@ -247,11 +291,7 @@ main = do
 
             print (here, "--------------------------------------------------")
 --             TIO.putStrLn src
-            putStrLn $ "     ┊ " ++ file
-            putStrLn $ "═════╪" ++ replicate 80 '═'
-            for_ (zip [1::Int ..] (T.lines src)) \(i, ln) ->
-                printf "%4i ┊%s\n" i ln
-            putStrLn $ "═════╧" ++ replicate 80 '═'
+            niceSrc file src
             print (here, "--------------------------------------------------")
 
             forM_ blocks $ \(lbl, lxs'') -> do
@@ -268,17 +308,22 @@ main = do
 --                         putStrLn ""
                         print (here, "--------------------------------------------------")
                         putStrLn ""
+
 --                         sinks ast1
                         (_, u) <- runStateT
-                            (traverseDiagram emWrap p0 ast1)
---                             (traverseDiagram em0 0 ast1)
+                            (traverseDiagram
+--                                 (emWrap (pure.show))
+                                (emWrap (\_ -> []))
+                                p0
+                                ast1
+                                )
                             (EmitState
                                 []
                                 (execState (collectSinks ast1) [])
                                 (execState (collectNodes ast1) [])
                                 []
                                 )
-                        for_ (esCode u) print
+                        for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
                         print $ length $ esStack u
 
 --                         u <- traverseDiagram emitPrint 0 ast1
