@@ -22,7 +22,9 @@ import Control.Monad.State
 import Data.List
 import Data.Function
 -- import Data.Proxy
--- import Data.Text (Text)
+-- import Data.Text (Text, lines)
+import qualified Data.Text as T --(Text, lines)
+import Text.Printf
 
 --------------------------------------------------------------------------------
 
@@ -151,11 +153,11 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
 
 --------------------------------------------------------------------------------
 
-emWrap :: (Show q, Show qq, Show label) => DgExt
-                      -> DgExt
+emWrap :: (Eq pos, Show pos, Show q, Show qq, Show label) => pos
+                      -> pos
                       -> Diagram continuation (q, qq) label
-                           (Cofree (Diagram continuation1 device label1) DgExt)
-                      -> StateT (EmitState DgExt) IO DgExt
+                           (Cofree (Diagram continuation1 device label1) pos)
+                      -> StateT (EmitState pos) IO pos
 emWrap q p x = go x *> pure p
     where
 
@@ -165,7 +167,7 @@ emWrap q p x = go x *> pure p
         return () -- "optimization"
     go (Node   w       ) = do
         sinks <- gets esSinks
-        let deps :: [DgExt] = foldMap (checkDataDep sinks) w
+        let deps = (foldMap (checkDataDep sinks) w) ++ [] -- ugh
         bringToTop q p --renaming to current node - pass through
     --now `or` stack top with all `deps`
         for_ deps \d -> do
@@ -245,7 +247,12 @@ main = do
             let blocks = labeledRungs lxs'
 
             print (here, "--------------------------------------------------")
-            TIO.putStrLn src
+--             TIO.putStrLn src
+            putStrLn $ "     ┊ " ++ file
+            putStrLn $ "═════╪" ++ replicate 80 '═'
+            for_ (zip [1..] (T.lines src)) \(i::Int, ln) ->
+                printf "%4i ┊%s\n" i ln
+            putStrLn $ "═════╧" ++ replicate 80 '═'
             print (here, "--------------------------------------------------")
 
             forM_ blocks $ \(lbl, lxs'') -> do
