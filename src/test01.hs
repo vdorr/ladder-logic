@@ -87,43 +87,60 @@ data PP p m a = PP
 
 -- 'postponed' is appended when -see above
 data TraverseState p m a = TraverseState
-    { postponedUntil :: [PP p m a] -- location after which we can run cont, cont
+    { tsPostponed :: [PP p m a] -- location after which we can run cont, cont
     , unevaluatedNodes :: [p]
     , evaluatedSinks :: [p]
+--     , evaluated :: [p]
     }
 
--- traverseDiagram
---     :: (Ord pos, Eq pos, Monad m) =>
---     (a1
---         -> pos
---         -> Diagram continuation device label (Cofree (Diagram continuation device label) pos)
---         -> m a1)
---     -> a1
---     -> Cofree (Diagram continuation device label) pos
---     -> m (TraverseState pos m a2)
-traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes [])
+traverseDiagram
+    :: (Ord p, Monad m)
+    => (a -> p -> Diagram c d l (Cofree (Diagram c d l) p) -> m a)
+    -> a
+    -> Cofree (Diagram c d l) p
+    -> m (TraverseState p m a)
+traverseDiagram emit q0 ast
+    = execStateT (go q0 ast)
+        (TraverseState [] unEvNodes []
+--             (nub $ toList ast)
+            )
 
     where
 
+--     go q x@(p :< Node w) = do
+--         dataDeps <- getDataDeps w
+--         locationDeps <- getUnevaluatedAndNotPostponedNodesAt p
+--         case dataDeps <> locationDeps of
+--             [] -> do
+--                 markNodeAsEvaluated p
+--                 q' <- emit' q x
+--                 runPostponed p
+--                 for_ w (go q')
+--             deps -> do
+--                 let r = maximum deps --postpone until most distant dependecy
+--                 postpone x r q
+--     go q x@(p :< Sink) = do
+--         markSinkAsEvaluated p
+--         void $ emit' q x
+--         runPostponed p
+--     go q othr@(_ :< x) = emit' q othr >>= \q' -> for_ x (go q')
+
     go q x@(p :< Node w) = do
-        dataDeps <- getDataDeps w
+        dataDeps     <- getDataDeps w
         locationDeps <- getUnevaluatedAndNotPostponedNodesAt p
         case dataDeps <> locationDeps of
-            [] -> do
-                markNodeAsEvaluated p
-                q' <- emit' q x
-                runPostponed p
-                for_ w (go q')
-            deps -> do
-                let r = maximum deps --postpone until most distant dependecy
-                postpone x r q
-    go q x@(p :< Sink) = do
-        markSinkAsEvaluated p
-        void $ emit' q x
-        runPostponed p
-    go q othr@(_ :< x) = emit' q othr >>= \q' -> for_ x (go q')
+            []   -> markNodeAsEvaluated p *> eval q x
+            deps -> postpone x (maximum deps) q --postpone until most distant dependecy
+    go q x@(p :< Sink) = markSinkAsEvaluated p *> eval q x
+    go q other = eval q other
 
-    emit' q (p :< x) = lift $ emit q p x
+    eval q x@(p :< w) = do
+--         markEvaluated p
+        q' <- lift (emit q p w)
+        runPostponed p
+        for_ w (go q')
+
+---------
 
 --look for unevaluted nodes on which node depends
 --XXX why evaluatedSinks? why not all sinks?
@@ -133,28 +150,35 @@ traverseDiagram emit q0 ast = execStateT (go q0 ast) (TraverseState [] unEvNodes
         evaluated <- gets evaluatedSinks
         return $ deps \\ evaluated
 
-    markSinkAsEvaluated p = modify \st -> st {evaluatedSinks=pure p <> evaluatedSinks st}
-    markNodeAsEvaluated p = modify \st -> st {unevaluatedNodes=delete p (unevaluatedNodes st)}
+--     markEvaluated p = modify \st -> st { evaluated = p : evaluated st }
+--     markEvaluated p = modify \st -> st {evaluated = delete p (evaluated st)}
+
+    markSinkAsEvaluated p = modify \st -> st {evaluatedSinks = p : evaluatedSinks st}
+    markNodeAsEvaluated p = modify \st -> st {unevaluatedNodes = delete p (unevaluatedNodes st)}
 
     unEvNodes = execState (collectNodes ast) []
 
     --hate this hack :(
     getUnevaluatedAndNotPostponedNodes
-        = (\\) <$> gets unevaluatedNodes <*> gets (foldMap ppNodes . postponedUntil)
+        = (\\) <$> gets unevaluatedNodes
+               <*> gets (foldMap ppNodes . tsPostponed)
 
     getUnevaluatedAndNotPostponedNodesAt p
         = filter (< p) <$> getUnevaluatedAndNotPostponedNodes
 
+---------
+
     postpone ast1 p qqq
         = modify \st
-            -> st {postponedUntil = PP p (collectNodes' ast1) (go qqq ast1) : postponedUntil st}
+            -> st {tsPostponed = PP p (collectNodes' ast1) (go qqq ast1) : tsPostponed st}
 
     runPostponed p = do
-        q <- gets postponedUntil
-        let qq = filter ((p==).ppPos) q
-        modify \st
-            -> st { postponedUntil = deleteFirstsBy (on (==) ppPos) (postponedUntil st) qq}
-        for_ qq ppCont
+--         postponed <- gets (filter ((p==).ppPos) . tsPostponed)
+--         modify \st -> st { tsPostponed = deleteFirstsBy (on (==) ppPos) (tsPostponed st) postponed}
+--         for_ postponed ppCont
+        (now, later) <- gets (partition ((p==).ppPos) . tsPostponed)
+        modify \st -> st { tsPostponed = later }
+        for_ now ppCont
 
     sinks = execState (collectSinks ast) []
 
@@ -408,22 +432,23 @@ main = do
 --                         putStrLn ""
                         print (here, "--------------------------------------------------")
                         putStrLn ""
---                         sinks ast1
-                        (_, u) <- runStateT
-                            (traverseDiagram
---                                 (emWrap (pure.show))
-                                (emWrap (\_ -> []))
-                                p0
-                                ast1
-                                )
-                            (EmitState
-                                []
-                                (execState (collectSinks ast1) [])
-                                (execState (collectNodes ast1) [])
-                                []
-                                )
-                        for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
-                        print $ length $ esStack u
+                        print (here, toList ast1)
+                        print (here, nub $ toList ast1)
+--                         (_, u) <- runStateT
+--                             (traverseDiagram
+-- --                                 (emWrap (pure.show))
+--                                 (emWrap (\_ -> []))
+--                                 p0
+--                                 ast1
+--                                 )
+--                             (EmitState
+--                                 []
+--                                 (execState (collectSinks ast1) [])
+--                                 (execState (collectNodes ast1) [])
+--                                 []
+--                                 )
+--                         for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
+--                         print $ length $ esStack u
 
 --                         u <- traverseDiagram emitPrint 0 ast1
 --                         print $ length $ postponedUntil u
