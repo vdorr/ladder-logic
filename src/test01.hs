@@ -184,11 +184,18 @@ traverseDiagram emit q0 ast
 
 --------------------------------------------------------------------------------
 
--- emWrap :: (Eq pos, Show pos, Show q, Show qq, Show label, Monad m) => pos
---                       -> pos
---                       -> Diagram continuation (q, qq) label
---                            (Cofree (Diagram continuation1 device label1) pos)
---                       -> StateT (EmitState pos [String]) m pos
+emWrap :: (Eq p) => (t -> [ExtendedInstruction label0 word0 address0])
+                      -> p
+                      -> p
+                      -> Diagram
+                           continuation
+                           t
+                           label0
+                           (Cofree (Diagram continuation1 device label) p)
+                      -> StateT
+                           (EmitState p [ExtendedInstruction label0 word0 address0])
+                           Identity
+                           p
 emWrap emitDevice q p x = go x *> pure p
     where
 

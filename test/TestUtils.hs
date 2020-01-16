@@ -253,7 +253,7 @@ parseOrDie5 devP path = do
 parseOrDie2
     :: (MonadError String m, Monad m)
     => DeviceParser Text dev
-    -> [[((Int, (Int, Int)), Tok Text)]]
+    -> [[(DgExt, Tok Text)]]
     -> m [(Maybe String
         , Cofree (Diagram Void dev String) DgExt)]
 parseOrDie2 devP lxs = do
