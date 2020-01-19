@@ -125,15 +125,27 @@ setPosOrBlur (ln, (co, _)) = do
 
 eat :: SFM (DgPState st tok) tok
 eat = do
-    DgPSt nx dg ps focused st <- get
+    DgPSt next dg ps focused st <- get
     guard focused
     case dgPop dg of
         Just ((p, v), dg') -> do
-            put $ case nx p dg' of
-                Right q -> DgPSt nx q   (Just p) True  st
-                Left  _ -> DgPSt nx dg' (Just p) False st --nowhere to move
+            put $ case next p dg' of
+                Right q -> DgPSt next q   (Just p) True  st
+                Left  _ -> DgPSt next dg' (Just p) False st --nowhere to move
+--             case next p dg' of
+--                 Right q | isBad p (pos q) -> lift $ Left $ show (here, ps)
+--                 Right q -> put $ DgPSt next q   (Just p) True  st
+--                 Left  _ -> put $ DgPSt next dg' (Just p) False st --nowhere to move
             return v
         Nothing -> lift $ Left $ show (here, ps)
+--TODO check if newly focused item is neighbor of eaten token
+
+    where
+    isBad _prevPos Nothing       = True --yeah, should not happen
+    isBad  prevPos (Just newPos) = not $ areNeighbors prevPos newPos
+    areNeighbors (a, (_, c)) (d, (e, _)) = (a == d) && (1+c == e)
+
+
 
 --------------------------------------------------------------------------------
 
@@ -315,9 +327,9 @@ focusDg :: Dg a -> Dg a
 focusDg = fmap focus . focus
 
 moveToLine :: Int -> Dg a -> Maybe (Dg a)
-moveToLine ln = move2 (compare (Just ln) . lnNr)
+moveToLine ln = move2 (compare (Just ln) . getLineNumber)
     where
-    lnNr = tip >=> pure . fst . fst --extract line number
+    getLineNumber = tip >=> pure . fst . fst --extract line number
 
 --------------------------------------------------------------------------------
 

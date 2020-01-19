@@ -246,31 +246,29 @@ hline2 :: LdP d t ()
 hline2 = do
     vl <- eat >>= \case
         HLine _ vl -> return vl
-        _ -> lift $ Left "expected horizontal line"
+        _          -> lift $ Left "expected horizontal line"
 
 --XXX replicateM_ vl (skip' (==VLine)) ?? fail if VLine already eaten
     when (vl > 0) $ do
         (ln, (co, _)) <- currentPos
         setPos (ln, (co + vl, ()))--TODO TEST move to same location is noop
 
+
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
 device = do
-    p <- currentPos
-    usr <- psUser <$> get
+    p        <- currentPos
+    usr      <- psUser <$> get
     (ops, f) <-
         withOperands do
             dev <- coil' <|> contact'
---             Right (flag, mkDev) <- pure $ ctxMkDev usr dev
---             return (flag, mkDev)
             case ctxMkDev usr dev of
-                 Left _-> lift $ Left here
+                 Left  _             -> lift $ Left here
                  Right (flag, mkDev) -> return (flag, mkDev)
---     Right dev' <- pure $ f ops
     dev' <- case f ops of
-         Left _ -> lift $ Left here
+         Left  _ -> lift $ Left here
          Right d ->  return d
     (p :<) <$> (Device dev' <$> hline')
---     undefined
+
 
 coil' :: LdP d t (DevType t)
 coil' = eat >>= \case
