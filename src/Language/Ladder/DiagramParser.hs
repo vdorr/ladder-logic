@@ -132,22 +132,17 @@ eat = do
             put $ case next p dg' of
                 Right q -> DgPSt next q   (Just p) True  st
                 Left  _ -> DgPSt next dg' (Just p) False st --nowhere to move
---             case next p dg' of
---                 Right q | isBad p (pos q) -> lift $ Left $ show (here, ps)
---                 Right q -> put $ DgPSt next q   (Just p) True  st
---                 Left  _ -> put $ DgPSt next dg' (Just p) False st --nowhere to move
             return v
         Nothing -> lift $ Left $ show (here, ps)
---TODO check if newly focused item is neighbor of eaten token
-
-    where
-    isBad _prevPos Nothing       = True --yeah, should not happen
-    isBad  prevPos (Just newPos) = not $ areNeighbors prevPos newPos
-    areNeighbors (a, (_, c)) (d, (e, _)) = (a == d) && (1+c == e)
-
-
 
 --------------------------------------------------------------------------------
+
+gap :: SFM (DgPState st tok) ()
+gap = do
+    get >>= \case
+        DgPSt{psFocused=False} -> return ()
+        DgPSt{psStr=DgLineEnd} -> return ()
+        _         -> lift $ Left $ here
 
 -- |Succeeds FIXME FIXME i am not sure when
 end :: SFM (DgPState st tok) ()
@@ -213,6 +208,7 @@ branch
     -> [(MoveToNext tok, SFM (DgPState st tok) a)]
     ->  SFM (DgPState st tok) [a]
 branch isFork branches = do
+    gets psFocused >>= guard
     origin <- currentPos
     fmap isFork peek >>= (`unless` (lift $ Left $ here ++ "not branch"))
     stuff  <- for branches $ \(dir, p)

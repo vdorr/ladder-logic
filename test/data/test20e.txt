@@ -3,12 +3,16 @@
 { T01
   \{ testVect =
                [ (1, [("a", X False),("b", X False),("c", X False),("d", X False),("e", X False),("f", X False)])
-               , (1, [("a", X True), ("b", X False)])
-               , (1, [("a", X False), ("b", X True)])
-               , (1, [("a", X True), ("b", X False)])
+               , (1, [("a", X True)])
+               , (1, [("b", X True)])
+               , (1, [("c", X True)])
                ]
-  , watch    = ["d", "e", "f"]
-  , expected = [[X False, X False], [X True, X False], [X False, X True], [X True, X False]]
+  , watch    = ["d", "e","f"]
+  , expected = [ [X False, X False, X False]
+               , [X True,  X False, X False]
+               , [X True,  X True,  X False]
+               , [X True,  X True,  X True]
+               ]
   \}
 }
 
@@ -21,7 +25,7 @@
 +--[ ]--|---------+
 |       |         |
 |       |  d      |
-|       +--( )----|-
+|       +--( )--- |
 |  c              |
 +--[ ]------------|---------+
 |                 |         |

@@ -225,6 +225,9 @@ end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 eol2 :: LdP d t (Cofree (Diagram c d t) DgExt)
 eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 
+gap2 :: LdP d t (Cofree (Diagram c d t) DgExt)
+gap2 = gap *> ((:< Sink) <$> colRight <$> lastPos)
+
 hline' :: LdP d t (Cofree (Diagram c d t) DgExt)
 hline'
 --     = some (hline2 <* option crossing)
@@ -232,7 +235,7 @@ hline'
 --     where
 --     crossing = skipSome (isTok VLine) *> hline2
     = some hline2
-    *> (device <|> node <|> jump <|> eol2)
+    *> (device <|> node <|> jump <|> gap2 <|> eol2)
 
 jump :: LdP d t (Cofree (Diagram c d t) DgExt)
 jump = do
