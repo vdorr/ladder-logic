@@ -441,8 +441,8 @@ box = do
 
 
     hline
-    
-    
+
+
 --     currentPosM >>= (traceShowM . (here,))
 --     Zp zpl zpr <- psStr <$> get
 --     forM_ (reverse zpl ++ zpr) $ \q -> traceShowM (here, q)

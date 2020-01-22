@@ -21,7 +21,7 @@ import Control.Monad.Writer
 import Control.Monad.Error
 import Control.Monad.Except
 -- import qualified Data.Map as M
--- import Data.Bifunctor
+import Data.Bifunctor
 import Data.List
 import Data.Function
 -- import Data.Proxy
@@ -34,6 +34,21 @@ import Data.Traversable
 
 import System.Console.ANSI.Types
 import System.Console.ANSI.Codes
+
+--------------------------------------------------------------------------------
+
+checkDataDep :: (Foldable t, Eq a, Monad m, Monoid (m a)) =>
+                t a -> Cofree (Diagram c d l) a -> m a
+checkDataDep sinks x 
+    | (p :< Node _) <- x, elem p sinks = return p 
+    | otherwise                        = mempty
+
+
+collectNodesAndSinks :: Cofree (Diagram c d l) a -> ([a], [a])
+collectNodesAndSinks ast = execState (go ast) ([], [])
+    where   go (p :< Node w) = modify (first (p:)) *> for_ w go
+            go (p :< Sink  ) = modify (second (p:))
+            go (_ :< other ) = for_ other go
 
 --------------------------------------------------------------------------------
 
@@ -55,75 +70,30 @@ import System.Console.ANSI.Codes
     or 'Node' (position deps) is evaluated
 -}
 
-collectSinks :: (MonadState (f a) m, Semigroup (f a),
-            Applicative f) =>
-            Cofree (Diagram continuation device label) a -> m ()
-collectSinks (p :< Sink) = modify (<> pure p)
-collectSinks (_ :< other) = for_ other collectSinks
-
-collectNodes :: (MonadState (f a) m, Semigroup (f a),
-            Applicative f) =>
-            Cofree (Diagram continuation device label) a -> m ()
-collectNodes (p :< Node w) = modify (<> pure p) *> for_ w collectNodes
-collectNodes (_ :< other) = for_ other collectNodes
-
-collectNodes' :: (Applicative f, Monoid (f a)) =>
-                Cofree (Diagram continuation device label) a -> f a
-collectNodes' ast = execState (collectNodes ast) mempty
-
-checkDataDep :: (Foldable t, Eq a, Monad m, Monoid (m a)) =>
-                t a -> Cofree (Diagram continuation device label) a -> m a
-checkDataDep sinks x 
-    | (p :< Node _) <- x, elem p sinks = return p 
-    | otherwise                        = mempty
-
---------------------------------------------------------------------------------
-
 data PP p m a = PP
-    { ppPos :: p
+    { ppPos   :: p
     , ppNodes :: [p]
-    , ppCont :: StateT (TraverseState p m a) m ()
+    , ppCont  :: StateT (TraverseState p m a) m ()
     }
 
--- 'postponed' is appended when -see above
 data TraverseState p m a = TraverseState
-    { tsPostponed :: [PP p m a] -- location after which we can run cont, cont
+    { tsPostponed      :: [PP p m a] -- location after which we can run cont, cont
     , unevaluatedNodes :: [p]
-    , evaluatedSinks :: [p]
---     , evaluated :: [p]
+    , evaluatedSinks   :: [p]
     }
 
 traverseDiagram
     :: (Ord p, Monad m)
     => (a -> p -> Diagram c d l (Cofree (Diagram c d l) p) -> m a)
+    -> (a -> Cofree (Diagram c d l) p -> m ())
     -> a
     -> Cofree (Diagram c d l) p
-    -> m (TraverseState p m a)
-traverseDiagram emit q0 ast
-    = execStateT (go q0 ast)
-        (TraverseState [] unEvNodes []
---             (nub $ toList ast)
-            )
+    -> m [p] -- (TraverseState p m a)
+traverseDiagram emit post q0 ast
+    = (fmap ppPos.tsPostponed) <$> execStateT (go q0 ast) (TraverseState [] unEvNodes [])
+--     =  execStateT (go q0 ast) (TraverseState [] unEvNodes [])
 
     where
-
---     go q x@(p :< Node w) = do
---         dataDeps <- getDataDeps w
---         locationDeps <- getUnevaluatedAndNotPostponedNodesAt p
---         case dataDeps <> locationDeps of
---             [] -> do
---                 markNodeAsEvaluated p
---                 q' <- emit' q x
---                 runPostponed p
---                 for_ w (go q')
---             deps -> do
---                 let r = maximum deps --postpone until most distant dependecy
---                 postpone x r q
---     go q x@(p :< Sink) = do
---         markSinkAsEvaluated p
---         void $ emit' q x
---         runPostponed p
---     go q othr@(_ :< x) = emit' q othr >>= \q' -> for_ x (go q')
 
     go q x@(p :< Node w) = do
         dataDeps     <- getDataDeps w
@@ -134,29 +104,20 @@ traverseDiagram emit q0 ast
     go q x@(p :< Sink) = markSinkAsEvaluated p *> eval q x
     go q other = eval q other
 
-    eval q x@(p :< w) = do
---         markEvaluated p
+    eval q (p :< w) = do
         q' <- lift (emit q p w)
         runPostponed p
         for_ w (go q')
 
----------
-
 --look for unevaluted nodes on which node depends
---XXX why evaluatedSinks? why not all sinks?
 --returns not yet evaluated dependencies
     getDataDeps w = do
         let deps = foldMap (checkDataDep sinks) w
         evaluated <- gets evaluatedSinks
         return $ deps \\ evaluated
 
---     markEvaluated p = modify \st -> st { evaluated = p : evaluated st }
---     markEvaluated p = modify \st -> st {evaluated = delete p (evaluated st)}
-
     markSinkAsEvaluated p = modify \st -> st {evaluatedSinks = p : evaluatedSinks st}
     markNodeAsEvaluated p = modify \st -> st {unevaluatedNodes = delete p (unevaluatedNodes st)}
-
-    unEvNodes = execState (collectNodes ast) []
 
     --hate this hack :(
     getUnevaluatedAndNotPostponedNodes
@@ -166,36 +127,30 @@ traverseDiagram emit q0 ast
     getUnevaluatedAndNotPostponedNodesAt p
         = filter (< p) <$> getUnevaluatedAndNotPostponedNodes
 
----------
-
-    postpone ast1 p qqq
-        = modify \st
-            -> st {tsPostponed = PP p (collectNodes' ast1) (go qqq ast1) : tsPostponed st}
+    postpone x until q = do
+        let stub = PP until (fst (collectNodesAndSinks x)) (go q x)
+        modify \st -> st {tsPostponed = stub : tsPostponed st}
+        lift $ post q x
 
     runPostponed p = do
---         postponed <- gets (filter ((p==).ppPos) . tsPostponed)
---         modify \st -> st { tsPostponed = deleteFirstsBy (on (==) ppPos) (tsPostponed st) postponed}
---         for_ postponed ppCont
         (now, later) <- gets (partition ((p==).ppPos) . tsPostponed)
         modify \st -> st { tsPostponed = later }
         for_ now ppCont
 
-    sinks = execState (collectSinks ast) []
+    (unEvNodes, sinks) = collectNodesAndSinks ast
 
 --------------------------------------------------------------------------------
 
-emWrap :: (Eq p) => (t -> [ExtendedInstruction label0 word0 address0])
-                      -> p
-                      -> p
-                      -> Diagram
-                           continuation
-                           t
-                           label0
-                           (Cofree (Diagram continuation1 device label) p)
-                      -> StateT
-                           (EmitState p [ExtendedInstruction label0 word0 address0])
-                           Identity
-                           p
+emWrap
+    :: (Eq p)
+    => (d -> [ExtendedInstruction l k adr])
+    -> p
+    -> p
+    -> Diagram c d l (Cofree (Diagram c d l) p)
+    -> StateT
+        (StackEmitState p [ExtendedInstruction l k adr])
+        (Either String)
+        p --TODO use MonadState constraint
 emWrap emitDevice q p x = go x *> pure p
     where
 
@@ -207,16 +162,13 @@ emWrap emitDevice q p x = go x *> pure p
         sinks <- gets esSinks
         let deps = (foldMap (checkDataDep sinks) w) ++ [] -- ugh
         bringToTop q p --renaming to current node - pass through
-    --now `or` stack top with all `deps`
-        for_ deps \d -> do
+        for_ deps \d -> do --now `or` stack top with all `deps`
             bringToTop d d
             pop --first `OR` operand
             pop --second `OR` operand
---             emit [show (">>>>> OR", p, d)]
             emit [ EISimple IOr ]
             push p --intermediate result
         for_ (drop 1 w) \_ -> do
---             emit [show (">>>>> DUP")]
             emit [ EISimple IDup ]
             push p --now result of this node is on stack
     go  Sink             = do
@@ -225,25 +177,20 @@ emWrap emitDevice q p x = go x *> pure p
         then bringToTop q p
         else do
             pop
---             emit [show (">>>>> DROP", p)]
             emit [ EISimple IDrop ]
     go (Source _a       ) = do
         push p
---         emit [show (">>>>> PUSH #1")]
         emit [ EISimple ILdOn ]
     go  End              = do
         pop -- ????
---         emit [show (">>>>> DROP")]
         emit [ EISimple IDrop ]
     go (Device device _a) = do
         bringToTop q q
         pop
---         emit [show (">>>>> EVAL", device)]
         emit $ emitDevice device
         push p
     go (Jump   label  ) = do
         bringToTop q q
---         emit [show (">>>>> CJMP", label)]
         emit [ EIJump label ]
         pop
     go (Cont   _continuation _a) = undefined
@@ -257,12 +204,11 @@ emWrap emitDevice q p x = go x *> pure p
             (_pre, []) -> undefined --not found
             ([], _) -> pop --pop current and push it with new name
             (pre, (v, _) : rest) -> do
---                 emit [show (">>>>> PICK ", length pre)]
                 emit [ EISimple (IPick (length pre)) ]
                 modify \st -> st { esStack = pre <> ((v, True) : rest) }
         push name
 
-    push v = modify \st -> st { esStack = (v, False):esStack st}
+    push v = modify \st -> st { esStack = (v, False) : esStack st }
 
     pop = do
         stk <- gets esStack
@@ -271,12 +217,73 @@ emWrap emitDevice q p x = go x *> pure p
             [] -> undefined
 
 
-data EmitState p w = EmitState
+data StackEmitState p w = StackEmitState
     { esStack :: [(p, Bool)] -- flag if used and can dropped
     , esSinks :: [p]
     , esNodes :: [p]
     , esCode :: w
     }
+
+--------------------------------------------------------------------------------
+
+accuEmit
+    :: (Eq p)
+    => p
+    -> p
+    -> Diagram c d l (Cofree (Diagram c d l) p)
+    -> StateT
+        (AccuEmitState p [String])
+        (Either String)
+        p
+accuEmit q p x = go x *> pure p
+    where
+    go = undefined
+
+    --find value in registers
+    getValue pp = do
+        rf   <- gets aesRegisters
+--         accu <- gets aesAccu
+        --let i = findIndex
+        case break ((==pp) . fst) rf of
+            (_pre, []) -> undefined --not found
+            ([], _) -> undefined
+            (pre, (v, _) : rest) -> do
+                undefined
+
+        undefined
+
+    load pp name = do
+        undefined
+
+accuPost
+    :: a
+    -> Cofree (Diagram c d l) a
+    -> StateT (AccuEmitState a [String]) (Either String) ()
+accuPost q (_ :< Node (_:_)) = do
+    rf   <- gets aesRegisters
+    accu <- gets aesAccu
+--find free register
+    modify \st -> st { aesCode = aesCode st ++ [show ((), "TODo")] }
+    undefined --nonempty node, keep the value
+accuPost _ _ = do
+    return () --not needed, forget it
+
+
+
+data AccuEmitState p w = AccuEmitState
+    { aesAccu      :: p
+    , aesSinks     :: [p]
+    , aesNodes     :: [p]
+    , aesRegisters :: [(p, (Int, Bool))]
+    , aesCode      :: w
+    }
+
+blargh ast@(q0 :< _)
+    = runStateT
+        (traverseDiagram accuEmit accuPost q0 ast)
+        (AccuEmitState q0 sinks nodes [] [])
+    where
+    (nodes, sinks) = collectNodesAndSinks ast --do i need this?
 
 --------------------------------------------------------------------------------
 
@@ -304,18 +311,11 @@ generateStkOMFG
     -> Cofree (Diagram Void device lbl) DgExt
     -> m [ExtendedInstruction lbl word addr]
 generateStkOMFG doDevice ast@(p0 :< _) = do
-    let (_, u) = runState
-                    (traverseDiagram
-                        (emWrap (fmap EISimple . doDevice))
-                        p0
-                        ast
-                        )
-                    (EmitState
-                        []
-                        (execState (collectSinks ast) [])
-                        (execState (collectNodes ast) [])
-                        []
-                        )
+    let (nodes, sinks) = collectNodesAndSinks ast
+    let Right (_, u) = runStateT
+                    (traverseDiagram (emWrap (fmap EISimple . doDevice))
+                        (\_ _ -> pure ()) p0 ast)
+                    (StackEmitState [] sinks nodes [])
     return $ esCode u
 
 emitDevice03
@@ -376,7 +376,9 @@ ehlo ast = do
 
 --------------------------------------------------------------------------------
 
-test1 lxs = do
+test1 ast1 = do
+    let Right (_, st) = blargh ast1
+    print (here, aesCode st)
     return ()
 
 test2 lxs = do
@@ -441,6 +443,7 @@ main = do
                         putStrLn ""
                         print (here, toList ast1)
                         print (here, nub $ toList ast1)
+                        test1 ast1
 --                         (_, u) <- runStateT
 --                             (traverseDiagram
 -- --                                 (emWrap (pure.show))

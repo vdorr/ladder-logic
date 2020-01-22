@@ -117,7 +117,7 @@ setPosOrBlur :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPosOrBlur (ln, (co, _)) = do
     DgPSt b zp ps _ st <- get
     let zp' = move ln co zp --FIXME can only move to direct neighbour!!!!!!!
-    put $ case zp' of
+    put case zp' of
         Just zp'' -> DgPSt b zp'' ps True  st
         Nothing   -> DgPSt b zp   ps False st
 
@@ -129,7 +129,7 @@ eat = do
     guard focused
     case dgPop dg of
         Just ((p, v), dg') -> do
-            put $ case next p dg' of
+            put case next p dg' of
                 Right q -> DgPSt next q   (Just p) True  st
                 Left  _ -> DgPSt next dg' (Just p) False st --nowhere to move
             return v
