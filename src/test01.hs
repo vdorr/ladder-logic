@@ -227,7 +227,7 @@ data StackEmitState p w = StackEmitState
 --------------------------------------------------------------------------------
 
 accuEmit
-    :: (Eq p)
+    :: (Eq p, Show p, Show l)
     => p
     -> p
     -> Diagram c d l (Cofree (Diagram c d l) p)
@@ -237,34 +237,94 @@ accuEmit
         p
 accuEmit q p x = go x *> pure p
     where
-    go = undefined
+
+    go (Node   []      ) = do
+--         pop
+--         liftIO $ print (">>>>> DROP")
+        accSet p
+        return () -- "optimization"
+    go (Node   w       ) = do
+        sinks <- gets aesSinks
+        let deps = (foldMap (checkDataDep sinks) w) ++ [] -- ugh
+        getValue q
+        for_ deps \d -> do
+            r <- findInRegs d
+            emit [ "or $" ++ show r ]
+        accSet p
+        unless (null w) do accSpill p
+    go  Sink             = do
+--         nodes <- gets aesNodes
+--         if elem p nodes
+--         then emit [ "hello" ]
+--         else do
+--             emit [ "hello" ]
+        accSet p
+        accSpill p
+    go (Source _a       ) = do
+        emit [ "ld #1" ]
+        accSet p
+    go  End              = do
+--         emit [ "hello" ]
+        return ()
+    go (Device device _a) = do
+        getValue q
+        emit [ "eval ??" ]
+        accSet p
+    go (Jump   label  ) = do
+        getValue q
+        emit [ "cjmp " ++ show label ]
+    go (Cont   _continuation _a) = undefined
+    go (Conn   _continuation) = undefined
+
+    emit = accEmit
 
     --find value in registers
     getValue pp = do
         rf   <- gets aesRegisters
---         accu <- gets aesAccu
-        --let i = findIndex
+        accu <- gets aesAccu
+        if accu == pp
+        then return ()
+        else do
+            case break ((==pp) . fst) rf of
+                (_pre, []) -> do --not found
+                    error (show (here, "a:", accu, "wanted:", pp, show rf))
+                (_, (_, (r, _)):_) -> emit [ "ld $" ++ show r ]
+--                 (pre, (v, _) : rest) -> do
+--                     undefined
+    findInRegs pp = do
+        rf   <- gets aesRegisters
         case break ((==pp) . fst) rf of
             (_pre, []) -> undefined --not found
-            ([], _) -> undefined
+            ([], (_, (r, _)):_) -> undefined
             (pre, (v, _) : rest) -> do
                 undefined
-
         undefined
-
+        return 0
     load pp name = do
         undefined
+
+accEmit s = modify \st -> st { aesCode = aesCode st ++ s }
+accSet q = modify \st -> st { aesAccu = q }
+accSpill :: p -> StateT
+        (AccuEmitState p [String])
+        (Either String) ()
+accSpill name = do
+    rf   <- gets aesRegisters
+--     accu <- gets aesAccu
+--find free register
+--     modify \st -> st { aesCode = aesCode st ++ [show ((), "TODo")] }
+--     undefined --nonempty node, keep the value
+    modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, False))] }
+    accEmit [ "st $" ++ show (length rf) ] 
+    return ()
 
 accuPost
     :: a
     -> Cofree (Diagram c d l) a
     -> StateT (AccuEmitState a [String]) (Either String) ()
 accuPost q (_ :< Node (_:_)) = do
-    rf   <- gets aesRegisters
-    accu <- gets aesAccu
---find free register
-    modify \st -> st { aesCode = aesCode st ++ [show ((), "TODo")] }
-    undefined --nonempty node, keep the value
+--     accu <- gets aesAccu
+    accSpill q --XXX feels wrong
 accuPost _ _ = do
     return () --not needed, forget it
 
@@ -378,7 +438,8 @@ ehlo ast = do
 
 test1 ast1 = do
     let Right (_, st) = blargh ast1
-    print (here, aesCode st)
+    print (here)
+    for_ (aesCode st) print
     return ()
 
 test2 lxs = do
@@ -399,10 +460,12 @@ implSimple = undefined
 
 niceSrc file src = do
     putStrLn $ "     ┊ " ++ file
-    putStrLn $ "═════╪" ++ replicate 80 '═'
+--     putStrLn $ "═════╪" ++ replicate 80 '═'
+    putStrLn $ "═════╪" ++ concat (replicate 7 "════╤════╦")
     for_ (zip [1::Int ..] (T.lines src)) \(i, ln) ->
         printf "%4i ┊%s\n" i ln
-    putStrLn $ "═════╧" ++ replicate 80 '═'
+--     putStrLn $ "═════╧" ++ replicate 80 '═'
+    putStrLn $ "═════╧" ++ concat (replicate 7 "════╧════╩")
 -- putStrLn  $ setSGRCode [SetItalicized True] ++ "hello"
 -- putStrLn  $ setSGRCode [Reset] ++ "hello"
 
