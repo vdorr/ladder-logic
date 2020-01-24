@@ -226,6 +226,29 @@ data StackEmitState p w = StackEmitState
 
 --------------------------------------------------------------------------------
 
+--TODO TODO TODO
+
+data Setup t lxs ast d code m = Setup
+    { sLexer        :: t -> m lxs
+    , sDeviceParser :: t -> m d
+    , sParser       :: (t -> m d) -> lxs -> m ast
+    , sDeviceEmit   :: d -> m code
+    , sCodeGen      :: ast -> m code
+    }
+
+accSetup = Setup
+    { sLexer        = undefined
+    , sDeviceParser = undefined
+    , sParser       = undefined
+    , sDeviceEmit   = undefined
+    , sCodeGen      = undefined
+    }
+
+{-
+data Failure = Lexing | Parsing | CodeGen | ...
+:: Setup -> m Failure
+-}
+
 accuEmit
     :: (Eq p, Show p, Show l)
     => p
@@ -239,94 +262,89 @@ accuEmit q p x = go x *> pure p
     where
 
     go (Node   []      ) = do
---         pop
---         liftIO $ print (">>>>> DROP")
-        accSet p
-        return () -- "optimization"
+        accSet p -- "optimization"
     go (Node   w       ) = do
         sinks <- gets aesSinks
         let deps = (foldMap (checkDataDep sinks) w) ++ [] -- ugh
         getValue q
         for_ deps \d -> do
-            r <- findInRegs d
-            emit [ "or $" ++ show r ]
+            r <- getFromRegs d
+            accEmit [ "or $" ++ show r ]
         accSet p
-        unless (null w) do accSpill p
+--         when (length w > 1) do accSpill (length w) p
+        unless (null w) do accSpill (length w) p
     go  Sink             = do
---         nodes <- gets aesNodes
---         if elem p nodes
---         then emit [ "hello" ]
---         else do
---             emit [ "hello" ]
-        accSet p
-        accSpill p
+        nodes <- gets aesNodes
+        if elem p nodes
+        then do
+            accSet p
+            accSpill 1 p
+        else return ()
+--         accSet p
+--         accSpill 1 p --TODO check if required
     go (Source _a       ) = do
-        emit [ "ld #1" ]
+        accEmit [ "ld #1" ]
         accSet p
     go  End              = do
---         emit [ "hello" ]
         return ()
     go (Device device _a) = do
         getValue q
-        emit [ "eval ??" ]
+        accEmit [ "eval ??" ++ " // " ++ show p ]
         accSet p
     go (Jump   label  ) = do
         getValue q
-        emit [ "cjmp " ++ show label ]
+        accEmit [ "cjmp " ++ show label ]
     go (Cont   _continuation _a) = undefined
     go (Conn   _continuation) = undefined
 
-    emit = accEmit
-
     --find value in registers
     getValue pp = do
-        rf   <- gets aesRegisters
         accu <- gets aesAccu
         if accu == pp
         then return ()
-        else do
-            case break ((==pp) . fst) rf of
-                (_pre, []) -> do --not found
-                    error (show (here, "a:", accu, "wanted:", pp, show rf))
-                (_, (_, (r, _)):_) -> emit [ "ld $" ++ show r ]
---                 (pre, (v, _) : rest) -> do
---                     undefined
-    findInRegs pp = do
-        rf   <- gets aesRegisters
+        else getFromRegs pp >>= load
+
+    load r = accEmit [ "ld $" ++ show r ]
+
+    getFromRegs pp = do
+        rf <- gets aesRegisters
         case break ((==pp) . fst) rf of
             (_pre, []) -> undefined --not found
-            ([], (_, (r, _)):_) -> undefined
-            (pre, (v, _) : rest) -> do
-                undefined
-        undefined
-        return 0
-    load pp name = do
-        undefined
+            (pre, (ppp, (v, uses)) : rest) -> do
+                let rf' = case uses of
+                            1 -> pre ++ rest
+                            _ -> pre ++ (ppp, (v, uses - 1)) : rest
+--                 let rf' = rf --TODO
+                modify \st -> st { aesRegisters = rf'}
+                return v
 
 accEmit s = modify \st -> st { aesCode = aesCode st ++ s }
 accSet q = modify \st -> st { aesAccu = q }
-accSpill :: p -> StateT
+
+accSpill :: Int -> p -> StateT
         (AccuEmitState p [String])
         (Either String) ()
-accSpill name = do
+accSpill uses name = do
     rf   <- gets aesRegisters
---     accu <- gets aesAccu
---find free register
---     modify \st -> st { aesCode = aesCode st ++ [show ((), "TODo")] }
---     undefined --nonempty node, keep the value
-    modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, False))] }
-    accEmit [ "st $" ++ show (length rf) ] 
-    return ()
+
+    let rUseNumber = snd . snd
+    case break ((==0) . rUseNumber) rf of
+        (_pre, []) -> do --free register not found
+            modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
+            accEmit [ "st $" ++ show (length rf) ] 
+        (pre, (ppp, (v, uses)) : rest) -> do
+            modify \st -> st { aesRegisters =  pre ++ (name, (v, uses)) : rest }
+            accEmit [ "st $" ++ show v ] 
+
+--     modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
+--     accEmit [ "st $" ++ show (length rf) ] 
 
 accuPost
     :: a
     -> Cofree (Diagram c d l) a
     -> StateT (AccuEmitState a [String]) (Either String) ()
-accuPost q (_ :< Node (_:_)) = do
---     accu <- gets aesAccu
-    accSpill q --XXX feels wrong
-accuPost _ _ = do
-    return () --not needed, forget it
+accuPost q (_ :< Node w@(_:_)) = accSpill (length w) q
+accuPost _  _                  = return () --not needed, forget it
 
 
 
@@ -334,7 +352,7 @@ data AccuEmitState p w = AccuEmitState
     { aesAccu      :: p
     , aesSinks     :: [p]
     , aesNodes     :: [p]
-    , aesRegisters :: [(p, (Int, Bool))]
+    , aesRegisters :: [(p, (Int, Int))]
     , aesCode      :: w
     }
 
