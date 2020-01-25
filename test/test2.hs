@@ -17,7 +17,7 @@ import Language.Ladder.Target
 
 --------------------------------------------------------------------------------
 
-newtype Prog word address = Prog { unProg :: [ExtendedInstruction Int word address]}
+newtype Prog word address = Prog { unProg :: [ExtendedInstruction Int (Instruction word address)]}
     deriving (Show)
 
 instance (Eq word, Eq address) => Eq (Prog word address) where
@@ -39,16 +39,20 @@ serializeTests = testGroup "Serialize"
 --             @?= (EIReturn :: ExtendedInstruction Int Int Int)
     , testCase "2" $
         "EIReturn"
-            @?= show (EIReturn :: ExtendedInstruction Int Int Int)
+            @?= show (EIReturn :: ExtendedInstruction Int (Instruction Int Int))
     , testCase "3" $
         "IGt"
             @?= show (IGt :: Instruction Int Int)
     ]
 
-genInstructions :: (Num word, Num address) => Gen [ExtendedInstruction Int word address]
+genInstructions
+    :: (Num word, Num address)
+    => Gen [ExtendedInstruction Int (Instruction word address)]
 genInstructions = Gen.list (Range.linear 0 100) genInstruction
 
-genInstruction :: (Num word, Num address) => Gen (ExtendedInstruction Int word address)
+genInstruction
+    :: (Num word, Num address)
+    => Gen (ExtendedInstruction Int (Instruction word address))
 genInstruction
     = Gen.choice $ instructionTable (pure 0) (pure 0) (pure 0) (pure 0)
 

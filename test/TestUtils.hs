@@ -78,7 +78,7 @@ compileForTest03
     => [(Maybe lbl, Cofree (Diagram Void
             (([(CellType, Operand Text)], DeviceImpl (V String) String))
             lbl) DgExt)]
-    -> m [ExtendedInstruction Int (V String) String]
+    -> m [ExtendedInstruction Int (Instruction (V String) String)]
 compileForTest03 ast = do
     (++ [EIReturn]) <$> generateStk2xx pure emitDevice03 ast
 
@@ -200,7 +200,7 @@ runLadderTest221 verbose num ast = do
 runLadderTestX
     :: Bool
     -> LadderTest
-    -> [ExtendedInstruction Int (V String) String]
+    -> [ExtendedInstruction Int (Instruction (V String) String)]
     -> IO Bool
 runLadderTestX verbose test@T01{} prog = do
 

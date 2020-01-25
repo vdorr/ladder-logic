@@ -82,7 +82,7 @@ generateStk2xx
     => (dev -> Either String x) --TODO swap (Either String) for m
     -> (x -> [Instruction word addr])
     -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
-    -> m [ExtendedInstruction Int word addr]
+    -> m [ExtendedInstruction Int (Instruction word addr)]
 generateStk2xx doOp emitDev ast = do
     ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
     ast''  <- for ast' (traverse (generateStk2' emitDev))

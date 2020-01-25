@@ -35,9 +35,9 @@ data V addr
 
 --------------------------------------------------------------------------------
 
-data ExtendedInstruction label word address
+data ExtendedInstruction label si
     = EIJump   !label
-    | EISimple !(Instruction word address)
+    | EISimple !si
     | EIReturn
     deriving (Show, Eq)
 
@@ -73,8 +73,8 @@ data Instruction w a
 --get rid of text
 resolveLabels
     :: (Show lbl, Eq lbl)
-    => [(Maybe lbl, [ExtendedInstruction lbl w a])]
-    -> Either String [ExtendedInstruction Int w a]
+    => [(Maybe lbl, [ExtendedInstruction lbl si])]
+    -> Either String [ExtendedInstruction Int si]
 resolveLabels l = for (foldMap snd l) g
     where
     l' = fmap (fmap length) l
@@ -118,7 +118,7 @@ class I d m where
 genStk :: (
 --     Show a0    , 
         Show label0, Monad m0)
-     => ([ExtendedInstruction label0 word address] -> m0 ())
+     => ([ExtendedInstruction label0 (Instruction word address)] -> m0 ())
                       -> (a0 -> [Instruction word address])
                       -> [Cofree (Diagram DgExt a0 label0) DgExt]
                       -> Cofree (Diagram DgExt a0 label0) DgExt
@@ -193,7 +193,7 @@ generateStk2'
     )
     => (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
-    -> m [ExtendedInstruction lbl word addr]
+    -> m [ExtendedInstruction lbl (Instruction word addr)]
 generateStk2' doDevice ast' = do
     let ast = dropEnd ast'
     --collapse nodes
@@ -208,7 +208,7 @@ generateStk2' doDevice ast' = do
 
 --------------------------------------------------------------------------------
 
-type Program a = [ExtendedInstruction Int (V a) a]
+type Program a = [ExtendedInstruction Int (Instruction (V a) a)]
 
 -- data Trigger = Periodic Int | Memory String
 data Task a = Task { nextRun, priority, period :: Int, program :: Program a }
@@ -240,7 +240,7 @@ run (clk, tasks, st0)
 
 execute :: (Eq address, Show address)
          => Memory address
-        -> [ExtendedInstruction Int (V address) address]
+        -> [ExtendedInstruction Int (Instruction (V address) address)]
         -> Either (ItpSt address, String) (Memory address)
 execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     where

@@ -52,10 +52,10 @@ mapInstruction g h = f
 
 --------------------------------------------------------------------------------
 
-programToByteString :: [ExtendedInstruction Int Word16 Word8] -> L.ByteString
+programToByteString :: [ExtendedInstruction Int (Instruction Word16 Word8)] -> L.ByteString
 programToByteString = chunksToByteString . instructionsToChunks
 
-instructionsToChunks :: [ExtendedInstruction Int Word16 Word8] -> [Chunk]
+instructionsToChunks :: [ExtendedInstruction Int (Instruction Word16 Word8)] -> [Chunk]
 instructionsToChunks l = foldMap snd l''
     where
     l' = fmap g l
@@ -119,7 +119,8 @@ chunksToByteString l
             C16 x -> putBitsFrom 15 x
         flush
 
-byteStringToInstructions :: L.ByteString -> [(Int, ExtendedInstruction Int Word16 Word8)]
+byteStringToInstructions :: L.ByteString
+    -> [(Int, ExtendedInstruction Int (Instruction Word16 Word8))]
 byteStringToInstructions = runGetL $ runDecode go
     where
     go = do
@@ -133,7 +134,7 @@ noMoreBits = Coding $ \k i b -> do
     empty <- isEmpty
     k (empty && i == 0) i b
 
-getOneInstruction :: Coding Get (Int, ExtendedInstruction Int Word16 Word8)
+getOneInstruction :: Coding Get (Int, ExtendedInstruction Int (Instruction Word16 Word8))
 getOneInstruction = get4 >>= \case
     0  -> return (1,        EISimple   ITrap)
     1  ->       ((1 + 3,) . EIJump   . fromIntegral)            <$> get12
@@ -167,8 +168,8 @@ getOneInstruction = get4 >>= \case
 
 -- |Translate input nibble-based labels to index of instruction
 findLabels
-    :: [(Int, ExtendedInstruction Int Word16 Word8)]
-    -> [ExtendedInstruction Int Word16 Word8]
+    :: [(Int, ExtendedInstruction Int (Instruction Word16 Word8))]
+    -> [ExtendedInstruction Int (Instruction Word16 Word8)]
 findLabels l = fmap f l
     where
     (_, l' ) = Prelude.foldl h (0, []) l
@@ -189,7 +190,7 @@ instructionTable
     -> f lbl
     -> f a
     -> f w
-    -> [f (ExtendedInstruction lbl w a)]
+    -> [f (ExtendedInstruction lbl (Instruction w a))]
 instructionTable stk lbl addr lit = 
     [        EIJump <$> lbl
     , pure   EIReturn

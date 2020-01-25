@@ -89,7 +89,7 @@ nodeTable = foldMap (\(x, xs) -> (x, x) : fmap (,x) xs)
 
 generateStk1
     :: Cofree (Diagram () (Dev String) String) DgExt
-    -> IO [ExtendedInstruction String (V String) String]
+    -> IO [ExtendedInstruction String (Instruction (V String) String)]
 generateStk1 ast = (EISimple <$>) <$> generateStk ast
 
 generateStk
@@ -141,7 +141,7 @@ generateStk ast' = do
 --XXX XXX XXX prob want new base functor, without 'End' (and without 'Source'?)
 -- and distinguishing 'Sink' and 'Stub'
 
---only node may have multiple successors
+--only node may ha/Instruction w ave multiple successors
 --stub(sink) may have one or zero successors
 --i should make newtype for nodeToSink elements
 
