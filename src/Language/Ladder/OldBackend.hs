@@ -107,7 +107,7 @@ generateStk ast' = do
     let x1' -- :: [([DgExt], Cofree (Diagram c (Op Operand String) String) DgExt)]
             = fmap (\x -> (stubs x, x)) x1
     --merge neighbouring nodes
-    let q -- :: [(([DgExt], [(DgExt, [DgExt])]), Cofree (Diagram DgExt (Op Operand String) String) DgExt)]
+    let q
             = fmap (\(stbs, tre) -> let (nds, tre') = merge' tre
                 in ((stbs, nds), tre')
                     --this is result - stubs in subtree, merged nodes and new tree

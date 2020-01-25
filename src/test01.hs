@@ -249,6 +249,30 @@ data Failure = Lexing | Parsing | CodeGen | ...
 :: Setup -> m Failure
 -}
 
+--------------------------------------------------------------------------------
+
+data AI r w a
+    = AITrap --invoke debugger
+    | AILdOn
+    | AILdReg !r
+    | AIStReg !r
+
+    | AILdBit !a
+    | AIStBit !a
+
+    | AIAnd   !r
+    | AIOr    !r
+    | AINot
+
+    | AILdCnA !w
+    | AILdM
+    | AIStM
+
+    | AIEq
+    | AILt
+    | AIGt
+    deriving (Show, Eq)
+
 accuEmit
     :: (Eq p, Show p, Show l)
     => p
