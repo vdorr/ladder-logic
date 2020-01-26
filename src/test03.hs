@@ -105,7 +105,7 @@ mapDevA doDevice = mapDgA pure doDevice pure
 compileOrDieX
     :: FilePath
     -> IO ( MemTrack String
-          , [ExtendedInstruction Int Word16 Word8]
+          , [ExtendedInstruction Int (Instruction Word16 Word8)]
           )
 compileOrDieX fn = do
     (_pragmas, blocks) <- parseOrDie5 deviceThing fn
@@ -122,7 +122,7 @@ compileOrDieX fn = do
 
 writeBlob
     :: FilePath
-    -> [ExtendedInstruction Int Word16 Word8]
+    -> [ExtendedInstruction Int (Instruction Word16 Word8)]
     -> IO ()
 writeBlob = do
     undefined

@@ -211,10 +211,10 @@ runLexer'
 --------------------------------------------------------------------------------
 
 -- |Discard comments and pragmas
-dropWhitespace
-    :: [(p, [((p, p), Tok a)])]
-    -> [(p, [((p, p), Tok a)])]
-dropWhitespace = filter (not.null.snd) . fmap (fmap (filter (not.isWsTok.snd)))
+-- dropWhitespace
+--     :: [(p, [((p, p), Tok a)])]
+--     -> [(p, [((p, p), Tok a)])]
+-- dropWhitespace = filter (not.null.snd) . fmap (fmap (filter (not.isWsTok.snd)))
 
 -- |Discard comments and pragmas
 dropWhitespace2
@@ -261,18 +261,18 @@ labeledRungs t = (lbl, this) : labeledRungs rest
 --------------------------------------------------------------------------------
 
 -- |Discard 'SourcePos', keep only integer line numbers and column ranges
-stripPos
-    :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
-    -> [ (Int, [((Int, Int), a)]) ]
-stripPos = fmap (bimap (unPos.sourceLine)
-    (fmap (first (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)))))
-
-stripPos2
-    :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
-    -> [[((Int, (Int, Int)), a)]]
-stripPos2 = fmap (fmap (first line) . snd)
-    where
-    line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
+-- stripPos
+--     :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
+--     -> [ (Int, [((Int, Int), a)]) ]
+-- stripPos = fmap (bimap (unPos.sourceLine)
+--     (fmap (first (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)))))
+-- 
+-- stripPos2
+--     :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
+--     -> [[((Int, (Int, Int)), a)]]
+-- stripPos2 = fmap (fmap (first line) . snd)
+--     where
+--     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
 
 stripPos3
     :: [ [((SourcePos, SourcePos), a)] ]

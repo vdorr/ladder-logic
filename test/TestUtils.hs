@@ -269,7 +269,7 @@ parseOrDie2 devP lxs = do
 
 --------------------------------------------------------------------------------
 
-lexFile :: FilePath -> IO [[((Int, (Int, Int)), Tok Text)]]
+lexFile :: FilePath -> IO [[(DgExt, Tok Text)]]
 lexFile file = do
     src <- TIO.readFile file
     case stripPos3 <$> runLexer src of
@@ -285,7 +285,7 @@ pickPragma key = partition f
                x : _ | key' : _ <- T.words x -> key' == key
                _                             -> False
 
-loadLadderTest :: FilePath -> IO (Maybe LadderTest, [[((Int, (Int, Int)), Tok Text)]])
+loadLadderTest :: FilePath -> IO (Maybe LadderTest, [[(DgExt, Tok Text)]])
 loadLadderTest file = do
     x <- lexFile file
     let (pgms, _) = pickPragma "T01" $ getLeadingPragmas $ dropPos x

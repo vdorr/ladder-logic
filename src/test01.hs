@@ -143,12 +143,12 @@ traverseDiagram emit post q0 ast
 
 emWrap
     :: (Eq p)
-    => (d -> [ExtendedInstruction l k adr])
+    => (d -> [ExtendedInstruction l (Instruction k adr)])
     -> p
     -> p
     -> Diagram c d l (Cofree (Diagram c d l) p)
     -> StateT
-        (StackEmitState p [ExtendedInstruction l k adr])
+        (StackEmitState p [ExtendedInstruction l (Instruction k adr)])
         (Either String)
         p --TODO use MonadState constraint
 emWrap emitDevice q p x = go x *> pure p
@@ -223,31 +223,6 @@ data StackEmitState p w = StackEmitState
     , esNodes :: [p]
     , esCode :: w
     }
-
---------------------------------------------------------------------------------
-
---TODO TODO TODO
-
-data Setup t lxs ast d code m = Setup
-    { sLexer        :: t -> m lxs
-    , sDeviceParser :: t -> m d
-    , sParser       :: (t -> m d) -> lxs -> m ast
-    , sDeviceEmit   :: d -> m code
-    , sCodeGen      :: ast -> m code
-    }
-
-accSetup = Setup
-    { sLexer        = undefined
-    , sDeviceParser = undefined
-    , sParser       = undefined
-    , sDeviceEmit   = undefined
-    , sCodeGen      = undefined
-    }
-
-{-
-data Failure = Lexing | Parsing | CodeGen | ...
-:: Setup -> m Failure
--}
 
 --------------------------------------------------------------------------------
 
@@ -389,12 +364,37 @@ blargh ast@(q0 :< _)
 
 --------------------------------------------------------------------------------
 
+--TODO TODO TODO
+
+data Setup src t lxs ast d code m = Setup
+    { sLexer        :: t -> m lxs
+    , sDeviceParser :: t -> m d
+    , sParser       :: (t -> m d) -> lxs -> m ast
+    , sDeviceEmit   :: d -> m code
+    , sCodeGen      :: ast -> m code
+    }
+
+accSetup = Setup
+    { sLexer        = undefined
+    , sDeviceParser = undefined
+    , sParser       = undefined
+    , sDeviceEmit   = undefined
+    , sCodeGen      = undefined
+    }
+
+{-
+data Failure = Lexing | Parsing | CodeGen | ...
+:: Setup -> m Failure
+-}
+
+--------------------------------------------------------------------------------
+
 generateStk2THISISTOOMUCH
     :: (Show addr, Show word, Show lbl, Eq lbl, MonadError String m, Monad m)
     => (dev -> Either String x) --TODO swap (Either String) for m
     -> (x -> [Instruction word addr])
     -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
-    -> m [ExtendedInstruction Int word addr]
+    -> m [ExtendedInstruction Int (Instruction word addr)]
 generateStk2THISISTOOMUCH doOp emitDev ast = do
     ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
     ast''  <- for ast' (traverse (generateStkOMFG emitDev))
@@ -411,7 +411,7 @@ generateStkOMFG
     )
     => (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
-    -> m [ExtendedInstruction lbl word addr]
+    -> m [ExtendedInstruction lbl (Instruction word addr)]
 generateStkOMFG doDevice ast@(p0 :< _) = do
     let (nodes, sinks) = collectNodesAndSinks ast
     let Right (_, u) = runStateT
@@ -441,7 +441,7 @@ compileForTest03
     => [(Maybe lbl, Cofree (Diagram Void
             (([(CellType, Operand Text)], DeviceImpl (V String) String))
             lbl) DgExt)]
-    -> m [ExtendedInstruction Int (V String) String]
+    -> m [ExtendedInstruction Int (Instruction (V String) String)]
 compileForTest03 ast = do
     (++ [EIReturn]) <$> generateStk2THISISTOOMUCH pure emitDevice03 ast
 -- compileForTest03 = undefined
@@ -497,7 +497,7 @@ test2 lxs = do
             return ()
 
 implSimple :: ([(CellType, Operand T.Text)], DeviceImpl (V addr0) addr0)
-             -> [ExtendedInstruction T.Text word0 address0]
+             -> [ExtendedInstruction T.Text (Instruction word0 address0)]
 implSimple = undefined
 
 niceSrc file src = do
