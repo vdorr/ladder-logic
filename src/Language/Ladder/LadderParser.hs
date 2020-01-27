@@ -98,16 +98,30 @@ type LdP device text
             (Tok text)
         )
 
-runParser
-    :: (DevType t
+type DeviceParser t d = DevType t
         -> Either
                 String
-                (DevOpFlag, [Operand t] -> Either String d))
+                (DevOpFlag, [Operand t] -> Either String d)
+
+runParser
+    :: DeviceParser t d
     -> LdP d t a
     -> [[(DgExt, Tok t)]]
     -> Either String (a, Dg (Tok t))
 runParser mkDev p s
     = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace2 s)) (LdPCtx mkDev)
+
+runParserX
+    :: DeviceParser t d
+    -> LdP d t a
+    -> [(DgExt, Tok t)]
+    -> Either String (a, [(Maybe t, Dg (Tok t))])
+runParserX mkDev p lxs = do --TODO
+--     let blocks = labeledRungs lxs
+
+    Left "TODO"
+--accepts untreated (not split to line, with all whitespce) token stream
+--handles labels
 
 --------------------------------------------------------------------------------
 

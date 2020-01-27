@@ -17,18 +17,18 @@ import Language.Ladder.Interpreter
 import Language.Ladder.Utils
 
 import Control.Monad.State
-import Control.Monad.Writer
-import Control.Monad.Error
+-- import Control.Monad.Writer
+-- import Control.Monad.Error
 import Control.Monad.Except
 -- import qualified Data.Map as M
 import Data.Bifunctor
 import Data.List
-import Data.Function
+-- import Data.Function
 -- import Data.Proxy
 import Data.Text (Text, unpack)
 import qualified Data.Text as T --(Text, lines)
 import Text.Printf
-import Data.Functor.Identity
+-- import Data.Functor.Identity
 
 import Data.Traversable
 
@@ -99,12 +99,12 @@ traverseDiagram emit post q0 ast
         dataDeps     <- getDataDeps w
         locationDeps <- getUnevaluatedAndNotPostponedNodesAt p
         case dataDeps <> locationDeps of
-            []   -> markNodeAsEvaluated p *> eval q x
+            []   -> markNodeAsEvaluated p *> evalV q x
             deps -> postpone x (maximum deps) q --postpone until most distant dependecy
-    go q x@(p :< Sink) = markSinkAsEvaluated p *> eval q x
-    go q other = eval q other
+    go q x@(p :< Sink) = markSinkAsEvaluated p *> evalV q x
+    go q other = evalV q other
 
-    eval q (p :< w) = do
+    evalV q (p :< w) = do
         q' <- lift (emit q p w)
         runPostponed p
         for_ w (go q')
@@ -127,8 +127,8 @@ traverseDiagram emit post q0 ast
     getUnevaluatedAndNotPostponedNodesAt p
         = filter (< p) <$> getUnevaluatedAndNotPostponedNodes
 
-    postpone x until q = do
-        let stub = PP until (fst (collectNodesAndSinks x)) (go q x)
+    postpone x untilPosition q = do
+        let stub = PP untilPosition (fst (collectNodesAndSinks x)) (go q x)
         modify \st -> st {tsPostponed = stub : tsPostponed st}
         lift $ post q x
 
@@ -248,15 +248,33 @@ data AI r w a
     | AIGt
     deriving (Show, Eq)
 
-accuEmit
-    :: (Eq p, Show p, Show l)
-    => p
-    -> p
-    -> Diagram c d l (Cofree (Diagram c d l) p)
-    -> StateT
-        (AccuEmitState p [String])
-        (Either String)
-        p
+accEval = go
+    where
+    go  AITrap     = undefined
+    go  AILdOn     = undefined
+    go (AILdReg r) = undefined
+    go (AIStReg r) = undefined
+    go (AILdBit a) = undefined
+    go (AIStBit a) = undefined
+    go (AIAnd   r) = undefined
+    go (AIOr    r) = undefined
+    go  AINot      = undefined
+    go (AILdCnA w) = undefined
+    go  AILdM      = undefined
+    go  AIStM      = undefined
+    go  AIEq       = undefined
+    go  AILt       = undefined
+    go  AIGt       = undefined
+
+-- accuEmit
+--     :: (Eq p, Show p, Show l, Show d)
+--     => p
+--     -> p
+--     -> Diagram c d l (Cofree (Diagram c d l) p)
+--     -> StateT
+--         (AccuEmitState p [String])
+--         (Either String)
+--         p
 accuEmit q p x = go x *> pure p
     where
 
@@ -288,7 +306,7 @@ accuEmit q p x = go x *> pure p
         return ()
     go (Device device _a) = do
         getValue q
-        accEmit [ "eval ??" ++ " // " ++ show p ]
+        accEmit [ "eval " ++ show device ++ " // " ++ show p ]
         accSet p
     go (Jump   label  ) = do
         getValue q
@@ -317,7 +335,9 @@ accuEmit q p x = go x *> pure p
                 modify \st -> st { aesRegisters = rf'}
                 return v
 
+accEmit ::  MonadState (AccuEmitState p [a]) m => [a] -> m ()
 accEmit s = modify \st -> st { aesCode = aesCode st ++ s }
+accSet :: MonadState (AccuEmitState p w) m => p -> m ()
 accSet q = modify \st -> st { aesAccu = q }
 
 accSpill :: Int -> p -> StateT
@@ -331,7 +351,7 @@ accSpill uses name = do
         (_pre, []) -> do --free register not found
             modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
             accEmit [ "st $" ++ show (length rf) ] 
-        (pre, (ppp, (v, uses)) : rest) -> do
+        (pre, (_ppp, (v, _uses)) : rest) -> do
             modify \st -> st { aesRegisters =  pre ++ (name, (v, uses)) : rest }
             accEmit [ "st $" ++ show v ] 
 
@@ -355,6 +375,9 @@ data AccuEmitState p w = AccuEmitState
     , aesCode      :: w
     }
 
+blargh :: (Ord p, Show p, Show l, Show d)
+    => Cofree (Diagram c d l) p
+                      -> Either String ([p], AccuEmitState p [String])
 blargh ast@(q0 :< _)
     = runStateT
         (traverseDiagram accuEmit accuPost q0 ast)
@@ -362,6 +385,14 @@ blargh ast@(q0 :< _)
     where
     (nodes, sinks) = collectNodesAndSinks ast --do i need this?
 
+blarghX :: (Ord p, Show p, Show l, Show d)
+    => [ (a, Cofree (Diagram c d l) p)]
+                      -> Either String ([String])
+blarghX s = do
+    chunks <- for s \(_lbl, ast) -> do
+        blargh ast
+    return (foldMap (aesCode.snd) chunks) --fixme 
+    
 --------------------------------------------------------------------------------
 
 --TODO TODO TODO
@@ -374,13 +405,13 @@ data Setup src t lxs ast d code m = Setup
     , sCodeGen      :: ast -> m code
     }
 
-accSetup = Setup
-    { sLexer        = undefined
-    , sDeviceParser = undefined
-    , sParser       = undefined
-    , sDeviceEmit   = undefined
-    , sCodeGen      = undefined
-    }
+-- accSetup = Setup
+--     { sLexer        = undefined
+--     , sDeviceParser = undefined
+--     , sParser       = undefined
+--     , sDeviceEmit   = undefined
+--     , sCodeGen      = undefined
+--     }
 
 {-
 data Failure = Lexing | Parsing | CodeGen | ...
@@ -396,10 +427,10 @@ generateStk2THISISTOOMUCH
     -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
     -> m [ExtendedInstruction Int (Instruction word addr)]
 generateStk2THISISTOOMUCH doOp emitDev ast = do
-    ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
-    ast''  <- for ast' (traverse (generateStkOMFG emitDev))
-    ast''' <- liftEither $ resolveLabels ast'' 
-    return ast'''
+    ast'  <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
+    code  <- for ast' (traverse (generateStkOMFG emitDev))
+    code' <- liftEither $ resolveLabels code
+    return $ code' ++ [EIReturn]
 
 -- generateStk2' 
 generateStkOMFG
@@ -420,101 +451,130 @@ generateStkOMFG doDevice ast@(p0 :< _) = do
                     (StackEmitState [] sinks nodes [])
     return $ esCode u
 
-emitDevice03
-    :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
-    -> [Instruction (V String) String]
-emitDevice03 = snd . emitDevice03'
-
-emitDevice03'
-    :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
-    -> ([String], [Instruction (V String) String])
-emitDevice03' (ops, impl) = case impl (fmap unAddr ops) of
-                            Left err -> error $ show (here, err)
-                            Right x -> x
-    where
-    unAddr :: (CellType, Operand Text) -> Operand String
-    unAddr (_, Var a) = Var $ unpack a
-    unAddr (_, Lit i) = Lit i
-
 compileForTest03
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
     => [(Maybe lbl, Cofree (Diagram Void
             (([(CellType, Operand Text)], DeviceImpl (V String) String))
             lbl) DgExt)]
     -> m [ExtendedInstruction Int (Instruction (V String) String)]
-compileForTest03 ast = do
-    (++ [EIReturn]) <$> generateStk2THISISTOOMUCH pure emitDevice03 ast
--- compileForTest03 = undefined
-
--- ehlo
---     :: [(Maybe String
---             , Cofree (Diagram Void 
---                     (([(CellType, Operand Text)], DeviceImpl (V String) String))
---                     String) DgExt)]
---     -> IO ()
-ehlo ast = do
---     when verbose $ print here
-    prog <- either fail pure $ compileForTest03 ast
-    let memSlots :: [(CellType, Text)] = nub $ execWriter $ traverse_ (traverse_ mp2) ast
---     print (here, memSlots, "<<<<<"::String)
---     print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
-
---     when verbose $ 
-    do
-        putStrLn "---------------------------"
-        for_ prog print
-        putStrLn "---------------------------"
---     runLadderTestX verbose test prog
-
+compileForTest03 ast = generateStk2THISISTOOMUCH pure emitDevice03 ast
     where
-    mp2 :: Cofree
-                        (Diagram c' ([(CellType, Operand Text)], b) s') a
-                      -> WriterT [(CellType, Text)] Identity ()
-    mp2 (_ :< n) = do
-        void $ mapDgA pure (tell.addressesOnly.fst) pure n
-        traverse_ mp2 n
+    emitDevice03
+        :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
+        -> [Instruction (V String) String]
+    emitDevice03 = snd . emitDevice03'
+        where
+        emitDevice03'
+            :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
+            -> ([String], [Instruction (V String) String])
+        emitDevice03' (ops, impl) = case impl (fmap unAddr ops) of
+                                    Left err -> error $ show (here, err)
+                                    Right x -> x
+            where
+            unAddr :: (CellType, Operand Text) -> Operand String
+            unAddr (_, Var a) = Var $ unpack a
+            unAddr (_, Lit i) = Lit i
 
-    addressesOnly s = [(t, a)|((t, Var a)) <- s]
+-- -- ehlo
+-- --     :: [(Maybe String
+-- --             , Cofree (Diagram Void 
+-- --                     (([(CellType, Operand Text)], DeviceImpl (V String) String))
+-- --                     String) DgExt)]
+-- --     -> IO ()
+-- ehlo ast = do
+-- --     when verbose $ print here
+--     prog <- either fail pure $ compileForTest03 ast
+-- --     let memSlots :: [(CellType, Text)] = nub $ execState (traverse_ (traverse_ mp2) ast) []
+-- --     print (here, memSlots, "<<<<<"::String)
+-- --     print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
+-- 
+--     putStrLn "---------------------------"
+--     for_ prog print
+--     putStrLn "---------------------------"
+-- 
+-- --     where
+-- --     mp2 :: Cofree
+-- --                         (Diagram c' ([(CellType, Operand txt)], b) s') a
+-- --                       -> StateT [(CellType, txt)] Identity ()
+-- --     mp2 (_ :< n) = do
+-- --         void $ mapDgA pure ((modify.(++)).addressesOnly.fst) pure n
+-- --         traverse_ mp2 n
+-- -- 
+-- --     addressesOnly s = [(t, a)|((t, Var a)) <- s]
 
 --------------------------------------------------------------------------------
 
-test1 ast1 = do
-    let Right (_, st) = blargh ast1
-    print (here)
-    for_ (aesCode st) print
-    return ()
+-- test1 ast1 = do
+--     let Right (_, st) = blargh ast1
+--     print (here)
+--     for_ (aesCode st) print
+--     return ()
 
-test2 lxs = do
+pipeline :: (t -> ExceptT e IO t1)
+                      -> (t1 -> ExceptT e1 IO [(a, t2)])
+                      -> (t2 -> ExceptT e2 IO b)
+                      -> ([(a, b)] -> ExceptT e3 IO b1)
+                      -> t
+                      -> IO b1
+pipeline lexer postLex parser compile sourceText = do
+    Right lxs <- runExceptT (lexer sourceText)
+    Right lxs' <- runExceptT (postLex lxs)
+    Right ast <- runExceptT $ for lxs' \(lbl, ast0) -> do
+        x <- parser ast0
+        return (lbl, x)
+    Right code <- runExceptT $ compile ast
+    return code
 
-    case runLadderParser_ (wrapDevice3 (pure . I) (pure . A)) ladderLiberal lxs of
-        Left  err -> print (here, err)
-        Right ast@(p0 :< _) -> do
-            print here
-            ehlo [(Nothing, ast)]
---             for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
---             for_ (esCode u) print
---             print $ length $ esStack u
-            return ()
+-- test2 lxs = do
+-- 
+--     case runLadderParser_ (wrapDevice3 (pure . I) (pure . A)) ladderLiberal lxs of
+--         Left  err -> print (here, err)
+--         Right ast -> do
+--             print here
+--             ehlo [(Nothing, ast)]
+-- --             for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
+-- --             for_ (esCode u) print
+-- --             print $ length $ esStack u
+--             return ()
 
-implSimple :: ([(CellType, Operand T.Text)], DeviceImpl (V addr0) addr0)
-             -> [ExtendedInstruction T.Text (Instruction word0 address0)]
-implSimple = undefined
-
-niceSrc file src = do
-    putStrLn $ "     ┊ " ++ file
---     putStrLn $ "═════╪" ++ replicate 80 '═'
-    putStrLn $ "═════╪" ++ concat (replicate 7 "════╤════╦")
+niceSrc :: (String -> IO ()) -> String -> Text -> IO ()
+niceSrc outputLine file src = do
+    outputLine $ "     ┊ " ++ file
+--     outputLine $ "═════╪" ++ replicate 80 '═'
+    outputLine $ "═════╪" ++ concat (replicate 7 "════╤════╦")
     for_ (zip [1::Int ..] (T.lines src)) \(i, ln) ->
-        printf "%4i ┊%s\n" i ln
---     putStrLn $ "═════╧" ++ replicate 80 '═'
-    putStrLn $ "═════╧" ++ concat (replicate 7 "════╧════╩")
--- putStrLn  $ setSGRCode [SetItalicized True] ++ "hello"
--- putStrLn  $ setSGRCode [Reset] ++ "hello"
+        outputLine (printf "%4i ┊%s" i ln)
+--     outputLine $ "═════╧" ++ replicate 80 '═'
+    outputLine $ "═════╧" ++ concat (replicate 7 "════╧════╩")
+-- outputLine  $ setSGRCode [SetItalicized True] ++ "hello"
+-- outputLine  $ setSGRCode [Reset] ++ "hello"
+
+-- test6 :: [(Maybe Text,
+--                (Cofree (Diagram Void (DevType Text, [Operand Text]) Text) DgExt,
+--                 Dg (Tok Text)))]
+--              -> Either e0 a0
+-- test6 = blarghX
 
 main :: IO ()
 main = do
     [file] <- getArgs
     src <- TIO.readFile file
+
+    print (here, "--------------------------------------------------")
+--     TIO.putStrLn src
+    niceSrc putStrLn file src
+    print (here, "--------------------------------------------------")
+
+    prog <- pipeline
+        (liftEither . fmap stripPos3 . runLexer)
+        (pure . labeledRungs . dropWhitespace2)
+        (liftEither . runLadderParser_ (wrapDevice3 (pure . I) (pure . A)) ladderLiberal)
+        (liftEither . compileForTest03)
+        src
+    putStrLn "---------------------------"
+    for_ prog print
+    putStrLn "---------------------------"
+
     case stripPos3 <$> runLexer src of
         Left err -> TIO.putStrLn err
         Right lxs -> do
@@ -522,54 +582,39 @@ main = do
             let lxs' = dropWhitespace2 lxs
             let blocks = labeledRungs lxs'
 
-            print (here, "--------------------------------------------------")
---             TIO.putStrLn src
-            niceSrc file src
-            print (here, "--------------------------------------------------")
-
             forM_ blocks $ \(lbl, lxs'') -> do
                 print (here, lbl)
                 let zp = mkDgZp lxs''
                 for_ (toList zp) (print . (here,))
 
 
-                test2 lxs''
+--                 test2 lxs''
 
 
-                case runLadderParser deviceThing ladderLiberal lxs'' of
-                    Left err -> print (here, err)
-                    Right (ast1@(p0 :< _), zp1) -> do
-                        print (here, "--------------------------------------------------")
-                        for_ (toList zp1) (print . (here,))
+--                 case runLadderParser deviceThing ladderLiberal lxs'' of
+--                     Left err -> print (here, err)
+--                     Right (ast1, zp1) -> do
 --                         print (here, "--------------------------------------------------")
---                         print (here, ast1)
+--                         for_ (toList zp1) (print . (here,))
+--                         print (here, "--------------------------------------------------")
 --                         putStrLn ""
-                        print (here, "--------------------------------------------------")
-                        putStrLn ""
-                        print (here, toList ast1)
-                        print (here, nub $ toList ast1)
-                        test1 ast1
---                         (_, u) <- runStateT
---                             (traverseDiagram
--- --                                 (emWrap (pure.show))
---                                 (emWrap (\_ -> []))
---                                 p0
---                                 ast1
---                                 )
---                             (EmitState
---                                 []
---                                 (execState (collectSinks ast1) [])
---                                 (execState (collectNodes ast1) [])
---                                 []
---                                 )
---                         for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
---                         print $ length $ esStack u
+--                         print (here, toList ast1)
+--                         print (here, nub $ toList ast1)
+--                         test1 ast1
+--                         return ()
 
---                         u <- traverseDiagram emitPrint 0 ast1
---                         print $ length $ postponedUntil u
---                         print $ length $ unevaluatedNodes u
---                         print $ length $ evaluatedSinks u
-                        return ()
+    ;
+    prog1 <- pipeline
+        (liftEither . fmap stripPos3 . runLexer)
+        (pure . labeledRungs . dropWhitespace2)
+        (liftEither . runLadderParser_ deviceThing ladderLiberal)
+        ( liftEither . blarghX)
+        src
+    putStrLn "---------------------------"
+    for_ prog1 print
+    putStrLn "---------------------------"
+    return ()
+
     where
 --     deviceThing = wrapDevice3 (pure . I) (pure . A)
     deviceThing = wrapDeviceSimple
