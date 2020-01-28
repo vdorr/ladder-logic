@@ -141,7 +141,7 @@ traverseDiagram emit post q0 ast
 
 --------------------------------------------------------------------------------
 
-emWrap
+stackEmit
     :: (Eq p)
     => (d -> [ExtendedInstruction l (Instruction k adr)])
     -> p
@@ -151,7 +151,7 @@ emWrap
         (StackEmitState p [ExtendedInstruction l (Instruction k adr)])
         (Either String)
         p --TODO use MonadState constraint
-emWrap emitDevice q p x = go x *> pure p
+stackEmit emitDevice q p x = go x *> pure p
     where
 
     go (Node   []      ) = do
@@ -248,33 +248,66 @@ data AI r w a
     | AIGt
     deriving (Show, Eq)
 
+type AccItpSt a = (Bool, [Bool], [V a], Memory a)
+
+accEval :: (Eq address, Show address)
+     => AI Int (V address) address
+     -> AccItpSt address
+     -> Either
+         (AccItpSt address, String)
+         (AccItpSt address)
 accEval = go
     where
-    go  AITrap     = undefined
-    go  AILdOn     = undefined
-    go (AILdReg r) = undefined
-    go (AIStReg r) = undefined
-    go (AILdBit a) = undefined
-    go (AIStBit a) = undefined
-    go (AIAnd   r) = undefined
-    go (AIOr    r) = undefined
-    go  AINot      = undefined
-    go (AILdCnA w) = undefined
-    go  AILdM      = undefined
-    go  AIStM      = undefined
-    go  AIEq       = undefined
-    go  AILt       = undefined
-    go  AIGt       = undefined
+    go  AITrap     st                = halt st "trap"
+    go  AILdOn        (a, rf, os, m) = pure (True, rf, os, m)
 
--- accuEmit
---     :: (Eq p, Show p, Show l, Show d)
---     => p
---     -> p
---     -> Diagram c d l (Cofree (Diagram c d l) p)
---     -> StateT
---         (AccuEmitState p [String])
---         (Either String)
---         p
+    go (AILdReg r) st@(_, rf, os, m) = (,rf,os,m) <$> getReg r st
+
+    go (AIStReg r) st@(a, rf, os, m)
+        | (f,v:g) <- splitAt r rf    = pure (a, f ++ a : g, os, m)
+        | otherwise                  = halt st (show ("rf idx out of range"::String, r, rf))
+    go (AILdBit i) st@(_, rf, os, m)
+        | Just (X v) <- lookup i m   = pure (v, rf, os, m)
+        | otherwise                  = halt st (show (here, "invalid memory access"::String, i))
+    go (AIStBit i) st@(a, rf, os, m)
+        | (m0,(_,X _):m1) <- break ((i==) . fst) m
+                                     = pure (a, rf, os, (m0 ++ (i, X a) : m1))
+        | otherwise                  = halt st (show (here, "invalid memory access"::String, i))
+
+--     go (AIAnd   r) st@(a, rf, os, m) = getReg r st >>= \b -> pure (a && b, rf, os, m)
+    go (AIAnd   r) st@(a, rf, os, m) = (,rf,os,m) <$> ((a &&) <$> getReg r st)
+
+    go (AIOr    r) st@(a, rf, os, m) = (,rf,os,m) <$> ((a ||) <$> getReg r st)
+    go  AINot      st@(a, rf, os, m) = pure (not a, rf, os, m)
+
+    go (AILdCnA k) (a, rf, os, m)    = pure (a, rf, k : os, m)
+    go  AILdM      st@(a, rf, A i : os, m)
+       | Just v <- lookup i m        = pure (a, rf, v : os, m)
+       | otherwise                   = halt st (show (here, "invalid memory access"::String, i))
+    go  AIStM      st = undefined --TODO
+    go  AIEq       st = undefined
+    go  AILt       (_, rf,   I b : I a : os, m) = pure (a < b, rf, os, m)
+    go  AIGt       (_, rf,   I b : I a : os, m) = pure (a > b, rf, os, m)
+    go  i          st                = halt st (show i)
+
+    halt st e = Left (st, show e)
+
+    getReg r st@(a, rf, os, m)
+--         | r >= 0 && r < length rf = pure (rf !! r, rf, os, m)
+        | r >= 0 && r < length rf = pure (rf !! r)
+        | otherwise               = Left (st, show ("rf idx out of range"::String, r, rf))
+
+--------------------------------------------------------------------------------
+
+accuEmit
+    :: (Eq p, Show p, Show l, Show d)
+    => p
+    -> p
+    -> Diagram c d l (Cofree (Diagram c d l) p)
+    -> StateT
+        (AccuEmitState p [(Maybe p, String)])
+        (Either String)
+        p
 accuEmit q p x = go x *> pure p
     where
 
@@ -286,7 +319,7 @@ accuEmit q p x = go x *> pure p
         getValue q
         for_ deps \d -> do
             r <- getFromRegs d
-            accEmit [ "or $" ++ show r ]
+            accEmit' [ "or $" ++ show r ]
         accSet p
 --         when (length w > 1) do accSpill (length w) p
         unless (null w) do accSpill (length w) p
@@ -297,20 +330,18 @@ accuEmit q p x = go x *> pure p
             accSet p
             accSpill 1 p
         else return ()
---         accSet p
---         accSpill 1 p --TODO check if required
     go (Source _a       ) = do
-        accEmit [ "ld #1" ]
+        accEmit' [ "ld #1" ]
         accSet p
     go  End              = do
         return ()
     go (Device device _a) = do
         getValue q
-        accEmit [ "eval " ++ show device ++ " // " ++ show p ]
+        accEmit' [ "eval " ++ show device ++ " // " ++ show p ]
         accSet p
     go (Jump   label  ) = do
         getValue q
-        accEmit [ "cjmp " ++ show label ]
+        accEmit' [ "cjmp " ++ show label ]
     go (Cont   _continuation _a) = undefined
     go (Conn   _continuation) = undefined
 
@@ -321,7 +352,9 @@ accuEmit q p x = go x *> pure p
         then return ()
         else getFromRegs pp >>= load
 
-    load r = accEmit [ "ld $" ++ show r ]
+    accEmit' = accEmit . fmap (Just p,)
+
+    load r = accEmit' [ "ld $" ++ show r ]
 
     getFromRegs pp = do
         rf <- gets aesRegisters
@@ -335,14 +368,14 @@ accuEmit q p x = go x *> pure p
                 modify \st -> st { aesRegisters = rf'}
                 return v
 
-accEmit ::  MonadState (AccuEmitState p [a]) m => [a] -> m ()
+-- accEmit ::  MonadState (AccuEmitState p [a]) m => [a] -> m ()
 accEmit s = modify \st -> st { aesCode = aesCode st ++ s }
-accSet :: MonadState (AccuEmitState p w) m => p -> m ()
+-- accSet :: MonadState (AccuEmitState p w) m => p -> m ()
 accSet q = modify \st -> st { aesAccu = q }
 
-accSpill :: Int -> p -> StateT
-        (AccuEmitState p [String])
-        (Either String) ()
+-- accSpill :: Int -> p -> StateT
+--         (AccuEmitState p [String])
+--         (Either String) ()
 accSpill uses name = do
     rf   <- gets aesRegisters
 
@@ -350,18 +383,18 @@ accSpill uses name = do
     case break ((==0) . rUseNumber) rf of
         (_pre, []) -> do --free register not found
             modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
-            accEmit [ "st $" ++ show (length rf) ] 
+            accEmit [ (Nothing, "st $" ++ show (length rf)) ] 
         (pre, (_ppp, (v, _uses)) : rest) -> do
             modify \st -> st { aesRegisters =  pre ++ (name, (v, uses)) : rest }
-            accEmit [ "st $" ++ show v ] 
+            accEmit [ (Nothing, "st $" ++ show v) ] 
 
 --     modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
 --     accEmit [ "st $" ++ show (length rf) ] 
 
-accuPost
-    :: a
-    -> Cofree (Diagram c d l) a
-    -> StateT (AccuEmitState a [String]) (Either String) ()
+-- accuPost
+--     :: a
+--     -> Cofree (Diagram c d l) a
+--     -> StateT (AccuEmitState a [String]) (Either String) ()
 accuPost q (_ :< Node w@(_:_)) = accSpill (length w) q
 accuPost _  _                  = return () --not needed, forget it
 
@@ -377,7 +410,7 @@ data AccuEmitState p w = AccuEmitState
 
 blargh :: (Ord p, Show p, Show l, Show d)
     => Cofree (Diagram c d l) p
-                      -> Either String ([p], AccuEmitState p [String])
+                      -> Either String ([p], AccuEmitState p [(Maybe p, String)])
 blargh ast@(q0 :< _)
     = runStateT
         (traverseDiagram accuEmit accuPost q0 ast)
@@ -387,7 +420,7 @@ blargh ast@(q0 :< _)
 
 blarghX :: (Ord p, Show p, Show l, Show d)
     => [ (a, Cofree (Diagram c d l) p)]
-                      -> Either String ([String])
+                      -> Either String [(Maybe p, String)]
 blarghX s = do
     chunks <- for s \(_lbl, ast) -> do
         blargh ast
@@ -446,7 +479,7 @@ generateStkOMFG
 generateStkOMFG doDevice ast@(p0 :< _) = do
     let (nodes, sinks) = collectNodesAndSinks ast
     let Right (_, u) = runStateT
-                    (traverseDiagram (emWrap (fmap EISimple . doDevice))
+                    (traverseDiagram (stackEmit (fmap EISimple . doDevice))
                         (\_ _ -> pure ()) p0 ast)
                     (StackEmitState [] sinks nodes [])
     return $ esCode u

@@ -90,33 +90,7 @@ resolveLabels l = for (foldMap snd l) g
 
 --------------------------------------------------------------------------------
 
--- could hide writer monad stuff
--- or data I m  = I { ldOn :: m () }
---not that i need monad, monoid or even semigroup would do the job
-
-{-
-class I d m where
-    emLdOn :: m ()
-    emDrop :: m ()
-    emDev :: d -> m ()
---     emBranch :: lbl -> m () -- ???
-    emPick :: Int -> m ()
-    emDup :: m ()
-    -}
-
--- data Emit ca w d m = Emit
---     { emLdOn :: m ()
---     , emDrop :: m ()
---     , emDevice :: d -> m ()
---     , emBranch :: ca -> m () -- ???
---     , emPick :: Int -> m ()
---     , emDup :: m ()
---     }
-
---------------------------------------------------------------------------------
-
 genStk :: (
---     Show a0    , 
         Show label0, Monad m0)
      => ([ExtendedInstruction label0 (Instruction word address)] -> m0 ())
                       -> (a0 -> [Instruction word address])
@@ -263,7 +237,6 @@ execute' :: (Eq address, Show address)
                 (ItpSt address))
         -> Memory address
         -> [ExtendedInstruction Int si]
-                
         -> Either (ItpSt address, String) (Memory address)
 execute' go mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
     where
@@ -305,7 +278,6 @@ eval = f
         | otherwise                 = Left (st, show (here, "invalid memory access"::String, a))
     f st@(w:ws, os, m)  (IStBit a)
         | (m0,(_,X _):m1) <- break ((==a) . fst) m
---                                     = pure (w : ws, os, (m0 ++ (a, X w) : m1))
                                     = pure (ws, os, (m0 ++ (a, X w) : m1))
         | otherwise                 = Left (st, show (here, "invalid memory access"::String, a))
     f (a:b:ws, os, m)    IAnd       = pure ((a && b) : ws, os, m)
@@ -313,6 +285,8 @@ eval = f
     f (a:ws,   os, m)    INot       = pure (not a : ws,  os, m)
 
     f (ws,   os, m)     (ILdCnA k)  = pure (ws,  k : os, m)
+
+    f _ IStM = undefined --TODO
 
     f st@(ws,   A a : os, m) ILdM
         | Just v <- lookup a m  = pure (ws, v : os, m)
