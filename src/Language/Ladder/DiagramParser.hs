@@ -52,13 +52,14 @@ type DgExt = (Int, (Int, Int))
 --------------------------------------------------------------------------------
 
 -- |Move in some direction from provided origin
-type MoveToNext tok = DgExt -> Dg tok -> Either String (Dg tok)
+type ParsingDirection tok = DgExt -> Dg tok -> Either String (Dg tok)
+type MoveToNext tok = ParsingDirection tok
 
 --TODO TODO make some tests for psFocused behaviour (e.g. gap test)
 
 -- |Parser state
 data DgPState st lx = DgPSt
-    { psNext     :: MoveToNext lx -- ^select next token
+    { psNext     :: ParsingDirection lx -- ^select next token
     , psStr      :: Dg lx         -- ^input
     , psLastBite :: Maybe DgExt   -- ^position of last token eaten
     , psFocused  :: Bool          -- ^current focus of zp is actual parser current token
@@ -78,7 +79,7 @@ move_ ln co dg = maybe (throwError here) return (move ln co dg)
 
 --FIXME should move only to direct neigbour
 -- (by using single step to exact position it probably works already)
-goRight, goDown, goUp, goLeft :: MoveToNext tok
+goRight, goDown, goUp, goLeft :: ParsingDirection tok
 goRight (ln, (_, co)) = move_ ln     (co+1)
 goDown  (ln, (co, _)) = move_ (ln+1) co
 goUp    (ln, (co, _)) = move_ (ln-1) co
@@ -89,10 +90,10 @@ goLeft  (ln, (co, _)) = move_ ln     (co-1)
 lastPos :: SFM (DgPState st tok) DgExt
 lastPos = psLastBite <$> get >>= maybe (lift $ Left here) return
 
-setDir :: MoveToNext tok -> SFM (DgPState st tok) ()
+setDir :: ParsingDirection tok -> SFM (DgPState st tok) ()
 setDir f = modify $ \(DgPSt _ zp ps fc st) -> DgPSt f zp ps fc st
 
--- getDir :: SFM (DgPState st tok) (MoveToNext tok)
+-- getDir :: SFM (DgPState st tok) (ParsingDirection tok)
 -- getDir = psNext <$> get
 
 step :: SFM (DgPState st tok) ()
@@ -106,10 +107,6 @@ step = do
 
 setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPos = setPosOrBlur
--- setPos (ln, (co, _)) = do
---     DgPSt b zp ps _  st <- get
---     Just zp'        <- return $ move ln co zp --FIXME can only move to direct neighbour!!!!!!!
---     put (DgPSt b zp' ps True st)
 
 -- |Clear 'psFocused' flag if there is not lexeme at desired position
 -- used by vertical diagram combinators
@@ -203,9 +200,92 @@ dgIsEmpty
   
 -}
 
+{-
+
+branch [goLeft *> hline, goDown *> vline]
+-- `branch` need to back `lastEaten` value
+
+goLeft *> goRight *> goLeft == goLeft
+goLeft = do
+    pp <- gets lastEaten
+    modify { next=stepLeft}
+    --still need to check continuity
+    step -- or stepFromWith pp stepLeft
+-- `step` has to be smarter, or `move` has to be, not sure which one
+
+-}
+
+goLeft', goUp', goDown', goRight'  :: SFM (DgPState st tok) ()
+goLeft' = step' goLeft
+goUp' = step' goUp
+goDown' = step' goDown
+goRight' = step' goRight
+
+step' f = do
+    origin <- gets psLastBite >>= \case
+                                    Just ppp -> return ppp
+                                    _ -> undefined --use currently focused position?
+    DgPSt _ zp ps focused st <- get
+    case f origin zp of
+        Right zp'  -> put (DgPSt f zp' ps True st)
+        Left  _err -> lift $ Left here --or not?
+
+goLeft'', goUp'', goDown'', goRight'' :: SFM (DgPState st tok) ()
+goLeft'' = step'' goLeft
+goUp'' = step'' goUp
+goDown'' = step'' goDown
+goRight'' = step'' goRight
+
+step'' f = do
+    origin <- gets psLastBite >>= \case
+                                    Just ppp -> return ppp
+                                    _ -> undefined --use currently focused position?
+    DgPSt _ zp ps focused st <- get
+--     case f origin zp of
+--         Right zp'  -> put (DgPSt f zp' ps True st)
+--         Left  _err -> lift $ Left here --or not?
+    put case f origin zp of
+            Right zp'  -> DgPSt f zp' ps True st
+            Left  _ -> DgPSt f zp ps False st
+
+-- backup and restore last bit position for parsing multiple paths from same origin
+keepOrigin :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
+keepOrigin p = do
+    origin <- gets psLastBite
+    x <- p
+    modify \st -> st { psLastBite = origin }
+    return x
+
+-- set last bit so whole extent of parsed sequence
+group :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
+group p = do
+    begin <- currentPos
+    x <- p
+    end <- gets psLastBite
+    modify \st -> st { psLastBite = ext begin <$> end }
+    return x
+
+branch'
+    :: SFM (DgPState st tok) ()
+    -> [SFM (DgPState st tok) a] -- XXX XXX assuming branch parsers are never failing?!?!
+    ->  SFM (DgPState st tok) [a]
+branch' p0 pps = do
+    p0
+    origin <- gets psLastBite
+    for pps \pd -> do
+        modify \st -> st { psLastBite = origin }
+        pd  -- XXX XXX assuming branch parsers are never failing?!?!
+        -- or `option pd`
+--     undefined
+
+ext :: DgExt -> DgExt -> DgExt
+ext (a, (b, c)) (d, (e, f))
+    | a == d = (a, (min b e, max c f))
+    | otherwise = (a, (b, c))
+
 branch
     :: (tok -> Bool)
-    -> [(MoveToNext tok, SFM (DgPState st tok) a)]
+    -> [(ParsingDirection tok, SFM (DgPState st tok) a)]
     ->  SFM (DgPState st tok) [a]
 branch isFork branches = do
     gets psFocused >>= guard
@@ -218,24 +298,6 @@ branch isFork branches = do
 --     setDir dir0 --restore direction, good for parsing boxes
     _ <- eat --FIXME set direction!!!!!!!!!!!!!
     return $ catMaybes stuff
-
--- branch'
---     :: ((Tok Text) -> Maybe b)
---     -> [(Next, DgP a)]
---     ->  DgP (b, [a])
--- branch' isFork branches = do
---     origin <- currentPos
---     dir0 <- psNext <$> get
---     Just f <- isFork <$> peek_
---     stuff <- for branches $ \(dir, p) -> do
---         setDir dir
---         setPos origin
---         step --with dir
---         p
---     setPos origin --eat `fork`
---     setDir dir0 --restore direction, good for parsing boxes
---     eat
---     return (f, stuff)
 
 -- |Matches diagram with nothing remaining on current line
 pattern DgLineEnd :: Zp (Zp a1)
@@ -262,55 +324,26 @@ dgPop dg = pop dg
     >>= \(ln, dg') -> 
         fmap (fmap (fmap (dgTrim . push dg')))
             pop ln
--- dgPop :: Dg a -> Maybe ((DgExt, a), Dg a)
--- dgPop (Zp u ((Zp l (x : rs)) : ds))
---     = Just (x, dgTrim $ Zp u ((Zp l rs) : ds))
--- dgPop _ = Nothing
-
--- pattern DgFocused :: b -> Zp (Zp (a1, b))
--- pattern DgFocused x <- Zp _ ((Zp _ ((_, x) : _)) : _)
 
 cursor :: Dg a -> Maybe a
--- cursor (DgFocused x) = Just x
--- cursor _             = Nothing
 cursor = tip >=> tip >=> pure . snd
 
--- |Match on current token position
--- pattern DgFocusedPos :: p -> Zp (Zp (p, a))
--- pattern DgFocusedPos p <- Zp _ (Zp _ ((p, _) : _) : _)
-
 pos :: Dg a -> Maybe DgExt
--- pos (DgFocusedPos p) = Just p
--- pos _                = Nothing
--- pos = fmap fst . (tip >=> tip)
 pos = tip >=> tip >=> pure . fst
 
 -- line :: Dg a -> Maybe Int
 -- line = pos >=> pure . fst
 
--- mkDgZp :: [(Int, [((Int, Int), tok)])] -> Dg tok
--- mkDgZp q= Zp [] $ (fmap (Zp [])) $ xxx q
 mkDgZp :: [[(DgExt, tok)]] -> Dg tok
 mkDgZp = fromList . fmap fromList
 
 --------------------------------------------------------------------------------
-
--- moveNotCursed :: Int -> Int -> Dg a -> Maybe (Dg a)
--- moveNotCursed line col = moveToLine line >=> moveToCol col
 
 move :: Int -> Int -> Dg a -> Maybe (Dg a)
 move line col = (moveToLine line >=> moveToCol col) . focusDg --FIXME get rid of focusing
 
 --FIXME merge with moveToLine somehow?
 moveToCol :: Int -> Dg a -> Maybe (Dg a)
--- moveToCol col (Zp us (zp : ds)) = reassemble <$> move2 (dir col . fst) zp
---     where
---     dir x (_, (a, b))
---         | x < a = LT
---         | x > b = GT
---         | otherwise = EQ
---     reassemble zp' = Zp us (zp' : ds)
--- moveToCol _ _ = Nothing
 moveToCol col dg = pop dg >>= \(ln, dg') -> push dg' <$> move2 dir ln
     where
     dir ((_, (a, b)), _)
@@ -329,42 +362,67 @@ moveToLine ln = move2 (compare (Just ln) . getLineNumber)
 
 --------------------------------------------------------------------------------
 
-colocated :: (DgExt -> DgExt)
-          -> SFM (DgPState st tok) t
-          -> (t -> SFM (DgPState st tok) b1)
-          -> SFM (DgPState st tok) b1
-colocated mapPos p pp = do
-    begin <- currentPos
+-- colocated' :: ParsingDirection tok
+--           -> SFM (DgPState st tok) t
+--           -> (t -> SFM (DgPState st tok) b1)
+--           -> SFM (DgPState st tok) b1
+-- colocated' mapPos p pp = do
+--     undefined
+
+colocated'' :: SFM (DgPState st tok) a
+          -> (a -> SFM (DgPState st tok) b) -- `option (goDown' varName)` or `goUp' argument`
+          -> SFM (DgPState st tok) b
+colocated'' p pp = do
+    directionBackup <- gets psNext
+--     begin <- currentPos
     x     <- p
     next  <- currentPos
-    _     <- setPosOrBlur (mapPos begin)
-    y     <- pp x
-    _     <- setPos next
+    end  <- gets psLastBite
+    y <- pp x
+    modify \st -> st { psNext = directionBackup, psLastBite = end }
+    _     <- setPosOrBlur next
     return y
 
-colocated_
-    :: (DgExt -> DgExt)
-    -> SFM (DgPState st tok) a
-    -> SFM (DgPState st tok) b
-    -> SFM (DgPState st tok) (a, b)
-colocated_ mapPos p pp = colocated mapPos p (\x -> (x,) <$> pp)
+colocated_'' p pp = colocated'' p (\x -> (x,) <$> pp)
+
+-- colocated :: (DgExt -> DgExt)
+--           -> SFM (DgPState st tok) t
+--           -> (t -> SFM (DgPState st tok) b1)
+--           -> SFM (DgPState st tok) b1
+-- colocated mapPos p pp = do
+--     begin <- currentPos
+--     x     <- p
+--     next  <- currentPos
+--     _     <- setPosOrBlur (mapPos begin)
+--     y     <- pp x
+--     _     <- setPos next
+--     return y
+-- 
+-- colocated_
+--     :: (DgExt -> DgExt)
+--     -> SFM (DgPState st tok) a
+--     -> SFM (DgPState st tok) b
+--     -> SFM (DgPState st tok) (a, b)
+-- colocated_ mapPos p pp = colocated mapPos p (\x -> (x,) <$> pp)
 
 above, below
     :: SFM (DgPState st tok) t
     -> (t -> SFM (DgPState st tok) b)
     -> SFM (DgPState st tok) b
 
-above = colocated (\(ln, co) -> (ln - 1, co))
-
-below = colocated (\(ln, co) -> (ln + 1, co))
+-- above = colocated (\(ln, co) -> (ln - 1, co))
+-- below = colocated (\(ln, co) -> (ln + 1, co))
+above p pp = colocated'' p (\x -> goUp'' *> pp x)
+below p pp = colocated'' p (\x -> goDown'' *> pp x)
 
 above_, below_
     :: SFM (DgPState st tok) a
     -> SFM (DgPState st tok) b
     -> SFM (DgPState st tok) (a, b)
 
-above_ = colocated_ (\(ln, co) -> (ln - 1, co))
-
-below_ = colocated_ (\(ln, co) -> (ln + 1, co))
+-- above_ = colocated_ (\(ln, co) -> (ln - 1, co))
+-- below_ = colocated_ (\(ln, co) -> (ln + 1, co))
+above_ p pp = colocated_'' p (goUp'' *> pp)
+below_ p pp = colocated_'' p (goDown'' *> pp)
 
 --------------------------------------------------------------------------------

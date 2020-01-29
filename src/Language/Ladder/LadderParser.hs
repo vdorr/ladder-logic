@@ -232,6 +232,7 @@ node'
 --FIXME with 'node' may end only left rail, vline stemming from node must lead to another node
 vline' :: LdP d t (Cofree (Diagram c d t) DgExt)
 vline' = many vline *> (end2 <|> node)
+--TODO for non-std ladders - check if crossing label and terminate at first `Node` returning `Sink`
 
 end2 :: LdP d t (Cofree (Diagram c d t) DgExt)
 end2 = end *> ((:< End) <$> colUnder <$> lastPos)
