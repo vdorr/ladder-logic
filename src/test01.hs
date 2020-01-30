@@ -1,5 +1,8 @@
 {-# OPTIONS_GHC -Wunused-imports  -Wall #-}
-{-# LANGUAGE CPP, TupleSections, FlexibleContexts, ScopedTypeVariables, BlockArguments #-}
+{-# LANGUAGE CPP, TupleSections, FlexibleContexts, ScopedTypeVariables
+    , BlockArguments
+    , OverloadedStrings
+#-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 import qualified Data.Text.IO as TIO
@@ -142,14 +145,14 @@ traverseDiagram emit post q0 ast
 --------------------------------------------------------------------------------
 
 stackEmit
-    :: (Eq p)
-    => (d -> [ExtendedInstruction l (Instruction k adr)])
+    :: (Eq p, Monad m)
+    => (d -> m [ExtendedInstruction l (Instruction k adr)])
     -> p
     -> p
     -> Diagram c d l (Cofree (Diagram c d l) p)
     -> StateT
         (StackEmitState p [ExtendedInstruction l (Instruction k adr)])
-        (Either String)
+        m --(Either String)
         p --TODO use MonadState constraint
 stackEmit emitDevice q p x = go x *> pure p
     where
@@ -187,7 +190,7 @@ stackEmit emitDevice q p x = go x *> pure p
     go (Device device _a) = do
         bringToTop q q
         pop
-        emit $ emitDevice device
+        lift (emitDevice device) >>= emit
         push p
     go (Jump   label  ) = do
         bringToTop q q
@@ -300,15 +303,16 @@ accEval = go
 --------------------------------------------------------------------------------
 
 accuEmit
-    :: (Eq p, Show p, Show l, Show d)
-    => p
+    :: (Eq p, Show p, Show l, Monad m)
+    => (d -> m [ExtendedInstruction l (AI Int k adr)])
+    -> p
     -> p
     -> Diagram c d l (Cofree (Diagram c d l) p)
     -> StateT
-        (AccuEmitState p [(Maybe p, String)])
-        (Either String)
+        (AccuEmitState p [(Maybe p, ExtendedInstruction l (AI Int k adr))])
+        m -- (Either String)
         p
-accuEmit q p x = go x *> pure p
+accuEmit emitDevice q p x = go x *> pure p
     where
 
     go (Node   []      ) = do
@@ -319,7 +323,8 @@ accuEmit q p x = go x *> pure p
         getValue q
         for_ deps \d -> do
             r <- getFromRegs d
-            accEmit' [ "or $" ++ show r ]
+--             accEmit' [ "or $" ++ show r ]
+            accEmit' [ EISimple $ AIOr r ]
         accSet p
 --         when (length w > 1) do accSpill (length w) p
         unless (null w) do accSpill (length w) p
@@ -331,17 +336,20 @@ accuEmit q p x = go x *> pure p
             accSpill 1 p
         else return ()
     go (Source _a       ) = do
-        accEmit' [ "ld #1" ]
+--         accEmit' [ "ld #1" ]
+        accEmit' [ EISimple AILdOn ]
         accSet p
     go  End              = do
         return ()
     go (Device device _a) = do
         getValue q
-        accEmit' [ "eval " ++ show device ++ " // " ++ show p ]
+--         accEmit' [ "eval " ++ show device ++ " // " ++ show p ]
+        lift (emitDevice device) >>= accEmit'
         accSet p
     go (Jump   label  ) = do
         getValue q
-        accEmit' [ "cjmp " ++ show label ]
+--         accEmit' [ "cjmp " ++ show label ]
+        accEmit' [ EIJump label ]
     go (Cont   _continuation _a) = undefined
     go (Conn   _continuation) = undefined
 
@@ -354,7 +362,8 @@ accuEmit q p x = go x *> pure p
 
     accEmit' = accEmit . fmap (Just p,)
 
-    load r = accEmit' [ "ld $" ++ show r ]
+--     load r = accEmit' [ "ld $" ++ show r ]
+    load r = accEmit' [ EISimple $ AILdReg r ]
 
     getFromRegs pp = do
         rf <- gets aesRegisters
@@ -380,13 +389,15 @@ accSpill uses name = do
     rf   <- gets aesRegisters
 
     let rUseNumber = snd . snd
-    case break ((==0) . rUseNumber) rf of
+    case break ((0==) . rUseNumber) rf of
         (_pre, []) -> do --free register not found
             modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
-            accEmit [ (Nothing, "st $" ++ show (length rf)) ] 
+--             accEmit [ (Nothing, "st $" ++ show (length rf)) ] 
+            accEmit [ (Nothing, EISimple $ AIStReg (length rf)) ] 
         (pre, (_ppp, (v, _uses)) : rest) -> do
             modify \st -> st { aesRegisters =  pre ++ (name, (v, uses)) : rest }
-            accEmit [ (Nothing, "st $" ++ show v) ] 
+--             accEmit [ (Nothing, "st $" ++ show v) ] 
+            accEmit [ (Nothing, EISimple $ AIStReg v) ] 
 
 --     modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
 --     accEmit [ "st $" ++ show (length rf) ] 
@@ -408,24 +419,33 @@ data AccuEmitState p w = AccuEmitState
     , aesCode      :: w
     }
 
-blargh :: (Ord p, Show p, Show l, Show d)
-    => Cofree (Diagram c d l) p
-                      -> Either String ([p], AccuEmitState p [(Maybe p, String)])
-blargh ast@(q0 :< _)
+blargh
+    :: (Ord p, Show p, Show l, Monad m)
+    => (d -> m [ExtendedInstruction l (AI Int k adr)])
+    -> Cofree (Diagram c d l) p
+--     -> Either String ([p], AccuEmitState p [(Maybe p, ExtendedInstruction l (AI Int k adr))])
+    -> m ([p], AccuEmitState p [(Maybe p, ExtendedInstruction l (AI Int k adr))])
+blargh accEmitDevice ast@(q0 :< _)
     = runStateT
-        (traverseDiagram accuEmit accuPost q0 ast)
+        (traverseDiagram (accuEmit accEmitDevice) accuPost q0 ast)
         (AccuEmitState q0 sinks nodes [] [])
     where
     (nodes, sinks) = collectNodesAndSinks ast --do i need this?
 
-blarghX :: (Ord p, Show p, Show l, Show d)
-    => [ (a, Cofree (Diagram c d l) p)]
-                      -> Either String [(Maybe p, String)]
-blarghX s = do
+    --(d -> [ExtendedInstruction l (AI Int k adr)])
+--     accEmitDevice = undefined
+
+
+blarghX :: (Ord p, Show p, Show l, Monad m)
+    => (d -> m [ExtendedInstruction l (AI Int k adr)])
+    -> [ (a, Cofree (Diagram c d l) p)]
+--     -> Either String [(Maybe p, ExtendedInstruction l (AI Int k adr))]
+    -> m [(Maybe p, ExtendedInstruction l (AI Int k adr))]
+blarghX emitDev  s = do
     chunks <- for s \(_lbl, ast) -> do
-        blargh ast
+        blargh emitDev ast
     return (foldMap (aesCode.snd) chunks) --fixme 
-    
+
 --------------------------------------------------------------------------------
 
 --TODO TODO TODO
@@ -465,30 +485,30 @@ generateStk2THISISTOOMUCH doOp emitDev ast = do
     code' <- liftEither $ resolveLabels code
     return $ code' ++ [EIReturn]
 
--- generateStk2' 
 generateStkOMFG
-    :: (Show lbl, Eq lbl
-    , Show addr
-    , Show word
---     , Show device
-    , Monad m
-    )
+    :: (Show lbl, Eq lbl, Show addr, Show word, Monad m)
     => (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
     -> m [ExtendedInstruction lbl (Instruction word addr)]
 generateStkOMFG doDevice ast@(p0 :< _) = do
     let (nodes, sinks) = collectNodesAndSinks ast
     let Right (_, u) = runStateT
-                    (traverseDiagram (stackEmit (fmap EISimple . doDevice))
+                    (traverseDiagram (stackEmit (pure . fmap EISimple . doDevice))
                         (\_ _ -> pure ()) p0 ast)
                     (StackEmitState [] sinks nodes [])
     return $ esCode u
 
 compileForTest03
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
-    => [(Maybe lbl, Cofree (Diagram Void
-            (([(CellType, Operand Text)], DeviceImpl (V String) String))
-            lbl) DgExt)]
+    => [( Maybe lbl
+        , Cofree
+            (Diagram
+                Void
+                (([(CellType, Operand Text)], DeviceImpl (V String) String))
+                lbl
+            )
+            DgExt
+        )]
     -> m [ExtendedInstruction Int (Instruction (V String) String)]
 compileForTest03 ast = generateStk2THISISTOOMUCH pure emitDevice03 ast
     where
@@ -641,7 +661,7 @@ main = do
         (liftEither . fmap stripPos3 . runLexer)
         (pure . labeledRungs . dropWhitespace2)
         (liftEither . runLadderParser_ deviceThing ladderLiberal)
-        ( liftEither . blarghX)
+        ( liftEither . blarghX accEmitDev1)
         src
     putStrLn "---------------------------"
     for_ prog1 print
@@ -651,3 +671,17 @@ main = do
     where
 --     deviceThing = wrapDevice3 (pure . I) (pure . A)
     deviceThing = wrapDeviceSimple
+
+--     accEmitDev2 :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
+--              -> Either String [ExtendedInstruction Text (AI Int Int Int)]
+--     accEmitDev2 (x, y) = (error . show) x
+             
+--     accEmitDev1 :: d -> Either String [ExtendedInstruction Text (AI Int Int Int)]
+    accEmitDev1 :: (DevType Text, [Operand Text])
+                      -> Either String [ExtendedInstruction Text (AI Int Int Int)]
+    accEmitDev1 (Coil_ " ", [Var a]) = pure [EISimple $ AIAnd undefined]
+    accEmitDev1 (Coil_ "/", _args) = pure undefined
+    accEmitDev1 (Coil_ "S", _args) = pure undefined
+    accEmitDev1 (Coil_ "R", _args) = pure undefined
+    accEmitDev1 (Coil_ d, _args) = pure undefined
+    accEmitDev1 (Contact_ d, _args) = pure undefined
