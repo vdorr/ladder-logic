@@ -371,8 +371,9 @@ accuEmit emitDevice q p x = go x *> pure p
             (_pre, []) -> undefined --not found
             (pre, (ppp, (v, uses)) : rest) -> do
                 let rf' = case uses of
-                            1 -> pre ++ rest
-                            _ -> pre ++ (ppp, (v, uses - 1)) : rest
+                            UseCount 1 -> pre ++ rest
+                            UseCount u -> pre ++ (ppp, (v, UseCount $ u - 1)) : rest
+                            _ -> undefined --TODO
 --                 let rf' = rf --TODO
                 modify \st -> st { aesRegisters = rf'}
                 return v
@@ -389,13 +390,13 @@ accSpill uses name = do
     rf   <- gets aesRegisters
 
     let rUseNumber = snd . snd
-    case break ((0==) . rUseNumber) rf of
+    case break ((UseCount 0==) . rUseNumber) rf of
         (_pre, []) -> do --free register not found
-            modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
+            modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, UseCount uses))] }
 --             accEmit [ (Nothing, "st $" ++ show (length rf)) ] 
             accEmit [ (Nothing, EISimple $ AIStReg (length rf)) ] 
         (pre, (_ppp, (v, _uses)) : rest) -> do
-            modify \st -> st { aesRegisters =  pre ++ (name, (v, uses)) : rest }
+            modify \st -> st { aesRegisters =  pre ++ (name, (v, UseCount uses)) : rest }
 --             accEmit [ (Nothing, "st $" ++ show v) ] 
             accEmit [ (Nothing, EISimple $ AIStReg v) ] 
 
@@ -410,12 +411,14 @@ accuPost q (_ :< Node w@(_:_)) = accSpill (length w) q
 accuPost _  _                  = return () --not needed, forget it
 
 
+data SlotUse = UseCount Int | Forever
+    deriving Eq
 
 data AccuEmitState p w = AccuEmitState
     { aesAccu      :: p
     , aesSinks     :: [p]
     , aesNodes     :: [p]
-    , aesRegisters :: [(p, (Int, Int))]
+    , aesRegisters :: [(p, (Int, SlotUse))]
     , aesCode      :: w
     }
 
