@@ -223,16 +223,28 @@ node = ann <$> currentPos <*> (Node <$> node')
 
 node' :: LdP d t [Cofree (Diagram c d t) DgExt]
 node'
-    = branch
-        (isTok Cross)
-        [ (goRight, hline') --currentPosM>>=traceShowM>>
-        , (goDown , vline')
-        ]
+--     = branch
+--         (isTok Cross)
+--         [ (goRight, hline') --currentPosM>>=traceShowM>>
+--         , (goDown , vline')
+--         ]
+
+--         eat >>= \case
+--             Cross -> return ()
+--             _ -> lift $ Left "expected node"
+    = cross
+    *> ((++) <$> (toList <$> (optional $ keepOrigin $ goRight'' *> hline'))
+             <*> (toList <$>
+                ((keepOrigin (const Nothing <$> (goDown'' *> end2)))
+                    <|> (optional $ id $ goDown'' *> vline'))))
 
 --FIXME with 'node' may end only left rail, vline stemming from node must lead to another node
 vline' :: LdP d t (Cofree (Diagram c d t) DgExt)
 vline' = many vline *> (end2 <|> node)
 --TODO for non-std ladders - check if crossing label and terminate at first `Node` returning `Sink`
+
+-- vline'' :: LdP d t (Cofree (Diagram c d t) DgExt)
+-- vline'' = some vline *> (end2 <|> node)
 
 end2 :: LdP d t (Cofree (Diagram c d t) DgExt)
 end2 = end *> ((:< End) <$> colUnder <$> lastPos)
