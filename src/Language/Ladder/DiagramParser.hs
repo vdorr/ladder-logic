@@ -1,7 +1,21 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 {-# LANGUAGE FlexibleInstances #-}
 
-module Language.Ladder.DiagramParser where
+module Language.Ladder.DiagramParser
+    ( colocated'', colocated_'', above, below, above_, below_
+    , ParsingDirection
+    , DgPState(..) --FIXME do not export
+    , DgExt, Dg, SFM
+    , gap, end, eat, eol
+    , dgIsEmpty --FIXME better name
+    , setDir, setPos, currentPos, lastPos, keepOrigin
+    , goRight, goDown, goUp, goLeft
+    , goRight'', goDown'', goUp'', goLeft''
+    , colRight, colUnder --XXX remove
+    , applyDgp, mkDgZp
+    , dgLength, dgTrim
+    )
+    where
 
 import Prelude hiding (fail)
 -- import Control.Monad.Fail
@@ -200,35 +214,20 @@ dgIsEmpty
   
 -}
 
-{-
-
-branch [goLeft *> hline, goDown *> vline]
--- `branch` need to back `lastEaten` value
-
-goLeft *> goRight *> goLeft == goLeft
-goLeft = do
-    pp <- gets lastEaten
-    modify { next=stepLeft}
-    --still need to check continuity
-    step -- or stepFromWith pp stepLeft
--- `step` has to be smarter, or `move` has to be, not sure which one
-
--}
-
-goLeft', goUp', goDown', goRight'  :: SFM (DgPState st tok) ()
-goLeft' = step' goLeft
-goUp' = step' goUp
-goDown' = step' goDown
-goRight' = step' goRight
-
-step' f = do
-    origin <- gets psLastBite >>= \case
-                                    Just ppp -> return ppp
-                                    _ -> undefined --use currently focused position?
-    DgPSt _ zp ps focused st <- get
-    case f origin zp of
-        Right zp'  -> put (DgPSt f zp' ps True st)
-        Left  _err -> lift $ Left here --or not?
+-- goLeft', goUp', goDown', goRight'  :: SFM (DgPState st tok) ()
+-- goLeft' = step' goLeft
+-- goUp' = step' goUp
+-- goDown' = step' goDown
+-- goRight' = step' goRight
+-- 
+-- step' f = do
+--     origin <- gets psLastBite >>= \case
+--                                     Just ppp -> return ppp
+--                                     _ -> undefined --use currently focused position?
+--     DgPSt _ zp ps focused st <- get
+--     case f origin zp of
+--         Right zp'  -> put (DgPSt f zp' ps True st)
+--         Left  _err -> lift $ Left here --or not?
 
 goLeft'', goUp'', goDown'', goRight'' :: SFM (DgPState st tok) ()
 goLeft'' = step'' goLeft
@@ -236,11 +235,12 @@ goUp'' = step'' goUp
 goDown'' = step'' goDown
 goRight'' = step'' goRight
 
+step'' :: ParsingDirection tok -> SFM (DgPState st tok) ()
 step'' f = do
     origin <- gets psLastBite >>= \case
                                     Just ppp -> return ppp
                                     _ -> undefined --use currently focused position?
-    DgPSt _ zp ps focused st <- get
+    DgPSt _ zp ps _focused st <- get
 --     case f origin zp of
 --         Right zp'  -> put (DgPSt f zp' ps True st)
 --         Left  _err -> lift $ Left here --or not?
@@ -259,45 +259,46 @@ keepOrigin p = do
 -- set last bit so whole extent of parsed sequence
 group :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
 group p = do
-    begin <- currentPos
+    first <- currentPos
     x <- p
-    end <- gets psLastBite
-    modify \st -> st { psLastBite = ext begin <$> end }
+    lastToken <- gets psLastBite
+    modify \st -> st { psLastBite = ext first <$> lastToken }
     return x
 
-branch'
-    :: SFM (DgPState st tok) ()
-    -> [SFM (DgPState st tok) a] -- XXX XXX assuming branch parsers are never failing?!?!
-    ->  SFM (DgPState st tok) [a]
-branch' p0 pps = do
-    p0
-    origin <- gets psLastBite
-    for pps \pd -> do
-        modify \st -> st { psLastBite = origin }
-        pd  -- XXX XXX assuming branch parsers are never failing?!?!
-        -- or `option pd`
---     undefined
+-- branch'
+--     :: SFM (DgPState st tok) ()
+--     -> [SFM (DgPState st tok) a] -- XXX XXX assuming branch parsers are never failing?!?!
+--     ->  SFM (DgPState st tok) [a]
+-- branch' p0 pps = do
+--     p0
+--     origin <- gets psLastBite
+--     for pps \pd -> do
+--         modify \st -> st { psLastBite = origin }
+--         pd  -- XXX XXX assuming branch parsers are never failing?!?!
+--         -- or `option pd`
+-- --     undefined
 
 ext :: DgExt -> DgExt -> DgExt
-ext (a, (b, c)) (d, (e, f))
-    | a == d = (a, (min b e, max c f))
-    | otherwise = (a, (b, c))
+ext (a, (b, c)) (_d, (e, f))
+--     | a == d = (a, (min b e, max c f))
+--     | otherwise = (a, (b, c))
+    = (a, (min b e, max c f))
 
-branch
-    :: (tok -> Bool)
-    -> [(ParsingDirection tok, SFM (DgPState st tok) a)]
-    ->  SFM (DgPState st tok) [a]
-branch isFork branches = do
-    gets psFocused >>= guard
-    origin <- currentPos
-    fmap isFork peek >>= (`unless` (lift $ Left $ here ++ "not branch"))
-    stuff  <- for branches $ \(dir, p)
-        -> optional (setDir dir *> setPos origin *> step *> p)
---         <|> return Nothing --step fail if there's nothing in desired direction
-    setPos origin --eat `fork`
---     setDir dir0 --restore direction, good for parsing boxes
-    _ <- eat --FIXME set direction!!!!!!!!!!!!!
-    return $ catMaybes stuff
+-- branch
+--     :: (tok -> Bool)
+--     -> [(ParsingDirection tok, SFM (DgPState st tok) a)]
+--     ->  SFM (DgPState st tok) [a]
+-- branch isFork branches = do
+--     gets psFocused >>= guard
+--     origin <- currentPos
+--     fmap isFork peek >>= (`unless` (lift $ Left $ here ++ "not branch"))
+--     stuff  <- for branches $ \(dir, p)
+--         -> optional (setDir dir *> setPos origin *> step *> p)
+-- --         <|> return Nothing --step fail if there's nothing in desired direction
+--     setPos origin --eat `fork`
+-- --     setDir dir0 --restore direction, good for parsing boxes
+--     _ <- eat --FIXME set direction!!!!!!!!!!!!!
+--     return $ catMaybes stuff
 
 -- |Matches diagram with nothing remaining on current line
 pattern DgLineEnd :: Zp (Zp a1)
@@ -377,12 +378,15 @@ colocated'' p pp = do
 --     begin <- currentPos
     x     <- p
     next  <- currentPos
-    end  <- gets psLastBite
+    lastBiteBackup  <- gets psLastBite
     y <- pp x
-    modify \st -> st { psNext = directionBackup, psLastBite = end }
+    modify \st -> st { psNext = directionBackup, psLastBite = lastBiteBackup }
     _     <- setPosOrBlur next
     return y
 
+colocated_'' :: SFM (DgPState st tok) t
+                      -> StateT (DgPState st tok) (Either String) t1
+                      -> SFM (DgPState st tok) (t, t1)
 colocated_'' p pp = colocated'' p (\x -> (x,) <$> pp)
 
 -- colocated :: (DgExt -> DgExt)
