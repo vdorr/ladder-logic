@@ -51,7 +51,6 @@ data DevOpFlag = None | Optional | Mandatory
 type LdP device text
     = SFM (DgPState (LdPCtx (Either String) text device) (Tok text))
 
---FIXME rename!!!!!!!!!!!!!!!!
 type DeviceParser t d
     = DevType t -> Either String (DevOpFlag, [Operand t] -> Either String d)
 
@@ -64,9 +63,7 @@ runParser mkDev p s
 --     = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace2 s)) (LdPCtx mkDev)
     = fst <$> applyDgp p' (mkDgZp (dropWhitespace2 s)) (LdPCtx mkDev)
     where
-    p' = do
-        x <- p
-        (x,) <$> getStream
+    p' = (,) <$> p <*> getStream
 -- TODO parser that:
 -- accepts untreated (not split to line, with all whitespce) token stream
 -- handles labels
