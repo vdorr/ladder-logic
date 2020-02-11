@@ -30,47 +30,6 @@ withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
 
 --------------------------------------------------------------------------------
 
-{-
-letter       : 'A'..'Z' | '_'
-number       : '0'..'9'
-
-token        : cross | vline | hline | label ...
-
-target       : number+ | letter+
-cross         : '+'
-vline        : '|'
-hline        : '-'+ 
-label        : target ':'
-redge        : '>'
-fedge        : '<'
-negated      : '0' '|'
-contact      : '[' ('/' | ' ' | 'P' | 'N' | '<' | '>' | '>=' | '<=' | '<>') ']'
-coil         : '(' ('/' | ' ' | 'S' | 'R' | 'P' | 'N') ')'
-contact'     : '[' anychar+ ']'
-coil'        : '(' anychar+ ')'
-connector    : '>' letter+ '>'
-continuation : connector
-return       : '<RETURN>'
-jump         : '>>' target
-name         : letter+
-location     : '%' ('I' | 'Q' | 'M') number+
-
---linecomment  : '//' anychar* '\n'
-blockcomment : '(*' anychar* '*)'
-pragma       : '{' anychar* '}'
-
--}
-{-
-
-├ ─
-
-├─
-
-      ├─
-│ │   └─
-
--}
-
 -- |Diagram token
 data Tok a
     = Cross            -- ^ "+"
