@@ -4,7 +4,7 @@
 module Language.Ladder.DiagramParser
     ( colocated'', colocated_'', above, below, above_, below_
     , ParsingDirection
-    , DgPState(..) --FIXME do not export
+    , DgPState -- (..) --FIXME do not export
     , DgExt, Dg, SFM
     , gap, end, eat, eol
     , dgIsEmpty --FIXME better name
@@ -14,15 +14,16 @@ module Language.Ladder.DiagramParser
     , colRight, colUnder --XXX remove
     , applyDgp, mkDgZp
     , dgLength, dgTrim
+    , getState, getStream
     )
     where
 
 import Prelude hiding (fail)
 -- import Control.Monad.Fail
-import Control.Applicative
+-- import Control.Applicative
 import Control.Monad hiding (fail)
-import Data.Maybe
-import Data.Traversable
+-- import Data.Maybe
+-- import Data.Traversable
 import GHC.Exts
 
 import Control.Monad.Except hiding (fail)
@@ -67,7 +68,7 @@ type DgExt = (Int, (Int, Int))
 
 -- |Move in some direction from provided origin
 type ParsingDirection tok = DgExt -> Dg tok -> Either String (Dg tok)
-type MoveToNext tok = ParsingDirection tok
+-- type MoveToNext tok = ParsingDirection tok
 
 --TODO TODO make some tests for psFocused behaviour (e.g. gap test)
 
@@ -100,6 +101,12 @@ goUp    (ln, (co, _)) = move_ (ln-1) co
 goLeft  (ln, (co, _)) = move_ ln     (co-1)
 
 --------------------------------------------------------------------------------
+
+getState :: SFM (DgPState st tok) st
+getState = gets psUser
+
+getStream :: SFM (DgPState st tok) (Dg tok)
+getStream = gets psStr
 
 lastPos :: SFM (DgPState st tok) DgExt
 lastPos = psLastBite <$> get >>= maybe (lift $ Left here) return

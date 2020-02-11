@@ -11,6 +11,7 @@ import Language.Ladder.LadderParser
 import Language.Ladder.Lexer
 import Language.Ladder.Utils
 import Language.Ladder.DiagramParser
+import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 

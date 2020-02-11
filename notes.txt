@@ -1,0 +1,55 @@
+
+--------------------------------------------------------------------------------
+
+{-
+hlink   : '-'+ ('|'+ '-'+)?
+hline   : (hlink | contact | coil | node)+
+node    : '+'
+name    : <cf tokenizer>
+
+--interpret as 2D syntax
+contact : name
+          '[' contactType ']'
+          name?
+
+coil    : name
+          '[' coilType ']'
+
+contactType : ...
+coilType    : ...
+
+-}
+
+{-
+
+--very approximate syntax
+
+wall   : '+' '-'+ '+'
+
+top    : name
+         wall
+
+bottom : wall
+
+
+left   : '0'? ('|' | '>' | '<') name?
+
+right  : name? '|' '0'?
+
+-}
+
+{-
+
+smallest possible box:
+    +-+
+    | |
+    +-+
+
+clearance (example of incorrect box):
+     |    // <--- reject!
+   +-+
+ --| |
+   +-+--  // <--- reject!
+
+-}
+

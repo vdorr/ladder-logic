@@ -12,9 +12,9 @@ import Data.Functor.Identity
 -- import Control.Monad.Writer
 -- import Control.Monad.State
 
-import Language.Ladder.LadderParser
 import Language.Ladder.DiagramParser
 import Language.Ladder.Utils
+import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 

@@ -15,6 +15,7 @@ import Data.Void
 import Language.Ladder.DiagramParser (DgExt)
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
+import Language.Ladder.Types
 import Language.Ladder.Analysis
 
 --------------------------------------------------------------------------------

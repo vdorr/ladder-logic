@@ -25,6 +25,7 @@ import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Interpreter
 import Language.Ladder.Analysis
+import Language.Ladder.Types
 
 import Language.Ladder.Simple
 

@@ -29,6 +29,8 @@ library
                      , Language.Ladder.Target
                      , Language.Ladder.Simple
                      , Language.Ladder.Example
+                     , Language.Ladder.Types
+                     , Language.Ladder.Box
                      , Language.Ladder.Entry
   -- other-modules:
   default-extensions:    CPP, TupleSections, ScopedTypeVariables

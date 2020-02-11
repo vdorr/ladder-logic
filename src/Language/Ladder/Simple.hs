@@ -13,6 +13,7 @@ import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Interpreter
 import Language.Ladder.Utils
+import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 
@@ -31,15 +32,6 @@ runLadderParser_
     -> [[((Int, (Int, Int)), Tok t)]] -- ^input tokens
     -> Either String a -- ^parser result
 runLadderParser_ pd p s = fst <$> runParser pd p s
-
---------------------------------------------------------------------------------
-
--- |Type of device recognizer function
-type DeviceParser name dev = DevType name
-    -> Either String
-        ( DevOpFlag
-        , [Operand name] -> Either String dev
-        )
 
 --------------------------------------------------------------------------------
 
