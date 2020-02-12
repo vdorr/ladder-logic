@@ -10,6 +10,8 @@ import Control.Applicative.Combinators (between)
 import qualified Data.Text as T
 import Data.Text (Text)
 
+import Data.Char
+
 --------------------------------------------------------------------------------
 
 newtype ParseErr = PE String
@@ -62,45 +64,58 @@ data Tok a
 
 --------------------------------------------------------------------------------
 
-renderLexeme :: Tok String -> String
-renderLexeme t = case t of
-    Cross            -> "+"
-    VLine            -> "|"
-    Label        a   -> a <> ":"
-    HLine        n _ -> replicate (n+1) '-'
-    REdge            -> ">"
-    FEdge            -> "<"
-    Number       n   -> show n
-    Contact      a   -> "[" <> a <> "]"
-    Coil         a   -> "(" <> a <> ")"
-    Continuation a   -> ">" <> a <> ">"
-    Return           -> "<RETURN>"
-    Jump'        a   -> ">>" <> a
-    Name         a   -> a
-    Comment      a   -> "(*" <> mconcat a <> "*)"
-    Pragma       a   -> "{" <> mconcat a <> "}"
-    NewLine          -> "\n" --FIXME windows
-    Whitespace   n   -> replicate n ' '
 
--- lexemeLength :: Tok String -> (Int, Int)
--- lexemeLength t = case t of
---     Cross            -> (0, 1)
---     VLine            -> (0, 1)
---     Label        a   -> (0, 1 + length a)
---     HLine        n _ -> (0, n + 1)
---     REdge            -> (0, 1)
---     FEdge            -> (0, 1)
---     Number       n   -> (0, length $ show n)
---     Contact      a   -> (0, 2 + length a)
---     Coil         a   -> (0, 2 + length a)
---     Continuation a   -> (0, 2 + length a)
---     Return           -> (0, 8)
---     Jump'        a   -> (0, 2 + length a)
---     Name         a   -> (0, length a)
---     Comment      a   -> (length a - 1, 4 + (length $ unlines a))
---     Pragma       a   -> (length a - 1, 2 + (length $ unlines a))
---     NewLine          -> (1, 0)
---     Whitespace   n   -> (0, n)
+lx s = f s []
+  where
+    f ('{':    xs) t = lol (Pragma . lines)  (until "}"  xs) t
+    f ('(':'*':xs) t = lol (Comment . lines) (until "*)" xs) t
+    f xs@(' ':   _xs) t = lol (Whitespace . (length)) (chars ' ' xs) t
+    f ('\n':    xs) t = lol (const NewLine) (Right ((), xs)) t
+--     <|> Label        <$> try (labelName <* char ':')
+--     <|> Number       <$> (read <$> some digitChar)
+--     <|> VLine        <$  char '|'
+--     <|> Cross        <$  char '+'
+--     <|> Continuation <$> try (between' ">" ">" name)
+-- 
+--     <|> HLine        <$> (((+(-1)).length) <$> some (char '-'))
+--                      <*> (lookAhead (length <$> many (char '|')))
+
+--     f ('-':    xs) t = lol' (\a b -> HLine (length a - 1) (countvl b)) (chars '-' xs) t
+    f ('-':    xs) t = lol' (\a _ -> undefined) (chars '-' xs) t
+
+--     <|> Jump'        <$> (try (chunk ">>") *> labelName)
+--     <|> Return       <$  try (chunk "<RETURN>")
+--     <|> Contact      <$> between'' "[" "]"
+--     <|> Coil         <$> between'' "(" ")"
+--     <|> REdge        <$  char '>'
+--     <|> FEdge        <$  char '<'
+--     <|> Name         <$> name
+    f (c:xs) t
+        | isDigit c = undefined
+        | isAlpha c = undefined
+    f [] t = Right (t, [])
+
+    lol :: (w -> Tok String)
+                      -> Either e (w, String)
+                      -> [Tok String]
+                      -> Either e ([Tok String], String)
+--     lol g p ys = do
+--         (a, b) <- p
+--         f b (g a : ys)
+    lol g p ys = lol' (\a _ -> g a) p ys
+    lol' g p ys = do
+        (a, b) <- p
+        f b (g a b : ys)
+
+    countvl xs = length $ takeWhile (=='|') xs
+    digits cs = Right $ span (isDigit) cs
+    alphaNum cs = Right $ span (isAlphaNum) cs
+    chars c cs = Right $ span (==c) cs -- or until, not sure
+    until n h = case T.breakOn (T.pack n) (T.pack h) of
+                     (p, xs) -> case T.stripPrefix (T.pack n) xs of
+                                     Nothing -> Left undefined
+                                     Just xxs -> Right (T.unpack p, T.unpack xxs)
+
 
 --------------------------------------------------------------------------------
 
@@ -111,7 +126,6 @@ lexeme
     <|> Whitespace   <$> length <$> some (char ' ')
     <|> NewLine      <$  eol
     <|> Label        <$> try (labelName <* char ':')
---     <|> Negated      <$  char '0'
     <|> Number       <$> (read <$> some digitChar)
     <|> VLine        <$  char '|'
     <|> Cross        <$  char '+'
@@ -124,7 +138,6 @@ lexeme
     <|> Return       <$  try (chunk "<RETURN>")
     <|> Contact      <$> between'' "[" "]"
     <|> Coil         <$> between'' "(" ")"
---         <|> Connector        <$> try (between ">" ">" name)
     <|> REdge        <$  char '>'
     <|> FEdge        <$  char '<'
     <|> Name         <$> name
@@ -268,5 +281,47 @@ dropPos2
     :: [[(p, Tok a)]]
     -> [[Tok a]]
 dropPos2 = fmap (fmap snd)
+
+--------------------------------------------------------------------------------
+
+renderLexeme :: Tok String -> String
+renderLexeme t = case t of
+    Cross            -> "+"
+    VLine            -> "|"
+    Label        a   -> a <> ":"
+    HLine        n _ -> replicate (n+1) '-'
+    REdge            -> ">"
+    FEdge            -> "<"
+    Number       n   -> show n
+    Contact      a   -> "[" <> a <> "]"
+    Coil         a   -> "(" <> a <> ")"
+    Continuation a   -> ">" <> a <> ">"
+    Return           -> "<RETURN>"
+    Jump'        a   -> ">>" <> a
+    Name         a   -> a
+    Comment      a   -> "(*" <> mconcat a <> "*)"
+    Pragma       a   -> "{" <> mconcat a <> "}"
+    NewLine          -> "\n" --FIXME windows
+    Whitespace   n   -> replicate n ' '
+
+-- lexemeLength :: Tok String -> (Int, Int)
+-- lexemeLength t = case t of
+--     Cross            -> (0, 1)
+--     VLine            -> (0, 1)
+--     Label        a   -> (0, 1 + length a)
+--     HLine        n _ -> (0, n + 1)
+--     REdge            -> (0, 1)
+--     FEdge            -> (0, 1)
+--     Number       n   -> (0, length $ show n)
+--     Contact      a   -> (0, 2 + length a)
+--     Coil         a   -> (0, 2 + length a)
+--     Continuation a   -> (0, 2 + length a)
+--     Return           -> (0, 8)
+--     Jump'        a   -> (0, 2 + length a)
+--     Name         a   -> (0, length a)
+--     Comment      a   -> (length a - 1, 4 + (length $ unlines a))
+--     Pragma       a   -> (length a - 1, 2 + (length $ unlines a))
+--     NewLine          -> (1, 0)
+--     Whitespace   n   -> (0, n)
 
 --------------------------------------------------------------------------------
