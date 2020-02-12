@@ -9,6 +9,7 @@ import Control.Monad.Writer.Strict
 import Data.List
 import Data.String
 import Data.Void
+import Control.Monad.State
 
 -- import qualified Control.Monad.Fail --FIXME
 
@@ -350,5 +351,90 @@ devices mkWord litFromAddr =
     emitOp a = case a of
                  Lit i -> mkWord i >>= \i' -> pure [ILdCnA i']
                  Var addr -> litFromAddr addr >>= \addr' -> Right [ILdCnA addr', ILdM]
+
+--------------------------------------------------------------------------------
+
+stackEmit
+    :: (Eq p, Monad m)
+    => (d -> m [ExtendedInstruction l (Instruction k adr)])
+    -> p
+    -> p
+    -> Diagram c d l (Cofree (Diagram c d l) p)
+    -> StateT
+        (StackEmitState p [ExtendedInstruction l (Instruction k adr)])
+        m --(Either String)
+        p --TODO use MonadState constraint
+stackEmit emitDevice q p x = go x *> pure p
+    where
+
+    go (Node   []      ) = do
+--         pop
+--         liftIO $ print (">>>>> DROP")
+        return () -- "optimization"
+    go (Node   w       ) = do
+        sinks <- gets esSinks
+        let deps = (foldMap (checkDataDep sinks) w) ++ [] -- ugh
+        bringToTop q p --renaming to current node - pass through
+        for_ deps \d -> do --now `or` stack top with all `deps`
+            bringToTop d d
+            pop --first `OR` operand
+            pop --second `OR` operand
+            emit [ EISimple IOr ]
+            push p --intermediate result
+        for_ (drop 1 w) \_ -> do
+            emit [ EISimple IDup ]
+            push p --now result of this node is on stack
+    go  Sink             = do
+        nodes <- gets esNodes
+        if elem p nodes
+        then bringToTop q p
+        else do
+            pop
+            emit [ EISimple IDrop ]
+    go (Source _a       ) = do
+        push p
+        emit [ EISimple ILdOn ]
+    go  End              = do
+        pop -- ????
+        emit [ EISimple IDrop ]
+    go (Device device _a) = do
+        bringToTop q q
+        pop
+        lift (emitDevice device) >>= emit
+        push p
+    go (Jump   label  ) = do
+        bringToTop q q
+        emit [ EIJump label ]
+        pop
+    go (Cont   _continuation _a) = undefined
+    go (Conn   _continuation) = undefined
+
+    emit s = modify \st -> st { esCode = esCode st ++ s }
+
+    bringToTop pp name = do
+        stk <- gets esStack
+        case break ((==pp) . fst) stk of
+            (_pre, []) -> undefined --not found
+            ([], _) -> pop --pop current and push it with new name
+            (pre, (v, _) : rest) -> do
+                emit [ EISimple (IPick (length pre)) ]
+                modify \st -> st { esStack = pre <> ((v, True) : rest) }
+        push name
+
+    push v = modify \st -> st { esStack = (v, False) : esStack st }
+
+    pop = do
+        stk <- gets esStack
+        case stk of
+            _:stk' -> modify \st -> st { esStack = dropWhile snd stk' }
+            [] -> undefined
+
+
+data StackEmitState p w = StackEmitState
+    { esStack :: [(p, Bool)] -- flag if used and can dropped
+    , esSinks :: [p]
+    , esNodes :: [p]
+    , esCode :: w
+    }
 
 --------------------------------------------------------------------------------

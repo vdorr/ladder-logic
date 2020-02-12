@@ -80,8 +80,8 @@ lx s = f s []
 --     <|> HLine        <$> (((+(-1)).length) <$> some (char '-'))
 --                      <*> (lookAhead (length <$> many (char '|')))
 
---     f ('-':    xs) t = lol' (\a b -> HLine (length a - 1) (countvl b)) (chars '-' xs) t
-    f ('-':    xs) t = lol' (\a _ -> undefined) (chars '-' xs) t
+    f ('-':    xs) t = lol' (\a b -> HLine (length a - 1) (countvl b)) (chars '-' xs) t
+--     f ('-':    xs) t = lol' (\a _ -> undefined) (chars '-' xs) t
 
 --     <|> Jump'        <$> (try (chunk ">>") *> labelName)
 --     <|> Return       <$  try (chunk "<RETURN>")
@@ -103,6 +103,10 @@ lx s = f s []
 --         (a, b) <- p
 --         f b (g a : ys)
     lol g p ys = lol' (\a _ -> g a) p ys
+    lol' :: (w -> String -> Tok String)
+                      -> Either e (w, String)
+                      -> [Tok String]
+                      -> Either e ([Tok String], String)
     lol' g p ys = do
         (a, b) <- p
         f b (g a b : ys)
