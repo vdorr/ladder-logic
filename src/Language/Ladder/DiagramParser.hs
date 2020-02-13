@@ -287,8 +287,6 @@ group p = do
 
 ext :: DgExt -> DgExt -> DgExt
 ext (a, (b, c)) (_d, (e, f))
---     | a == d = (a, (min b e, max c f))
---     | otherwise = (a, (b, c))
     = (a, (min b e, max c f))
 
 -- branch

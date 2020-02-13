@@ -6,7 +6,7 @@ import Text.Megaparsec hiding (Label) --as P hiding (runParser', Pos)
 import Text.Megaparsec.Char --as PC
 import Data.Bifunctor
 import Control.Applicative.Combinators (between)
-
+import Data.List
 import qualified Data.Text as T
 import Data.Text (Text)
 
@@ -64,49 +64,38 @@ data Tok a
 
 --------------------------------------------------------------------------------
 
-
+lx :: String -> Either String ([Tok String], String)
 lx s = f s []
   where
-    f ('{':    xs) t = lol (Pragma . lines)  (until "}"  xs) t
-    f ('(':'*':xs) t = lol (Comment . lines) (until "*)" xs) t
-    f xs@(' ':   _xs) t = lol (Whitespace . (length)) (chars ' ' xs) t
-    f ('\n':    xs) t = lol (const NewLine) (Right ((), xs)) t
---     <|> Label        <$> try (labelName <* char ':')
---     <|> Number       <$> (read <$> some digitChar)
---     <|> VLine        <$  char '|'
---     <|> Cross        <$  char '+'
---     <|> Continuation <$> try (between' ">" ">" name)
--- 
---     <|> HLine        <$> (((+(-1)).length) <$> some (char '-'))
---                      <*> (lookAhead (length <$> many (char '|')))
-
-    f ('-':    xs) t = lol' (\a b -> HLine (length a - 1) (countvl b)) (chars '-' xs) t
---     f ('-':    xs) t = lol' (\a _ -> undefined) (chars '-' xs) t
-
---     <|> Jump'        <$> (try (chunk ">>") *> labelName)
---     <|> Return       <$  try (chunk "<RETURN>")
---     <|> Contact      <$> between'' "[" "]"
---     <|> Coil         <$> between'' "(" ")"
---     <|> REdge        <$  char '>'
---     <|> FEdge        <$  char '<'
---     <|> Name         <$> name
-    f (c:xs) t
-        | isDigit c = undefined
-        | isAlpha c = undefined
-    f [] t = Right (t, [])
+    f    ('{':     xs) t = lol (Pragma . lines)  (takeUntilC '}'  xs) t
+    f    ('(':'*': xs) t = lol (Comment . lines) (takeUntil "*)" xs) t
+    f xs@(' ':    _xs) t = lol (Whitespace . (length)) (chars ' ' xs) t
+    f    ('\n':    xs) t = lol (const NewLine) (Right ((), xs)) t
+    f    ('|':     xs) t = lol (const VLine) (Right ((), xs)) t
+    f    ('+':     xs) t = lol (const Cross) (Right ((), xs)) t
+    f    ('-':     xs) t = lol' (\a b -> HLine (length a - 1) (countvl b)) (chars '-' xs) t
+    f    ('[':     xs) t = lol (Contact)  (takeUntil "]"  xs) t
+    f    ('(':     xs) t = lol (Coil)  (takeUntil ")"  xs) t
+    f    ('>':     xs) t = lol (const REdge) (Right ((), xs)) t
+    f    ('<':     xs) t = lol (const FEdge) (Right ((), xs)) t
+    f    (c  :     xs) t
+        | isDigit c      = lol (Number . read)  (digits xs) t
+        | isAlpha c      = lol (Name)  (alphaNum xs) t
+    f    []            t = Right (t, [])
+    f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
 
     lol :: (w -> Tok String)
-                      -> Either e (w, String)
+                      -> Either String (w, String)
                       -> [Tok String]
-                      -> Either e ([Tok String], String)
+                      -> Either String ([Tok String], String)
 --     lol g p ys = do
 --         (a, b) <- p
 --         f b (g a : ys)
     lol g p ys = lol' (\a _ -> g a) p ys
     lol' :: (w -> String -> Tok String)
-                      -> Either e (w, String)
+                      -> Either String (w, String)
                       -> [Tok String]
-                      -> Either e ([Tok String], String)
+                      -> Either String ([Tok String], String)
     lol' g p ys = do
         (a, b) <- p
         f b (g a b : ys)
@@ -115,10 +104,15 @@ lx s = f s []
     digits cs = Right $ span (isDigit) cs
     alphaNum cs = Right $ span (isAlphaNum) cs
     chars c cs = Right $ span (==c) cs -- or until, not sure
-    until n h = case T.breakOn (T.pack n) (T.pack h) of
+    takeUntil n h = case T.breakOn (T.pack n) (T.pack h) of
                      (p, xs) -> case T.stripPrefix (T.pack n) xs of
                                      Nothing -> Left undefined
                                      Just xxs -> Right (T.unpack p, T.unpack xxs)
+    takeUntilC n h = case break (==n) (h) of
+                     (p, n':xs) | n'==n, isSuffixOf "\\" p
+                        -> first ((p++[n'])++) <$> takeUntilC n xs
+                     (p, n':xs) | n'==n -> Right (p, xs)
+                     (_p, _xs) -> Left "lol"
 
 
 --------------------------------------------------------------------------------

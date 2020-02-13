@@ -415,10 +415,10 @@ stackEmit emitDevice q p x = go x *> pure p
     go  End              = do
         pop -- ????
         emit [ EISimple IDrop ]
-    go (Device device _a) = do
+    go (Device dev _a) = do
         bringToTop q q
         pop
-        lift (emitDevice device) >>= emit
+        lift (emitDevice dev) >>= emit
         push p
     go (Jump   label  ) = do
         bringToTop q q
@@ -429,7 +429,7 @@ stackEmit emitDevice q p x = go x *> pure p
 
     emit s = modify \st -> st { esCode = esCode st ++ s }
 
-    bringToTop pp name = do
+    bringToTop pp renameAs = do
         stk <- gets esStack
         case break ((==pp) . fst) stk of
             (_pre, []) -> undefined --not found
@@ -437,7 +437,7 @@ stackEmit emitDevice q p x = go x *> pure p
             (pre, (v, _) : rest) -> do
                 emit [ EISimple (IPick (length pre)) ]
                 modify \st -> st { esStack = pre <> ((v, True) : rest) }
-        push name
+        push renameAs
 
     push v = modify \st -> st { esStack = (v, False) : esStack st }
 
