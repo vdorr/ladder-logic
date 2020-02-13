@@ -417,44 +417,45 @@ testN01 =
 
 analysisTests :: TestTree
 analysisTests = testGroup "Analysis"
-    [ testCase "sttsort 1" $ do
---         print g01'
-        isSpatialOrTopo gDepends (compare `on` snd) g01'
-            @?= Nothing
-    , testCase "sttsort 2"
-        $ ts [([2], 1)] @?= [1]
-    , testCase "sttsort 3" $ ts
-            [ ([],  1)
-            , ([1], 2)
-            , ([],  3)
-            , ([1], 4)
-            ]
-            @?= [1,2,3,4]
-    , testCase "sttsort 4" $ ts
-            [ ([],  1)
-            , ([3], 2)
-            , ([] , 3)
-            , ([1], 4)
-            ]
-            @?= [1,3,2,4]
-    , testCase "sttsort 5" $ ts
-            [ ([2], 1)
-            , ([1], 2)
-            , ([], 3)
-            ]
-            @?= [2,1,3]
-    , testCase "sttsort 6" $ ts
-            [ ([2,3], 1)
-            , ([], 2)
-            , ([2], 3)
-            , ([], 4)
-            ]
-            @?= [2,3,1,4]
-    , testProperty "sttsort isSpatialOrTopo" prop_sttsort
+    [ 
+--     testCase "sttsort 1" $ do
+-- --         print g01'
+--         isSpatialOrTopo gDepends (compare `on` snd) g01'
+--             @?= Nothing
+--     , testCase "sttsort 2"
+--         $ ts [([2], 1)] @?= [1]
+--     , testCase "sttsort 3" $ ts
+--             [ ([],  1)
+--             , ([1], 2)
+--             , ([],  3)
+--             , ([1], 4)
+--             ]
+--             @?= [1,2,3,4]
+--     , testCase "sttsort 4" $ ts
+--             [ ([],  1)
+--             , ([3], 2)
+--             , ([] , 3)
+--             , ([1], 4)
+--             ]
+--             @?= [1,3,2,4]
+--     , testCase "sttsort 5" $ ts
+--             [ ([2], 1)
+--             , ([1], 2)
+--             , ([], 3)
+--             ]
+--             @?= [2,1,3]
+--     , testCase "sttsort 6" $ ts
+--             [ ([2,3], 1)
+--             , ([], 2)
+--             , ([2], 3)
+--             , ([], 4)
+--             ]
+--             @?= [2,3,1,4]
+--     , testProperty "sttsort isSpatialOrTopo" prop_sttsort
     ]
 
-    where
-    ts = fmap snd . sttsort gDepends
+--     where
+--     ts = fmap snd . sttsort gDepends
 
 --     let dep01 = (\(as, a) (bs, b) -> elem b as)
 --     let ts = sttsort dep01
@@ -469,34 +470,34 @@ analysisTests = testGroup "Analysis"
 --                     (\p -> iscycle (on (==) snd) dep01 p s2)
 --                     $ istopoM dep01 s2
 --                 , s2)
-g01, g01' :: [([Int], Int)]
-g01' = sttsort gDepends g01
-g01 =
-    [ ( [ 7 , 4 ] , 2 )
-    , ( [] , 3 )
-    , ( [] , 4 )
-    , ( [ 3 ] , 7 )
-    ]
+-- g01, g01' :: [([Int], Int)]
+-- g01' = sttsort gDepends g01
+-- g01 =
+--     [ ( [ 7 , 4 ] , 2 )
+--     , ( [] , 3 )
+--     , ( [] , 4 )
+--     , ( [ 3 ] , 7 )
+--     ]
+-- 
+-- genGraph :: Gen [([Int], Int)]
+-- genGraph = do --Gen.sample $ 
+--     let k = 10
+--     n <- Gen.int $ constant 0 k
+-- --     let l = [0..n]
+--     ll <- for [0..n] $ \v -> do
+--         deps <- Gen.list (linear 0 k) (Gen.int $ constant 0 k)
+--         return (deps, v)
+--     return ll
+-- 
+-- gDepends :: ([Int], Int) -> ([Int], Int) -> Bool
+-- gDepends = (\(as, _a) (_bs, b) -> elem b as)
 
-genGraph :: Gen [([Int], Int)]
-genGraph = do --Gen.sample $ 
-    let k = 10
-    n <- Gen.int $ constant 0 k
---     let l = [0..n]
-    ll <- for [0..n] $ \v -> do
-        deps <- Gen.list (linear 0 k) (Gen.int $ constant 0 k)
-        return (deps, v)
-    return ll
-
-gDepends :: ([Int], Int) -> ([Int], Int) -> Bool
-gDepends = (\(as, _a) (_bs, b) -> elem b as)
-
-prop_sttsort :: Property
-prop_sttsort =
-    withTests 1000 . property $ do
-        g <- forAll genGraph
-        let g' = sttsort gDepends g
-        Nothing === isSpatialOrTopo gDepends (compare `on` snd) g'
+-- prop_sttsort :: Property
+-- prop_sttsort =
+--     withTests 1000 . property $ do
+--         g <- forAll genGraph
+--         let g' = sttsort gDepends g
+--         Nothing === isSpatialOrTopo gDepends (compare `on` snd) g'
 
 --------------------------------------------------------------------------------
 

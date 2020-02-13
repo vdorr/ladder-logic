@@ -40,33 +40,33 @@ cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 
 --------------------------------------------------------------------------------
 
-pickFirst :: (a -> Bool) -> [a] -> (Maybe a, [a])
-pickFirst p s
-    = case break p s of
-        (a, b:bs) -> (Just b , a ++ bs)
-        _         -> (Nothing, s)
+-- pickFirst :: (a -> Bool) -> [a] -> (Maybe a, [a])
+-- pickFirst p s
+--     = case break p s of
+--         (a, b:bs) -> (Just b , a ++ bs)
+--         _         -> (Nothing, s)
 
 --------------------------------------------------------------------------------
 
 --TODO tests
 -- stability - without dependencies order is unchanged
 -- topology - either topo order is satisfied or it is cycle (or no dependency)
-sttsort :: (a -> a -> Bool) -> [a] -> [a]
-sttsort depOn = f
-    where
-    f (x : xs) = dep ++ [x] ++ f indep
-        where
-        (dep, indep) = g x xs
-    f [] = []
-
-    g x xs
-        = case pickFirst (depOn x) xs of
-            (Just x1, x1s) ->
-                let
-                    (dep1, indep1) = g x1 x1s
-                    (dep, indep) = g x indep1
-                in
-                    (dep1++[x1]++dep , indep )
-            (Nothing, xs1) -> ([], xs1)
+-- sttsort :: (a -> a -> Bool) -> [a] -> [a]
+-- sttsort depOn = f
+--     where
+--     f (x : xs) = dep ++ [x] ++ f indep
+--         where
+--         (dep, indep) = g x xs
+--     f [] = []
+-- 
+--     g x xs
+--         = case pickFirst (depOn x) xs of
+--             (Just x1, x1s) ->
+--                 let
+--                     (dep1, indep1) = g x1 x1s
+--                     (dep, indep) = g x indep1
+--                 in
+--                     (dep1++[x1]++dep , indep )
+--             (Nothing, xs1) -> ([], xs1)
 
 --------------------------------------------------------------------------------

@@ -17,7 +17,7 @@ import Language.Ladder.DiagramParser (DgExt)
 import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Types
-import Language.Ladder.Analysis
+-- import Language.Ladder.Analysis
 
 --------------------------------------------------------------------------------
 
@@ -92,73 +92,93 @@ resolveLabels l = for (foldMap snd l) g
 
 --------------------------------------------------------------------------------
 
-genStk :: (
-        Show label0, Monad m0)
-     => ([ExtendedInstruction label0 (Instruction word address)] -> m0 ())
-                      -> (a0 -> [Instruction word address])
-                      -> [Cofree (Diagram DgExt a0 label0) DgExt]
-                      -> Cofree (Diagram DgExt a0 label0) DgExt
-                      -> m0 [Cofree (Diagram DgExt a0 label0) DgExt]
-genStk emit' emitDevice' stk0 asts = go stk0 asts
-
-    where
-    emit = emit' . fmap EISimple
-    emitDevice = emit . emitDevice'
-
-    go stack nd@(p :< a) = f stack a
-        where
-
-        f stk     (Source b)      = do
-            emit [ILdOn]
-            go (nd:stk) b
-        f (_:stk)  Sink           = do
-            return (nd:stk)
-        f stk      End         = return (stk) --XXX emit Drop?
-        f (_:stk) (Device d b)    = do
-            emitDevice d
-            go (nd:stk) b
-        f (_:stk) (Jump s)        = do
-            emit' [EIJump s]
-            return stk
-        f (_:stk) (Node b)        = do
---i think dups should be emitted only AFTER node value is computed
-    --fold over stack, picking sinks(aka stubs), emitting Or's
-            --depth of stack stays the same during evaluation of preds
-            for_ (zip stk [0..]) $ \(x, i) -> do
-                case x of
-                     pp :< Sink | pp == p -> do
-                         bringToTop i
-                         emit [IOr]
-                     _ -> return ()
-
-            let copiesOnStack = fmap (const nd) b
-            replicateM_ (length b - 1) $ emit [IDup]
-
-            foldlM
-                (go) --emit Dup's here? --so that stack level is kept low
-                (copiesOnStack ++ stk)
-                b
-        f (_:stk) (Conn _)       = do
-            return (nd:stk)
-        f stk      (Cont stubP b) = do
-            case findIndex (isConn stubP) stk of
-                Just i  -> bringToTop' (i) -- +100)
-                Nothing -> error here --should not happen
-            go (nd:stk) b --XXX not sure about nd on stack here
-
-        f _stk _n = error here -- show (here, stk, n)
-
-    isConn p0 (_ :< Conn p1) = p0 == p1
-    isConn _   _             = False
-
---     bringToTop 0 = emit [IDup] --return ()
-    bringToTop 0 = return ()
-    bringToTop i = emit [IPick i]
-
---     bringToTop' 0 = emit [IDup] --return ()
-    bringToTop' i = emit [IPick i]
-
---------------------------------------------------------------------------------
+-- genStk :: (
+--         Show label0, Monad m0)
+--      => ([ExtendedInstruction label0 (Instruction word address)] -> m0 ())
+--                       -> (a0 -> [Instruction word address])
+--                       -> [Cofree (Diagram DgExt a0 label0) DgExt]
+--                       -> Cofree (Diagram DgExt a0 label0) DgExt
+--                       -> m0 [Cofree (Diagram DgExt a0 label0) DgExt]
+-- genStk emit' emitDevice' stk0 asts = go stk0 asts
+-- 
+--     where
+--     emit = emit' . fmap EISimple
+--     emitDevice = emit . emitDevice'
+-- 
+--     go stack nd@(p :< a) = f stack a
+--         where
+-- 
+--         f stk     (Source b)      = do
+--             emit [ILdOn]
+--             go (nd:stk) b
+--         f (_:stk)  Sink           = do
+--             return (nd:stk)
+--         f stk      End         = return (stk) --XXX emit Drop?
+--         f (_:stk) (Device d b)    = do
+--             emitDevice d
+--             go (nd:stk) b
+--         f (_:stk) (Jump s)        = do
+--             emit' [EIJump s]
+--             return stk
+--         f (_:stk) (Node b)        = do
+-- --i think dups should be emitted only AFTER node value is computed
+--     --fold over stack, picking sinks(aka stubs), emitting Or's
+--             --depth of stack stays the same during evaluation of preds
+--             for_ (zip stk [0..]) $ \(x, i) -> do
+--                 case x of
+--                      pp :< Sink | pp == p -> do
+--                          bringToTop i
+--                          emit [IOr]
+--                      _ -> return ()
+-- 
+--             let copiesOnStack = fmap (const nd) b
+--             replicateM_ (length b - 1) $ emit [IDup]
+-- 
+--             foldlM
+--                 (go) --emit Dup's here? --so that stack level is kept low
+--                 (copiesOnStack ++ stk)
+--                 b
+--         f (_:stk) (Conn _)       = do
+--             return (nd:stk)
+--         f stk      (Cont stubP b) = do
+--             case findIndex (isConn stubP) stk of
+--                 Just i  -> bringToTop' (i) -- +100)
+--                 Nothing -> error here --should not happen
+--             go (nd:stk) b --XXX not sure about nd on stack here
+-- 
+--         f _stk _n = error here -- show (here, stk, n)
+-- 
+--     isConn p0 (_ :< Conn p1) = p0 == p1
+--     isConn _   _             = False
+-- 
+-- --     bringToTop 0 = emit [IDup] --return ()
+--     bringToTop 0 = return ()
+--     bringToTop i = emit [IPick i]
+-- 
+-- --     bringToTop' 0 = emit [IDup] --return ()
+--     bringToTop' i = emit [IPick i]
+-- 
+-- generateStk2'
+--     :: (Show lbl, Eq lbl
+--     , Show addr
+--     , Show word
+-- --     , Show device
+--     , Monad m
+--     )
+--     => (device -> [Instruction word addr])
+--     -> Cofree (Diagram Void device lbl) DgExt
+--     -> m [ExtendedInstruction lbl (Instruction word addr)]
+-- generateStk2' doDevice ast' = do
+--     let ast = dropEnd ast'
+--     --collapse nodes
+--     let (nodes, a0) = repositionSinks nodes <$> merge' ast
+--     --chop
+--     let Just a1 = forest a0
+--     let a5 = cut1' a1
+--     let a6 = sortOn position a5
+--     let a7 = tsort3 a6
+-- 
+--     execWriterT $ foldlM (genStk tell doDevice) [] a7
 
 generateStk2'
     :: (Show lbl, Eq lbl
@@ -170,17 +190,15 @@ generateStk2'
     => (device -> [Instruction word addr])
     -> Cofree (Diagram Void device lbl) DgExt
     -> m [ExtendedInstruction lbl (Instruction word addr)]
-generateStk2' doDevice ast' = do
-    let ast = dropEnd ast'
-    --collapse nodes
-    let (nodes, a0) = repositionSinks nodes <$> merge' ast
-    --chop
-    let Just a1 = forest a0
-    let a5 = cut1' a1
-    let a6 = sortOn position a5
-    let a7 = tsort3 a6
 
-    execWriterT $ foldlM (genStk tell doDevice) [] a7
+generateStk2' doDevice ast@(p0 :< _) = do
+--     undefined
+    let (nodes, sinks) = collectNodesAndSinks ast
+    let Right (_, u) = runStateT
+                    (traverseDiagram (stackEmit (pure . fmap EISimple . doDevice))
+                        (\_ _ -> pure ()) p0 ast)
+                    (StackEmitState [] sinks nodes [])
+    return $ esCode u
 
 --------------------------------------------------------------------------------
 
