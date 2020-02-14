@@ -11,6 +11,7 @@ module Language.Ladder.Lexer
 
     , renderLexeme
     , dropPos2
+    , lx
     )
     where
 
@@ -77,9 +78,10 @@ data Tok a
 
 --------------------------------------------------------------------------------
 
-lx :: String -> Either String ([Tok String], String)
-lx s = f s []
-  where
+lx :: String -> Either String ((Int, [Tok String]), String)
+lx s = f s (0, [])
+    where
+    len = length s
     f    ('{':     xs) t = lol (Pragma . lines)  (takeUntilC '}'  xs) t
     f    ('(':'*': xs) t = lol (Comment . lines) (takeUntil "*)" xs) t
     f xs@(' ':    _xs) t = lol (Whitespace . (length)) (chars ' ' xs) t
@@ -98,21 +100,17 @@ lx s = f s []
     f    []            t = Right (t, [])
     f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
 
-    lol :: (w -> Tok String)
-                      -> Either String (w, String)
-                      -> [Tok String]
-                      -> Either String ([Tok String], String)
---     lol g p ys = do
---         (a, b) <- p
---         f b (g a : ys)
+    lol :: (w -> Tok String) -> Either String (w, String)
+        -> (Int, [Tok String])
+        -> Either String ((Int, [Tok String]), String)
+    lol' :: (w -> String -> Tok String) -> Either String (w, String)
+        -> (Int, [Tok String])
+        -> Either String ((Int, [Tok String]), String)
     lol g p ys = lol' (\a _ -> g a) p ys
-    lol' :: (w -> String -> Tok String)
-                      -> Either String (w, String)
-                      -> [Tok String]
-                      -> Either String ([Tok String], String)
-    lol' g p ys = do
-        (a, b) <- p
-        f b (g a b : ys)
+    lol' g p (k, ys) = do
+        (a, xs) <- p
+        f xs (k+0, g a xs : ys)
+--         undefined
 
     countvl xs = length $ takeWhile (=='|') xs
     digits cs = Right $ span (isDigit) cs
@@ -327,6 +325,7 @@ renderLexeme t = case t of
     Pragma       a   -> "{" <> mconcat a <> "}"
     NewLine          -> "\n" --FIXME windows
     Whitespace   n   -> replicate n ' '
+    Colon            -> ":"
 
 -- lexemeLength :: Tok String -> (Int, Int)
 -- lexemeLength t = case t of
