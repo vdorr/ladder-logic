@@ -81,35 +81,35 @@ data Tok a
 lx :: String -> Either String ((Int, [Tok String]), String)
 lx s = f s (0, [])
     where
-    len = length s
-    f    ('{':     xs) t = lol (Pragma . lines)  (takeUntilC '}'  xs) t
-    f    ('(':'*': xs) t = lol (Comment . lines) (takeUntil "*)" xs) t
-    f xs@(' ':    _xs) t = lol (Whitespace . (length)) (chars ' ' xs) t
-    f    ('\n':    xs) t = lol (const NewLine) (Right ((), xs)) t
-    f    ('|':     xs) t = lol (const VLine) (Right ((), xs)) t
-    f    ('+':     xs) t = lol (const Cross) (Right ((), xs)) t
-    f    ('-':     xs) t = lol' (\a b -> HLine (length a - 1) (countvl b)) (chars '-' xs) t
-    f    ('[':     xs) t = lol (Contact)  (takeUntil "]"  xs) t
-    f    ('(':     xs) t = lol (Coil)  (takeUntil ")"  xs) t
-    f    ('>':     xs) t = lol (const REdge) (Right ((), xs)) t
-    f    ('<':     xs) t = lol (const FEdge) (Right ((), xs)) t
-    f    (':':     xs) t = lol (const Colon) (Right ((), xs)) t
+--     len = length s
+    f    ('{':     xs) t = lol xs (Pragma . lines)  (takeUntilC '}') t
+    f    ('(':'*': xs) t = lol xs (Comment . lines) (takeUntil "*)") t
+    f xs@(' ':    _xs) t = lol xs (Whitespace . (length)) (chars ' ') t
+    f    ('\n':    xs) t = lol xs (const NewLine) (const $ Right ((), xs)) t
+    f    ('|':     xs) t = lol xs (const VLine) (const $ Right ((), xs)) t
+    f    ('+':     xs) t = lol xs (const Cross) (const $ Right ((), xs)) t
+    f    ('-':     xs) t = lol' xs (\a b -> HLine (length a - 1) (countvl b)) (chars '-') t
+    f    ('[':     xs) t = lol xs (Contact) (takeUntil "]" ) t
+    f    ('(':     xs) t = lol xs (Coil)  (takeUntil ")" ) t
+    f    ('>':     xs) t = lol xs (const REdge) (const $ Right ((), xs)) t
+    f    ('<':     xs) t = lol xs (const FEdge) (const $ Right ((), xs)) t
+    f    (':':     xs) t = lol xs (const Colon) (const $ Right ((), xs)) t
     f    (c  :     xs) t
-        | isDigit c      = lol (Number . read)  (digits xs) t
-        | isAlpha c      = lol (Name)  (alphaNum xs) t
+        | isDigit c      = lol xs (Number . read)  (digits) t
+        | isAlpha c      = lol xs (Name)  (alphaNum) t
     f    []            t = Right (t, [])
     f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
 
-    lol :: (w -> Tok String) -> Either String (w, String)
+    lol :: String -> (w -> Tok String) -> (String -> Either String (w, String))
         -> (Int, [Tok String])
         -> Either String ((Int, [Tok String]), String)
-    lol' :: (w -> String -> Tok String) -> Either String (w, String)
+    lol' :: String -> (w -> String -> Tok String) -> (String -> Either String (w, String))
         -> (Int, [Tok String])
         -> Either String ((Int, [Tok String]), String)
-    lol g p ys = lol' (\a _ -> g a) p ys
-    lol' g p (k, ys) = do
-        (a, xs) <- p
-        f xs (k+0, g a xs : ys)
+    lol xs g p ys = lol' xs (\a _ -> g a) p ys
+    lol' xs g p (k, ys) = do
+        (a, xs') <- p xs
+        f xs' (k+length xs - length xs', g a xs' : ys)
 --         undefined
 
     countvl xs = length $ takeWhile (=='|') xs
