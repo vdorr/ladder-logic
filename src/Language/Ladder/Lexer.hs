@@ -1,5 +1,18 @@
 
-module Language.Ladder.Lexer where
+module Language.Ladder.Lexer
+    ( Tok(..)
+    , dropWhitespace2
+    , stripPos3
+    , runLexer'
+    , labeledRungs
+    , runLexer
+    , getLeadingPragmas
+    , dropPos
+
+    , renderLexeme
+    , dropPos2
+    )
+    where
 
 --FIXME FIXME get rid of megaparsec
 import Text.Megaparsec hiding (Label) --as P hiding (runParser', Pos)
@@ -58,7 +71,7 @@ data Tok a
     | Pragma       ![a]   -- ^ { ... }
     | NewLine
     | Whitespace   !Int
-
+    | Colon
 --     | Store a            -- FBD only "---VARIABLE"
     deriving (Show, Eq, Functor)
 
@@ -78,6 +91,7 @@ lx s = f s []
     f    ('(':     xs) t = lol (Coil)  (takeUntil ")"  xs) t
     f    ('>':     xs) t = lol (const REdge) (Right ((), xs)) t
     f    ('<':     xs) t = lol (const FEdge) (Right ((), xs)) t
+    f    (':':     xs) t = lol (const Colon) (Right ((), xs)) t
     f    (c  :     xs) t
         | isDigit c      = lol (Number . read)  (digits xs) t
         | isAlpha c      = lol (Name)  (alphaNum xs) t
@@ -114,6 +128,16 @@ lx s = f s []
                      (p, n':xs) | n'==n -> Right (p, xs)
                      (_p, _xs) -> Left "lol"
 
+lxx :: [Tok String] -> [Tok String]
+lxx = f
+    where
+    f (Name lbl : Colon : xs) = Label lbl : f xs
+    f (Number _ : Colon : xs) = Label undefined : f xs --TODO
+    f (REdge : REdge : Name _ : xs) = Jump' undefined : f xs
+    f (FEdge : Name ret : REdge : xs)
+        | fmap toLower ret == "return" = Return : f xs
+    f (x:xs) = x : f xs
+    f [] = []
 
 --------------------------------------------------------------------------------
 
@@ -163,6 +187,8 @@ lexerP = many (withPos lexeme) <* eof
 
 lexerLinesP :: Parsec ParseErr Text [[((SourcePos, SourcePos), Tok Text)]]
 lexerLinesP = (fmap snd . breakLines) <$> lexerP
+
+--------------------------------------------------------------------------------
 
 runLexer
     :: Text
