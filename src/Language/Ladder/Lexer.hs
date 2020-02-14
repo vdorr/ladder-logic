@@ -78,7 +78,7 @@ data Tok a
 
 --------------------------------------------------------------------------------
 
-lx :: String -> Either String ((Int, [Tok String]), String)
+lx :: String -> Either String ((Int, [((Int, Int), Tok String)]), String)
 lx s = f s (0, [])
     where
 --     len = length s
@@ -100,16 +100,20 @@ lx s = f s (0, [])
     f    []            t = Right (t, [])
     f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
 
-    lol :: String -> (w -> Tok String) -> (String -> Either String (w, String))
-        -> (Int, [Tok String])
-        -> Either String ((Int, [Tok String]), String)
-    lol' :: String -> (w -> String -> Tok String) -> (String -> Either String (w, String))
-        -> (Int, [Tok String])
-        -> Either String ((Int, [Tok String]), String)
-    lol xs g p ys = lol' xs (\a _ -> g a) p ys
+    lol :: String -> (w -> Tok String)
+        -> (String -> Either String (w, String))
+        -> (Int, [((Int, Int), Tok String)])
+        -> Either String ((Int, [((Int, Int), Tok String)]), String)
+    lol' :: String -> (w -> String -> Tok String)
+        -> (String -> Either String (w, String))
+        -> (Int, [((Int, Int), Tok String)])
+        -> Either String ((Int, [((Int, Int), Tok String)]), String)
+    lol xs g p ys = 
+        lol' xs (\a _ -> g a) p ys
+--         undefined
     lol' xs g p (k, ys) = do
         (a, xs') <- p xs
-        f xs' (k+length xs - length xs', g a xs' : ys)
+        f xs' undefined --(k+length xs - length xs', g a xs' : ys)
 --         undefined
 
     countvl xs = length $ takeWhile (=='|') xs
