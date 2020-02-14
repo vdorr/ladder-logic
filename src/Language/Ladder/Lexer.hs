@@ -26,6 +26,8 @@ import Data.Text (Text)
 
 import Data.Char
 
+import Data.Loc
+
 --------------------------------------------------------------------------------
 
 newtype ParseErr = PE String
@@ -78,8 +80,9 @@ data Tok a
 
 --------------------------------------------------------------------------------
 
-lx :: String -> Either String ((Int, [((Int, Int), Tok String)]), String)
-lx s = f s (0, [])
+-- lx :: String -> Either String ((Int, [((Int, Int), Tok String)]), String)
+lx :: String -> Either String [((Int, Int), Tok String)]
+lx s = fmap (\((_, q), _) -> reverse q) $ f s (0, [])
     where
 --     len = length s
     f    ('{':     xs) t = lol xs (Pragma . lines)  (takeUntilC '}') t
@@ -113,7 +116,8 @@ lx s = f s (0, [])
 --         undefined
     lol' xs g p (k, ys) = do
         (a, xs') <- p xs
-        f xs' undefined --(k+length xs - length xs', g a xs' : ys)
+        let k' = k+length xs - length xs'
+        f xs' (k', ((k, k'), g a xs') : ys) -- g a xs' : ys)
 --         undefined
 
     countvl xs = length $ takeWhile (=='|') xs
@@ -130,16 +134,17 @@ lx s = f s (0, [])
                      (p, n':xs) | n'==n -> Right (p, xs)
                      (_p, _xs) -> Left "lol"
 
-lxx :: [Tok String] -> [Tok String]
+lxx :: [((Int, Int), Tok String)] -> [((Int, Int), Tok String)]
 lxx = f
     where
-    f (Name lbl : Colon : xs) = Label lbl : f xs
-    f (Number _ : Colon : xs) = Label undefined : f xs --TODO
-    f (REdge : REdge : Name _ : xs) = Jump' undefined : f xs
-    f (FEdge : Name ret : REdge : xs)
-        | fmap toLower ret == "return" = Return : f xs
+    f ((a, Name lbl) : (b, Colon) : xs) = (ext a b, Label lbl) : f xs
+    f ((a, Number n) : (b, Colon) : xs) = (ext a b, Label (show n)) : f xs --FIXME jump to number
+    f ((a, REdge) : (_, REdge) : (b, Name _) : xs) = (ext a b, Jump' undefined) : f xs
+    f ((a, FEdge) : (_, Name ret) : (b, REdge) : xs)
+        | fmap toLower ret == "return" = (ext a b, Return) : f xs
     f (x:xs) = x : f xs
     f [] = []
+    ext (a, _) (_, b)  = (a, b)
 
 --------------------------------------------------------------------------------
 
