@@ -81,8 +81,8 @@ data Tok a
 --------------------------------------------------------------------------------
 
 -- lx :: String -> Either String ((Int, [((Int, Int), Tok String)]), String)
-lx :: String -> Either String [((Int, Int), Tok String)]
-lx s = fmap (\((_, q), _) -> reverse q) $ f s (0, [])
+lx :: String -> Either String [((Int, (Int, Int)), Tok String)]
+lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (0, 0, [])
     where
 --     len = length s
     f    ('{':     xs) t = lol xs (Pragma . lines)  (takeUntilC '}') t
@@ -105,19 +105,22 @@ lx s = fmap (\((_, q), _) -> reverse q) $ f s (0, [])
 
     lol :: String -> (w -> Tok String)
         -> (String -> Either String (w, String))
-        -> (Int, [((Int, Int), Tok String)])
-        -> Either String ((Int, [((Int, Int), Tok String)]), String)
+        -> (Int, Int, [((Int, (Int, Int)), Tok String)])
+        -> Either String
+            ((Int, Int, [((Int, (Int, Int)), Tok String)]), String)
+
     lol' :: String -> (w -> String -> Tok String)
         -> (String -> Either String (w, String))
-        -> (Int, [((Int, Int), Tok String)])
-        -> Either String ((Int, [((Int, Int), Tok String)]), String)
+        -> (Int, Int, [((Int, (Int, Int)), Tok String)])
+        -> Either String
+            ((Int, Int, [((Int, (Int, Int)), Tok String)]), String)
     lol xs g p ys = 
         lol' xs (\a _ -> g a) p ys
 --         undefined
-    lol' xs g p (k, ys) = do
+    lol' xs g p (ln, k, ys) = do
         (a, xs') <- p xs
         let k' = k+length xs - length xs'
-        f xs' (k', ((k, k'), g a xs') : ys) -- g a xs' : ys)
+        f xs' (ln, k', ((0, (k, k')), g a xs') : ys) -- g a xs' : ys)
 --         undefined
 
     countvl xs = length $ takeWhile (=='|') xs
@@ -134,7 +137,7 @@ lx s = fmap (\((_, q), _) -> reverse q) $ f s (0, [])
                      (p, n':xs) | n'==n -> Right (p, xs)
                      (_p, _xs) -> Left "lol"
 
-lxx :: [((Int, Int), Tok String)] -> [((Int, Int), Tok String)]
+lxx :: [(SrcPos, Tok String)] -> [(SrcPos, Tok String)]
 lxx = f
     where
     f ((a, Name lbl) : (b, Colon) : xs) = (ext a b, Label lbl) : f xs
@@ -144,7 +147,7 @@ lxx = f
         | fmap toLower ret == "return" = (ext a b, Return) : f xs
     f (x:xs) = x : f xs
     f [] = []
-    ext (a, _) (_, b)  = (a, b)
+    ext (x, (a, _)) (_, (_, b))  = (x, (a, b))
 
 --------------------------------------------------------------------------------
 
