@@ -88,10 +88,10 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (0, 0, [])
     f    ('{':     xs) t = lol xs (Pragma . lines)  (takeUntilC '}') t
     f    ('(':'*': xs) t = lol xs (Comment . lines) (takeUntil "*)") t
     f xs@(' ':    _xs) t = lol xs (Whitespace . (length)) (chars ' ') t
-    f    ('\n':    xs) t = lol xs (const NewLine) (const $ Right ((), xs)) t
+    f    ('\n':    xs) t = lol' (+1) xs (\_ _ -> NewLine) (const $ Right ((), xs)) t
     f    ('|':     xs) t = lol xs (const VLine) (const $ Right ((), xs)) t
     f    ('+':     xs) t = lol xs (const Cross) (const $ Right ((), xs)) t
-    f    ('-':     xs) t = lol' xs (\a b -> HLine (length a - 1) (countvl b)) (chars '-') t
+    f    ('-':     xs) t = lol' id xs (\a b -> HLine (length a - 1) (countvl b)) (chars '-') t
     f    ('[':     xs) t = lol xs (Contact) (takeUntil "]" ) t
     f    ('(':     xs) t = lol xs (Coil)  (takeUntil ")" ) t
     f    ('>':     xs) t = lol xs (const REdge) (const $ Right ((), xs)) t
@@ -109,18 +109,18 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (0, 0, [])
         -> Either String
             ((Int, Int, [((Int, (Int, Int)), Tok String)]), String)
 
-    lol' :: String -> (w -> String -> Tok String)
+    lol' :: (Int -> Int) -> String -> (w -> String -> Tok String)
         -> (String -> Either String (w, String))
         -> (Int, Int, [((Int, (Int, Int)), Tok String)])
         -> Either String
             ((Int, Int, [((Int, (Int, Int)), Tok String)]), String)
     lol xs g p ys = 
-        lol' xs (\a _ -> g a) p ys
+        lol' id xs (\a _ -> g a) p ys
 --         undefined
-    lol' xs g p (ln, k, ys) = do
+    lol' mapLine xs g p (ln, k, ys) = do
         (a, xs') <- p xs
         let k' = k+length xs - length xs'
-        f xs' (ln, k', ((0, (k, k')), g a xs') : ys) -- g a xs' : ys)
+        f xs' (mapLine ln, k', ((0, (k, k')), g a xs') : ys) -- g a xs' : ys)
 --         undefined
 
     countvl xs = length $ takeWhile (=='|') xs
@@ -137,7 +137,7 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (0, 0, [])
                      (p, n':xs) | n'==n -> Right (p, xs)
                      (_p, _xs) -> Left "lol"
 
-lxx :: [(SrcPos, Tok String)] -> [(SrcPos, Tok String)]
+-- lxx :: [(SrcPos, Tok String)] -> [(SrcPos, Tok String)]
 lxx = f
     where
     f ((a, Name lbl) : (b, Colon) : xs) = (ext a b, Label lbl) : f xs
