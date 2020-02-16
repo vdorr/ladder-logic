@@ -36,8 +36,10 @@ instance ShowErrorComponent ParseErr where
 
 --------------------------------------------------------------------------------
 
-withPos :: (Stream t, Ord e) => Parsec e t a -> Parsec e t ((SourcePos, SourcePos), a)
-withPos p = (\a b c -> ((a, c), b)) <$> getSourcePos <*> p <*> getSourcePos
+withPos :: (Stream t, Ord e) => Parsec e t a -> Parsec e t ((SrcPos, SrcPos), a)
+withPos p = (\a b c -> ((a, c), b)) <$> src <*> p <*> src
+    where
+    src = getSourcePos >>= \pos -> pure (unPos$sourceLine pos, unPos$sourceColumn pos)
 
 --------------------------------------------------------------------------------
 
@@ -186,25 +188,28 @@ lexeme
             then chunk b <|> return (T.singleton c)
             else return (T.singleton c)
 
-lexerP :: Parsec ParseErr Text [((SourcePos, SourcePos), Tok Text)]
+lexerP :: Parsec ParseErr Text [((SrcPos, SrcPos), Tok Text)]
 -- lexerP = space *> many (withPos lexeme <* space) <* eof
 lexerP = many (withPos lexeme) <* eof
 
-lexerLinesP :: Parsec ParseErr Text [[((SourcePos, SourcePos), Tok Text)]]
+lexerLinesP :: Parsec ParseErr Text [[((SrcPos, SrcPos), Tok Text)]]
 lexerLinesP = (fmap snd . breakLines) <$> lexerP
 
 --------------------------------------------------------------------------------
 
+-- type SrcPos = (Int, (Int, Int))
+type SrcPos = (Int, (Int))
+
 runLexer
     :: Text
-    -> Either Text [ [((SourcePos, SourcePos), Tok Text)] ]
+    -> Either Text [ [((SrcPos, SrcPos), Tok Text)] ]
 runLexer
     = bimap (T.pack . errorBundlePretty) id
     . parse lexerLinesP "(file)"
 
 runLexer'
     :: Text
-    -> Either String [ [((SourcePos, SourcePos), Tok Text)] ]
+    -> Either String [ [((SrcPos, SrcPos), Tok Text)] ]
 runLexer'
     = first errorBundlePretty
     . parse lexerLinesP "(file)"
@@ -225,11 +230,12 @@ dropWhitespace2 = filter (not.null) . fmap (filter (not.isWsTok.snd))
 
 -- |Break list of tokens into list of lists of tokens with same line number
 breakLines
-    :: [((SourcePos, SourcePos), tok)]
-    -> [(SourcePos, [((SourcePos, SourcePos), tok)])]
+    :: [((SrcPos, SrcPos), tok)]
+    -> [(SrcPos, [((SrcPos, SrcPos), tok)])]
 breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
     where
-    (a, b) = span ((sourceLine p==).sourceLine.fst.fst) xs
+    (a, b) = span ((srcLine p==).srcLine.fst.fst) xs
+    srcLine = fst
 breakLines [] = []
 
 -- |Returns True if lexeme is comment or pragma
@@ -275,12 +281,24 @@ labeledRungs t = (lbl, this) : labeledRungs rest
 --     where
 --     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
 
+-- stripPos3
+--     :: [[((SourcePos, SourcePos), a)]]
+--     -> [[((Int, (Int, Int)), a)]]
+-- stripPos3 = fmap (fmap (first line))
+--     where
+--     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
+
 stripPos3
-    :: [ [((SourcePos, SourcePos), a)] ]
+    :: [[((SrcPos, SrcPos), a)]]
     -> [[((Int, (Int, Int)), a)]]
 stripPos3 = fmap (fmap (first line))
     where
-    line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
+    line (s, e) = (pline s, (column s, (column e)-1))
+    column = snd
+    pline = fst
+-- fmap (fmap (first line))
+--     where
+--     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
 
 --------------------------------------------------------------------------------
 
