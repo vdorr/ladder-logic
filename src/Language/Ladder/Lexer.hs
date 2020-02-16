@@ -26,8 +26,6 @@ import Data.Text (Text)
 
 import Data.Char
 
-import Data.Loc
-
 --------------------------------------------------------------------------------
 
 newtype ParseErr = PE String
