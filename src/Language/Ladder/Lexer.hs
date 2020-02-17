@@ -111,7 +111,7 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
     f    ('\n':    xs) t = lol' 1 True xs (\_ _ -> NewLine) (const $ Right ((), xs)) t
     f    ('|':     xs) t = lol 1 xs (const VLine) (const $ Right ((), xs)) t
     f    ('+':     xs) t = lol 1 xs (const Cross) (const $ Right ((), xs)) t
-    f    ('-':     xs) t = lol' 1 False xs (\a b -> HLine (length a + 1) (countvl b)) (chars '-') t
+    f    ('-':     xs) t = lol' 1 False xs (\a b -> HLine (length a) (countvl b)) (chars '-') t
     f    ('[':     xs) t = lol 1 xs (Contact) (takeUntil "]" ) t
     f    ('(':     xs) t = lol 1 xs (Coil)  (takeUntil ")" ) t
     f    ('>':     xs) t = lol 1 xs (const REdge) (const $ Right ((), xs)) t
@@ -137,10 +137,10 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
         (a, xs') <- p xs
         case q of
              False -> do
-                let k' = kk + k + length xs - length xs'
-                f xs' (ln, k', ((ln, (k, k')), g a xs') : ys)
+                let k' = kk + k + length xs - length xs' - 1
+                f xs' (ln, k' +1, ((ln, (k, k')), g a xs') : ys)
              True -> do
-                let k' = kk + k + length xs - length xs'
+                let k' = k + length xs - length xs'
                 f xs' (ln+1, 1, ((ln, (k, k')), g a xs') : ys)
 
     lol kk xs g p ys = lol' kk False xs (\a _ -> g a) p ys
