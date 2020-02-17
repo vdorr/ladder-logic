@@ -445,7 +445,7 @@ compileForTest03 ast = generateStk2THISISTOOMUCH pure emitDevice03 ast
 --     for_ (aesCode st) print
 --     return ()
 
-pipeline :: (t -> ExceptT e IO t1)
+pipeline :: Show e2 => (t -> ExceptT e IO t1)
                       -> (t1 -> ExceptT e1 IO [(a, t2)])
                       -> (t2 -> ExceptT e2 IO b)
                       -> ([(a, b)] -> ExceptT e3 IO b1)
@@ -454,9 +454,12 @@ pipeline :: (t -> ExceptT e IO t1)
 pipeline lexer postLex parser compile sourceText = do
     Right lxs <- runExceptT (lexer sourceText)
     Right lxs' <- runExceptT (postLex lxs)
-    Right ast <- runExceptT $ for lxs' \(lbl, ast0) -> do
+    ast0 <- runExceptT $ for lxs' \(lbl, ast0) -> do
         x <- parser ast0
         return (lbl, x)
+    ast <- case ast0 of
+         Left err -> error $ show (here, err)
+         Right ast1 -> return ast1
     Right code <- runExceptT $ compile ast
     return code
 
@@ -490,6 +493,8 @@ niceSrc outputLine file src = do
 --              -> Either e0 a0
 -- test6 = blarghX
 
+stripPos3 = id
+
 main :: IO ()
 main = do
     [file] <- getArgs
@@ -499,7 +504,7 @@ main = do
 --     TIO.putStrLn src
     niceSrc putStrLn file src
     print (here, "--------------------------------------------------")
-
+#if 0
     prog <- pipeline
         (liftEither . fmap stripPos3 . runLexer)
         (pure . labeledRungs . dropWhitespace2)
@@ -509,7 +514,7 @@ main = do
     putStrLn "---------------------------"
     for_ prog print
     putStrLn "---------------------------"
-
+#endif
     case stripPos3 <$> runLexer src of
         Left err -> TIO.putStrLn err
         Right lxs -> do
@@ -537,7 +542,7 @@ main = do
 --                         print (here, nub $ toList ast1)
 --                         test1 ast1
 --                         return ()
-
+#if 0
     ;
     prog1 <- pipeline
         (liftEither . fmap stripPos3 . runLexer)
@@ -548,6 +553,7 @@ main = do
     putStrLn "---------------------------"
     for_ prog1 (print.snd)
     putStrLn "---------------------------"
+#endif
     return ()
 
     where

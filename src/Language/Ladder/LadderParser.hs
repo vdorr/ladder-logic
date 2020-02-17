@@ -26,6 +26,8 @@ import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.Types
 
+import Debug.Trace
+
 --------------------------------------------------------------------------------
 
 -- |Contact operand, located above or below
@@ -79,7 +81,7 @@ ladder
 -- like 'ladder' but do not check if all lexemes consumed
 ladderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
 ladderLiberal
-    = setDir goDown
+    = traceShowM here >> setDir goDown
     *> (ann <$> currentPos <*> fmap Source vline')
 
 --------------------------------------------------------------------------------

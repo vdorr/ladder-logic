@@ -208,11 +208,11 @@ dgIsEmpty :: SFM (DgPState st tok) ()
 -- dgIsEmpty :: Show tok => SFM (DgPState st tok) ()
 dgIsEmpty
 --     =   (dgNull . psStr) <$> get
---     >>= (`when` fail (here ++ "not empty"))
---     = fmap (not . dgNull . psStr) get >>= guard
-    =   (dgNull . psStr) <$> get
-    >>= (`when` (lift $ Left $ here ++ "not empty"))
-
+--     >>= (`when` (lift $ Left $ here ++ "not empty"))
+    = fmap focusDg getStream >>= \case
+                                    (Zp _ (Zp _ ((p, _):_):_) ) -> 
+                                        lift $ Left $ here ++ "not empty " ++ show p
+                                    _ -> return ()
 {-
    |
    +-------

@@ -47,9 +47,11 @@ library
                      , containers
                      , text
                      , bytestring
-                     , bits, bytes, base16-bytestring, binary
+                     , bits
+                     , bytes
+                     , base16-bytestring
+                     , binary
                      , pretty-show
-                     , srcloc
 
   hs-source-dirs:      src
                        .

@@ -49,7 +49,7 @@ preproc5'
     -> Either Text [[((Int, (Int, Int)), Tok Text)]]
 preproc5' = preproc . runLexer
     where
-    preproc = fmap (stripPos3 . dropWhitespace2)
+    preproc = fmap (id . dropWhitespace2)
 
 --------------------------------------------------------------------------------
 

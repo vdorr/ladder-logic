@@ -9,7 +9,7 @@ import qualified Data.Text.IO as TIO
 import Data.Text (Text, unpack)
 import qualified Data.Text as T
 import Control.Monad
-import Control.Applicative
+-- import Control.Applicative
 import Data.Traversable
 import Data.Semigroup
 import Data.Void
@@ -234,6 +234,17 @@ ldUnpack1 :: Cofree (Diagram c op Text) a
          -> Cofree (Diagram c op String) a
 ldUnpack1 (a :< n) = a :< fmap ldUnpack1 (mapDg id id unpack n)
 
+-- |Discard position informations from list of lexemes
+dropPos
+    :: [[(p, Tok a)]]
+    -> [Tok a]
+dropPos = foldMap (fmap snd)
+
+dropPos2
+    :: [[(p, Tok a)]]
+    -> [[Tok a]]
+dropPos2 = fmap (fmap snd)
+
 --------------------------------------------------------------------------------
 
 -- |return pragmas
@@ -273,7 +284,7 @@ parseOrDie2 devP lxs = do
 lexFile :: FilePath -> IO [[(DgExt, Tok Text)]]
 lexFile file = do
     src <- TIO.readFile file
-    case stripPos3 <$> runLexer src of
+    case id <$> runLexer src of
         Left  err -> fail $ show (here, err)
         Right x   -> return x
 
