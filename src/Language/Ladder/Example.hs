@@ -56,7 +56,7 @@ type LadderAst = Cofree (Diagram Void (DevType Text, [Operand Text]) Text) DgExt
 -- (5,(14,14))  :< Sink))])])]))
 parseLd :: Text -> Either String LadderAst
 parseLd s = do
-    ast <- (id . dropWhitespace2) <$> runLexer' s
+    ast <- dropWhitespace <$> runLexer s
     runLadderParser_ wrapDeviceSimple ladder ast
 
 --------------------------------------------------------------------------------

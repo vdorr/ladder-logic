@@ -1,4 +1,3 @@
-#define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.LadderParser
 --     ( Diagram(..)
@@ -19,14 +18,12 @@ import Control.Applicative --hiding (fail)
 import Control.Monad hiding (fail)
 import Data.Foldable
 import Data.Void
-import Control.Monad.State hiding (fail)
+-- import Control.Monad.State hiding (fail)
 
 import Language.Ladder.Utils
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.Types
-
-import Debug.Trace
 
 --------------------------------------------------------------------------------
 
@@ -63,7 +60,7 @@ runParser
     -> Either String (a, Dg (Tok t))
 runParser mkDev p s
 --     = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace2 s)) (LdPCtx mkDev)
-    = fst <$> applyDgp p' (mkDgZp (dropWhitespace2 s)) (LdPCtx mkDev)
+    = fst <$> applyDgp p' (mkDgZp (dropWhitespace s)) (LdPCtx mkDev)
     where
     p' = (,) <$> p <*> getStream
 -- TODO parser that:
@@ -74,51 +71,50 @@ runParser mkDev p s
 
 ladder :: LdP d t (Cofree (Diagram Void d t) DgExt)
 ladder
-    = setDir goDown
-    *> (ann <$> currentPos <*> fmap Source vline')
+    = ladderLiberal
     <* dgIsEmpty
 
 -- like 'ladder' but do not check if all lexemes consumed
 ladderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
 ladderLiberal
-    = traceShowM here >> setDir goDown
+    = setDir goDown
     *> (ann <$> currentPos <*> fmap Source vline')
 
 --------------------------------------------------------------------------------
 
 number :: LdP d t (Operand t)
 number = eat >>= \case  Number n -> return $ Lit n
-                        _        -> lift $ Left "expected number"
+                        _        -> failure "expected number"
 
 cross :: LdP d t ()
 cross = eat >>= \case   Cross -> return ()
-                        _     -> lift $ Left "expected '+'"
+                        _     -> failure "expected '+'"
 
 name :: LdP d t t
 name = eat >>= \case    Name lbl -> return lbl
-                        _        -> lift $ Left "expected name"
+                        _        -> failure "expected name"
 
 hline :: LdP d t Int
 hline = eat >>= \case   HLine _ vl -> return vl
-                        _         -> lift $ Left "expected horizontal line"
+                        _         -> failure "expected horizontal line"
     
 vline :: LdP d t ()
 vline = eat >>= \case   VLine -> return ()
-                        _     -> lift $ Left "expected vertical line"
+                        _     -> failure "expected vertical line"
 
 coil' :: LdP d t (DevType t)
 coil' = eat >>= \case   Coil f -> return $ Coil_ f
-                        _      -> lift $ Left "expected coil"
+                        _      -> failure "expected coil"
 
 contact' :: LdP d t (DevType t)
 contact' = eat >>= \case    Contact f -> return $ Contact_ f
-                            _         -> lift $ Left "expected contact"
+                            _         -> failure "expected contact"
 
 jump :: LdP d t (Cofree (Diagram c d t) DgExt)
 jump = do
     p <- currentPos
     eat >>= \case   Jump' lbl -> return $ p :< Jump lbl
-                    _         -> lift $ Left "expected jump"
+                    _         -> failure "expected jump"
 
 --------------------------------------------------------------------------------
 
@@ -195,15 +191,22 @@ hline2 = do
 
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
 device = do
-    p        <- currentPos
-    usr      <- getState
-    (ops, f) <-
-                withOperands do
-                    dev <- coil' <|> contact'
-                    case ctxMkDev usr dev of
-                        Left  _             -> lift $ Left here
-                        Right (flag, mkDev) -> return (flag, mkDev)
-    dev'     <- case f ops of
-                    Left  _ -> lift $ Left here
-                    Right d ->  return d
+    p    <- currentPos
+    dev  <- withOperands do
+                dev <- coil' <|> contact'
+                lookupDeviceParser dev
+    dev' <- runUsrDevParser dev
     (p :<) <$> (Device dev' <$> hline')
+
+    where
+
+    runUsrDevParser (operands, userDevParser)
+        = case userDevParser operands of
+            Left  err -> failure $ "device: device parse error '" ++ err ++ "'"
+            Right d ->  return d
+
+    lookupDeviceParser dev = do
+        usr      <- getState
+        case ctxMkDev usr dev of
+            Left  _             -> failure "device: unknown device"
+            Right (flag, mkDev) -> return (flag, mkDev)

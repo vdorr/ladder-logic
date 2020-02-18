@@ -1,29 +1,29 @@
 
 module Language.Ladder.Lexer
     ( Tok(..)
-    , dropWhitespace2
+    , SrcRange
+    , dropWhitespace
 --     , stripPos3
-    , runLexer'
-    , labeledRungs
     , runLexer
+    , labeledRungs
+--     , runLexer
     , getLeadingPragmas
 --     , dropPos
 
     , renderLexeme
 --     , dropPos2
-    , lx
+--     , lx
     )
     where
 
 --FIXME FIXME get rid of megaparsec
-import Text.Megaparsec hiding (Label) --as P hiding (runParser', Pos)
-import Text.Megaparsec.Char --as PC
+-- import Text.Megaparsec hiding (Label) --as P hiding (runParser', Pos)
+-- import Text.Megaparsec.Char --as PC
 import Data.Bifunctor
-import Control.Applicative.Combinators (between)
-import Data.List
-import qualified Data.Text as T
-import Data.Text (Text)
-
+-- import Control.Applicative.Combinators (between)
+import Data.List hiding (stripPrefix)
+-- import qualified Data.Text as T
+import Data.Text (Text, breakOn, pack, unpack, stripPrefix)
 import Data.Char
 
 --------------------------------------------------------------------------------
@@ -149,10 +149,10 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
     digits cs = Right $ span (isDigit) cs
     alphaNum cs = Right $ span (\c -> isAlphaNum c || c == '_' || c == '%') cs
     chars c cs = Right $ span (==c) cs -- or until, not sure
-    takeUntil n h = case T.breakOn (T.pack n) (T.pack h) of
-                     (p, xs) -> case T.stripPrefix (T.pack n) xs of
+    takeUntil n h = case breakOn (pack n) (pack h) of
+                     (p, xs) -> case stripPrefix (pack n) xs of
                                      Nothing -> Left "wtf"
-                                     Just xxs -> Right (T.unpack p, T.unpack xxs)
+                                     Just xxs -> Right (unpack p, unpack xxs)
     takeUntilC n h = case break (==n) (h) of
                      (p, n':xs) | n'==n, isSuffixOf "\\" p
                         -> first ((p++[n'])++) <$> takeUntilC n xs
@@ -175,71 +175,71 @@ lxx = f
 
 --------------------------------------------------------------------------------
 
-newtype ParseErr = PE String
-    deriving (Show, Eq, Ord)
-
-instance ShowErrorComponent ParseErr where
-    showErrorComponent (PE e)  = show e
-
---------------------------------------------------------------------------------
-
-withPos :: (Stream t, Ord e) => Parsec e t a -> Parsec e t ((SrcPos, SrcPos), a)
-withPos p = (\a b c -> ((a, c), b)) <$> src <*> p <*> src
-    where
-    src = getSourcePos >>= \pos -> pure (unPos$sourceLine pos, unPos$sourceColumn pos)
+-- newtype ParseErr = PE String
+--     deriving (Show, Eq, Ord)
+-- 
+-- instance ShowErrorComponent ParseErr where
+--     showErrorComponent (PE e)  = show e
 
 --------------------------------------------------------------------------------
 
-lexeme :: Parsec ParseErr Text (Tok Text)
-lexeme
-    =   Pragma       <$> T.lines <$> between''' "{" "}"
-    <|> Comment      <$> T.lines <$> between''' "(*" "*)"
-    <|> Whitespace   <$> length <$> some (char ' ')
-    <|> NewLine      <$  eol
-    <|> Label        <$> try (labelName <* char ':')
-    <|> Number       <$> (read <$> some digitChar)
-    <|> VLine        <$  char '|'
-    <|> Cross        <$  char '+'
-    <|> Continuation <$> try (between' ">" ">" name)
-
-    <|> HLine        <$> (((+(-1)).length) <$> some (char '-'))
-                     <*> (lookAhead (length <$> many (char '|')))
-
-    <|> Jump'        <$> (try (chunk ">>") *> labelName)
-    <|> Return       <$  try (chunk "<RETURN>")
-    <|> Contact      <$> between'' "[" "]"
-    <|> Coil         <$> between'' "(" ")"
-    <|> REdge        <$  char '>'
-    <|> FEdge        <$  char '<'
-    <|> Name         <$> name
-
-    where
-    labelName = T.pack <$> some alphaNumChar
-    name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '_' <|> char '%')
-    between' a b = between (chunk a) (chunk b)
-    between'' :: Text -> Text -> Parsec ParseErr Text Text
-    between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))
-
-    --escape with backlsash, allow curly braces in pragmas
-    between''' :: Text -> Text -> Parsec ParseErr Text Text
-    between''' a b = mconcat <$> (chunk a *> manyTill interm (try (chunk b)))
-        where
-        interm = do
-            c <- anySingle
-            if '\\' == c
-            then chunk b <|> return (T.singleton c)
-            else return (T.singleton c)
-
-lexerP :: Parsec ParseErr Text [((SrcPos, SrcPos), Tok Text)]
--- lexerP = space *> many (withPos lexeme <* space) <* eof
-lexerP = many (withPos lexeme) <* eof
-
-lexerLinesP :: Parsec ParseErr Text [[((SrcPos, SrcPos), Tok Text)]]
-lexerLinesP = (fmap snd . breakLines) <$> lexerP
+-- withPos :: (Stream t, Ord e) => Parsec e t a -> Parsec e t ((SrcPos, SrcPos), a)
+-- withPos p = (\a b c -> ((a, c), b)) <$> src <*> p <*> src
+--     where
+--     src = getSourcePos >>= \pos -> pure (unPos$sourceLine pos, unPos$sourceColumn pos)
 
 --------------------------------------------------------------------------------
 
-type SrcPos = (Int, Int)
+-- lexeme :: Parsec ParseErr Text (Tok Text)
+-- lexeme
+--     =   Pragma       <$> T.lines <$> between''' "{" "}"
+--     <|> Comment      <$> T.lines <$> between''' "(*" "*)"
+--     <|> Whitespace   <$> length <$> some (char ' ')
+--     <|> NewLine      <$  eol
+--     <|> Label        <$> try (labelName <* char ':')
+--     <|> Number       <$> (read <$> some digitChar)
+--     <|> VLine        <$  char '|'
+--     <|> Cross        <$  char '+'
+--     <|> Continuation <$> try (between' ">" ">" name)
+-- 
+--     <|> HLine        <$> (((+(-1)).length) <$> some (char '-'))
+--                      <*> (lookAhead (length <$> many (char '|')))
+-- 
+--     <|> Jump'        <$> (try (chunk ">>") *> labelName)
+--     <|> Return       <$  try (chunk "<RETURN>")
+--     <|> Contact      <$> between'' "[" "]"
+--     <|> Coil         <$> between'' "(" ")"
+--     <|> REdge        <$  char '>'
+--     <|> FEdge        <$  char '<'
+--     <|> Name         <$> name
+-- 
+--     where
+--     labelName = T.pack <$> some alphaNumChar
+--     name = label "identifier" $ T.pack <$> some (alphaNumChar <|> char '_' <|> char '%')
+--     between' a b = between (chunk a) (chunk b)
+--     between'' :: Text -> Text -> Parsec ParseErr Text Text
+--     between'' a b = T.pack <$> (chunk a *> manyTill anySingle (try (chunk b)))
+-- 
+--     --escape with backlsash, allow curly braces in pragmas
+--     between''' :: Text -> Text -> Parsec ParseErr Text Text
+--     between''' a b = mconcat <$> (chunk a *> manyTill interm (try (chunk b)))
+--         where
+--         interm = do
+--             c <- anySingle
+--             if '\\' == c
+--             then chunk b <|> return (T.singleton c)
+--             else return (T.singleton c)
+-- 
+-- lexerP :: Parsec ParseErr Text [((SrcPos, SrcPos), Tok Text)]
+-- -- lexerP = space *> many (withPos lexeme <* space) <* eof
+-- lexerP = many (withPos lexeme) <* eof
+-- 
+-- lexerLinesP :: Parsec ParseErr Text [[((SrcPos, SrcPos), Tok Text)]]
+-- lexerLinesP = (fmap snd . breakLines) <$> lexerP
+
+--------------------------------------------------------------------------------
+
+-- type SrcPos = (Int, Int)
 
 -- runLexer
 --     :: Text
@@ -257,34 +257,28 @@ type SrcPos = (Int, Int)
 
 --------------------------------------------------------------------------------
 
-runLexer
-    :: Text
-    -> Either Text [ [(SrcRange, Tok Text)] ]
-runLexer
-    = first T.pack . runLexer'
+-- runLexer
+--     :: Text
+--     -> Either Text [ [(SrcRange, Tok Text)] ]
+-- runLexer
+--     = first T.pack . runLexer'
 --     = bimap (T.pack . errorBundlePretty) stripPos3
 --     . parse lexerLinesP "(file)"
 
-runLexer'
-    :: Text
-    -> Either String [ [(SrcRange, Tok Text)] ]
-runLexer'
-    = runLexer''
+runLexer :: Text -> Either String [ [(SrcRange, Tok Text)] ]
+runLexer = runLexer''
 --     = bimap errorBundlePretty stripPos3
 --     . parse lexerLinesP "(file)"
 
 
-runLexer''
-    :: Text
-    -> Either String [ [(SrcRange, Tok Text)] ]
+runLexer'' :: Text -> Either String [ [(SrcRange, Tok Text)] ]
 runLexer'' s
-    = ((split ((NewLine==).snd)) . fmap (fmap (fmap T.pack)) . lxx) <$> (lx $ T.unpack s)
+    = ((split ((NewLine==).snd)) . fmap (fmap (fmap pack)) . lxx) <$> (lx $ unpack s)
 
     where
         split p xs = case break p xs of
                           (a, []) -> [a]
                           (a, b : rest) -> (a ++ [b]) : split p rest
---                           _ -> undefined
 
 --------------------------------------------------------------------------------
 
@@ -295,20 +289,20 @@ runLexer'' s
 -- dropWhitespace = filter (not.null.snd) . fmap (fmap (filter (not.isWsTok.snd)))
 
 -- |Discard comments and pragmas
-dropWhitespace2
+dropWhitespace
     :: [[(p, Tok a)]]
     -> [[(p, Tok a)]]
-dropWhitespace2 = filter (not.null) . fmap (filter (not.isWsTok.snd))
+dropWhitespace = filter (not.null) . fmap (filter (not.isWsTok.snd))
 
 -- |Break list of tokens into list of lists of tokens with same line number
-breakLines
-    :: [((SrcPos, SrcPos), tok)]
-    -> [(SrcPos, [((SrcPos, SrcPos), tok)])]
-breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
-    where
-    (a, b) = span ((srcLine p==).srcLine.fst.fst) xs
-    srcLine = fst
-breakLines [] = []
+-- breakLines
+--     :: [((SrcPos, SrcPos), tok)]
+--     -> [(SrcPos, [((SrcPos, SrcPos), tok)])]
+-- breakLines (x@((p, _), _) : xs) = (p, x : a) : breakLines b
+--     where
+--     (a, b) = span ((srcLine p==).srcLine.fst.fst) xs
+--     srcLine = fst
+-- breakLines [] = []
 
 -- |Returns True if lexeme is comment or pragma
 isWsTok :: Tok a -> Bool
@@ -332,10 +326,10 @@ labeledRungs t = (lbl, this) : labeledRungs rest
     (lbl, t')
         = case t of
             ([(_, Label x)] : xs) -> (Just x, xs)
-            xs                         -> (Nothing, xs)
+            xs                    -> (Nothing, xs)
 
     isLabel [(_, Label _)] = True
-    isLabel _                   = False
+    isLabel _              = False
 
 --------------------------------------------------------------------------------
 
@@ -360,14 +354,14 @@ labeledRungs t = (lbl, this) : labeledRungs rest
 --     where
 --     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
 
-stripPos3
-    :: [[((SrcPos, SrcPos), a)]]
-    -> [[(SrcRange, a)]]
-stripPos3 = fmap (fmap (first line))
-    where
-    line (s, e) = (pline s, (column s, (column e)-1))
-    column = snd
-    pline = fst
+-- stripPos3
+--     :: [[((SrcPos, SrcPos), a)]]
+--     -> [[(SrcRange, a)]]
+-- stripPos3 = fmap (fmap (first line))
+--     where
+--     line (s, e) = (pline s, (column s, (column e)-1))
+--     column = snd
+--     pline = fst
 -- fmap (fmap (first line))
 --     where
 --     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))

@@ -1,5 +1,3 @@
-#define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
-{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Ladder.DiagramParser
     ( colocated'', colocated_'', above, below, above_, below_
@@ -15,6 +13,7 @@ module Language.Ladder.DiagramParser
     , applyDgp, mkDgZp
     , dgLength, dgTrim
     , getState, getStream
+    , failure
     )
     where
 
@@ -38,9 +37,8 @@ dgLength :: Dg a -> Int
 dgLength = sum . fmap length
 
 -- | null or not null idontknow
-dgNull :: Dg a -> Bool
--- dgNull = and . fmap null
-dgNull = or . fmap (not . null)
+-- dgNull :: Dg a -> Bool
+-- dgNull = or . fmap (not . null)
 
 -- |Drop empty lines
 dgTrim :: Dg a -> Dg a
@@ -89,7 +87,7 @@ applyDgp p dg st = sfm p (DgPSt goRight dg Nothing True st)
 --------------------------------------------------------------------------------
 
 move_ :: Int -> Int -> Dg a -> Either String (Dg a)
-move_ ln co dg = maybe (throwError here) return (move ln co dg)
+move_ ln co dg = maybe (throwError "move_: bad move") return (move ln co dg)
 -- move_ ln co dg = maybe (throwError here) return (moveNotCursed ln co dg)
 
 --FIXME should move only to direct neigbour
@@ -102,6 +100,9 @@ goLeft  (ln, (co, _)) = move_ ln     (co-1)
 
 --------------------------------------------------------------------------------
 
+failure :: String -> SFM (DgPState st tok) a
+failure err = lift $ Left err --TODO add location if possible
+
 getState :: SFM (DgPState st tok) st
 getState = gets psUser
 
@@ -109,22 +110,19 @@ getStream :: SFM (DgPState st tok) (Dg tok)
 getStream = gets psStr
 
 lastPos :: SFM (DgPState st tok) DgExt
-lastPos = psLastBite <$> get >>= maybe (lift $ Left here) return
+lastPos = psLastBite <$> get >>= maybe (failure "lastPos: nothing parsed") pure
 
 setDir :: ParsingDirection tok -> SFM (DgPState st tok) ()
 setDir f = modify $ \(DgPSt _ zp ps fc st) -> DgPSt f zp ps fc st
 
--- getDir :: SFM (DgPState st tok) (ParsingDirection tok)
--- getDir = psNext <$> get
-
-step :: SFM (DgPState st tok) ()
-step = do
-    origin                <- currentPos
-    DgPSt f zp ps focused st <- get --if nothing is focused, currentPos makes no sense
-    guard focused
-    case f origin zp of
-        Right zp'  -> put (DgPSt f zp' ps True st)
-        Left  _err -> lift $ Left here --or not?
+-- step :: SFM (DgPState st tok) ()
+-- step = do
+--     origin                <- currentPos
+--     DgPSt f zp ps focused st <- get --if nothing is focused, currentPos makes no sense
+--     guard focused
+--     case f origin zp of
+--         Right zp'  -> put (DgPSt f zp' ps True st)
+--         Left  _err -> lift $ Left here --or not?
 
 setPos :: (Int, (Int, b)) -> SFM (DgPState st tok) ()
 setPos = setPosOrBlur
@@ -151,7 +149,7 @@ eat = do
                 Right q -> DgPSt next q   (Just p) True  st
                 Left  _ -> DgPSt next dg' (Just p) False st --nowhere to move
             return v
-        Nothing -> lift $ Left $ show (here, ps)
+        Nothing -> failure $ "eat: " ++ show ps
 
 --------------------------------------------------------------------------------
 
@@ -160,14 +158,14 @@ gap = do
     get >>= \case
         DgPSt{psFocused=False} -> return ()
         DgPSt{psStr=DgLineEnd} -> return ()
-        _         -> lift $ Left $ here
+        _         -> failure "gap: no gap"
 
 -- |Succeeds FIXME FIXME i am not sure when
 end :: SFM (DgPState st tok) ()
 -- end = void peek <|> (lift $ Left "not empty")
 end = (cursor . psStr) <$> get >>= \case
                                          Nothing -> return ()
-                                         _ -> lift $ Left "not empty"
+                                         _ -> failure "not empty"
 
 currentPosM :: SFM (DgPState st tok) (Maybe DgExt)
 currentPosM = (pos . psStr) <$> get
@@ -175,16 +173,15 @@ currentPosM = (pos . psStr) <$> get
 currentPos :: SFM (DgPState st tok) DgExt
 currentPos = currentPosM >>= \case
                        Just p -> return p
-                       _ -> lift $ Left "empty"
+                       _ -> failure "empty"
 
---TODO implement in terms of 'peekM'
-peek :: SFM (DgPState st tok) tok
-peek = peekM >>= \case
-                       Just p -> return p
-                       _ -> lift $ Left "empty"
-
-peekM :: SFM (DgPState st tok) (Maybe tok)
-peekM = (cursor . psStr) <$> get
+-- peek :: SFM (DgPState st tok) tok
+-- peek = peekM >>= \case
+--                        Just p -> return p
+--                        _ -> lift $ Left "empty"
+-- 
+-- peekM :: SFM (DgPState st tok) (Maybe tok)
+-- peekM = (cursor . psStr) <$> get
 
 -- --for VLine crossing impl
 -- skipSome :: (tok -> Bool) -> SFM (DgPState st tok) ()
@@ -211,7 +208,7 @@ dgIsEmpty
 --     >>= (`when` (lift $ Left $ here ++ "not empty"))
     = fmap focusDg getStream >>= \case
                                     (Zp _ (Zp _ ((p, _):_):_) ) -> 
-                                        lift $ Left $ here ++ "not empty " ++ show p
+                                        failure $ "dgIsEmpty: not empty " ++ show p
                                     _ -> return ()
 {-
    |
@@ -259,35 +256,22 @@ step'' f = do
 keepOrigin :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
 keepOrigin p = do
     origin <- gets psLastBite
-    x <- p
-    modify \st -> st { psLastBite = origin }
+    x      <- p
+    _      <- modify \st -> st { psLastBite = origin }
     return x
 
--- set last bit so whole extent of parsed sequence
-group :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
-group p = do
-    first <- currentPos
-    x <- p
-    lastToken <- gets psLastBite
-    modify \st -> st { psLastBite = ext first <$> lastToken }
-    return x
-
--- branch'
---     :: SFM (DgPState st tok) ()
---     -> [SFM (DgPState st tok) a] -- XXX XXX assuming branch parsers are never failing?!?!
---     ->  SFM (DgPState st tok) [a]
--- branch' p0 pps = do
---     p0
---     origin <- gets psLastBite
---     for pps \pd -> do
---         modify \st -> st { psLastBite = origin }
---         pd  -- XXX XXX assuming branch parsers are never failing?!?!
---         -- or `option pd`
--- --     undefined
-
-ext :: DgExt -> DgExt -> DgExt
-ext (a, (b, c)) (_d, (e, f))
-    = (a, (min b e, max c f))
+-- -- set last bit so whole extent of parsed sequence
+-- group :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
+-- group p = do
+--     first <- currentPos
+--     x <- p
+--     lastToken <- gets psLastBite
+--     modify \st -> st { psLastBite = ext first <$> lastToken }
+--     return x
+-- 
+-- ext :: DgExt -> DgExt -> DgExt
+-- ext (a, (b, c)) (_d, (e, f))
+--     = (a, (min b e, max c f))
 
 -- branch
 --     :: (tok -> Bool)
@@ -314,7 +298,7 @@ eol :: SFM (DgPState st tok) ()
 eol = do
     psStr <$> get >>= \case
         DgLineEnd -> return ()
-        _         -> lift $ Left $ here
+        _         -> failure "eol: not eol"
 
 colRight :: DgExt -> DgExt
 colRight (ln, (_, co)) = (ln, (co + 1, co + 1))

@@ -8,7 +8,7 @@ import Test.Tasty.Hedgehog
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-import Hedgehog.Range
+-- import Hedgehog.Range
 import System.Environment
 
 -- import Data.List
@@ -18,7 +18,7 @@ import NeatInterpolation
 import Data.Text (Text, pack, unpack)
 -- import qualified Data.Text
 import Data.Bifunctor
-import Data.Function
+-- import Data.Function
 import Data.Traversable
 import Data.Foldable -- hiding (toList)
 import GHC.Exts hiding (toList)
@@ -47,9 +47,9 @@ import TestUtils
 preproc5'
     :: Text
     -> Either Text [[((Int, (Int, Int)), Tok Text)]]
-preproc5' = preproc . runLexer
+preproc5' = preproc . first pack . runLexer
     where
-    preproc = fmap (id . dropWhitespace2)
+    preproc = fmap dropWhitespace
 
 --------------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ testPreproc5 = fmap concat . testPreproc4
 
 --keep comments and pragmas, drop position info, concat lines
 testLexer :: Text -> Either Text [Tok Text]
-testLexer = fmap dropPos . runLexer
+testLexer = fmap dropPos . first pack . runLexer
 
 simpleResult :: (Bifunctor f, Eq e, Monoid e) => f e a -> f Bool a
 simpleResult = first (/=mempty)
@@ -193,27 +193,27 @@ genToken =
     Gen.choice
         [ pure Cross
         , pure VLine
-        ,      Label        <$> name --TODO numeric label
+        ,      Label        <$> shortName --TODO numeric label
         ,      HLine        <$> smallNonZero <*> pure 0
         , pure REdge
         , pure FEdge
-        ,      Number       <$> number
-        ,      Contact      <$> name
-        ,      Coil         <$> name
-        ,      Continuation <$> name
+        ,      Number       <$> biggishNumber
+        ,      Contact      <$> shortName
+        ,      Coil         <$> shortName
+        ,      Continuation <$> shortName
         , pure Return
-        ,      Jump'        <$> name --TODO numeric label
-        ,      Name         <$> name
-        ,      Comment      <$> pure <$> name --TODO richer alphabet
-        ,      Pragma       <$> pure <$> name --TODO richer alphabet
+        ,      Jump'        <$> shortName --TODO numeric label
+        ,      Name         <$> shortName
+        ,      Comment      <$> pure <$> shortName --TODO richer alphabet
+        ,      Pragma       <$> pure <$> shortName --TODO richer alphabet
         , pure NewLine
         ,      Whitespace   <$> smallNonZero
         ]
     where
-    name = Gen.text (Range.linear 1 20) Gen.alpha
+    shortName = Gen.text (Range.linear 1 20) Gen.alpha
 --     smallNumber = Gen.int (Range.linear 0 999999)
     smallNonZero = Gen.int (Range.linear 1 999)
-    number = Gen.int (Range.linear 0 maxBound)
+    biggishNumber = Gen.int (Range.linear 0 maxBound)
 
 --------------------------------------------------------------------------------
 
@@ -633,11 +633,11 @@ wrapDeviceForTest
 wrapDeviceForTest = wrapDevice3 (pure . I) (pure . A)
 
 testFromDirectory :: FilePath -> TestName -> (FilePath -> IO TestTree) -> IO TestTree
-testFromDirectory path name mkCase = do
+testFromDirectory path testName mkCase = do
     files <- filter ((".txt"==).takeExtension) <$> listDirectory path
 --     print (here, files)
     tests <- for files $ \fn -> mkCase fn
-    return $ testGroup name tests
+    return $ testGroup testName tests
 
 fileTestsNeg :: FilePath -> IO TestTree
 fileTestsNeg path
@@ -674,7 +674,7 @@ fileTests path
     = testFromDirectory path "File tests - positive" $ \fn -> do
         return $ testCase fn $ do
             (tst, lxs'') <- loadLadderTest (path </> fn)
-            let lxs = dropWhitespace2 lxs''
+            let lxs = dropWhitespace lxs''
             let (pgms, _) = pickPragma "LANGUAGE" $ getLeadingPragmas $ dropPos lxs''
             let wrapper = case fmap (fmap (words . unpack)) pgms of
                  (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2

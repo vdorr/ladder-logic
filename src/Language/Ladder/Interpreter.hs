@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes, FlexibleInstances #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.Interpreter where

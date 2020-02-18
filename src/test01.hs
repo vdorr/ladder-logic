@@ -285,6 +285,14 @@ accSpill uses name = do
 --     :: a
 --     -> Cofree (Diagram c d l) a
 --     -> StateT (AccuEmitState a [String]) (Either String) ()
+accuPost :: (Monad m)
+    => p
+    -> Cofree (Diagram continuation device label) a
+    -> StateT
+        (AccuEmitState p [(Maybe p, ExtendedInstruction l (AI (Reg adr) k adr))])
+        m -- (Either String)
+        ()
+
 accuPost q (_ :< Node w@(_:_)) = accSpill (length w) q
 accuPost _  _                  = return () --not needed, forget it
 
@@ -487,14 +495,6 @@ niceSrc outputLine file src = do
 -- outputLine  $ setSGRCode [SetItalicized True] ++ "hello"
 -- outputLine  $ setSGRCode [Reset] ++ "hello"
 
--- test6 :: [(Maybe Text,
---                (Cofree (Diagram Void (DevType Text, [Operand Text]) Text) DgExt,
---                 Dg (Tok Text)))]
---              -> Either e0 a0
--- test6 = blarghX
-
-stripPos3 = id
-
 main :: IO ()
 main = do
     [file] <- getArgs
@@ -504,10 +504,10 @@ main = do
 --     TIO.putStrLn src
     niceSrc putStrLn file src
     print (here, "--------------------------------------------------")
-#if 0
+#if 1
     prog <- pipeline
-        (liftEither . fmap stripPos3 . runLexer)
-        (pure . labeledRungs . dropWhitespace2)
+        (liftEither . runLexer)
+        (pure . labeledRungs . dropWhitespace)
         (liftEither . runLadderParser_ (wrapDevice3 (pure . I) (pure . A)) ladderLiberal)
         (liftEither . compileForTest03)
         src
@@ -515,11 +515,11 @@ main = do
     for_ prog print
     putStrLn "---------------------------"
 #endif
-    case stripPos3 <$> runLexer src of
-        Left err -> TIO.putStrLn err
+    case runLexer src of
+        Left err -> putStrLn err
         Right lxs -> do
 
-            let lxs' = dropWhitespace2 lxs
+            let lxs' = dropWhitespace lxs
             let blocks = labeledRungs lxs'
 
             forM_ blocks $ \(lbl, lxs'') -> do
@@ -542,11 +542,11 @@ main = do
 --                         print (here, nub $ toList ast1)
 --                         test1 ast1
 --                         return ()
-#if 0
+#if 1
     ;
     prog1 <- pipeline
-        (liftEither . fmap stripPos3 . runLexer)
-        (pure . labeledRungs . dropWhitespace2)
+        (liftEither . runLexer)
+        (pure . labeledRungs . dropWhitespace)
         (liftEither . runLadderParser_ deviceThing ladderLiberal)
         ( liftEither . blarghX accEmitDev1)
         src

@@ -256,7 +256,7 @@ parseOrDie5
           )
 parseOrDie5 devP path = do
     lxs <- lexFile path
-    ast <- case parseOrDie2 devP $ dropWhitespace2 lxs of
+    ast <- case parseOrDie2 devP $ dropWhitespace lxs of
                         Left  err -> fail err
                         Right x   -> return x
     let pragmas  = fmap unpack $ fmap mconcat <$> getLeadingPragmas $ dropPos lxs
@@ -284,7 +284,7 @@ parseOrDie2 devP lxs = do
 lexFile :: FilePath -> IO [[(DgExt, Tok Text)]]
 lexFile file = do
     src <- TIO.readFile file
-    case id <$> runLexer src of
+    case runLexer src of
         Left  err -> fail $ show (here, err)
         Right x   -> return x
 
