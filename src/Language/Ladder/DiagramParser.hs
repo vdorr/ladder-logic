@@ -29,6 +29,7 @@ import Control.Monad.Except hiding (fail)
 import Control.Monad.State hiding (fail)
 
 import Language.Ladder.Zipper
+import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 
@@ -58,9 +59,6 @@ sfm = runStateT
 
 -- |Diagram parser input stream (or, say, input vortex)
 type Dg a = Zp (Zp (DgExt, a))
-
--- |Token position and extent
-type DgExt = (Int, (Int, Int))
 
 --------------------------------------------------------------------------------
 

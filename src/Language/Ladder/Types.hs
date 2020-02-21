@@ -3,6 +3,7 @@ module Language.Ladder.Types
     ( Diagram(..)
     , Operand(..)
     , DevType(..)
+    , DgExt
     , mapDgA, mapDg
     , traverseDiagram
     , checkDataDep, collectNodesAndSinks
@@ -17,6 +18,11 @@ import Data.List
 import Data.Bifunctor
 
 import Language.Ladder.Utils
+
+--------------------------------------------------------------------------------
+
+-- |Token position and extent
+type DgExt = (Int, (Int, Int))
 
 --------------------------------------------------------------------------------
 

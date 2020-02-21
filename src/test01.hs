@@ -563,14 +563,17 @@ main = do
 --     accEmitDev2 :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
 --              -> Either String [ExtendedInstruction Text (AI Int Int Int)]
 --     accEmitDev2 (x, y) = (error . show) x
-             
+
 --     accEmitDev1 :: d -> Either String [ExtendedInstruction Text (AI Int Int Int)]
     accEmitDev1 :: (DevType Text, [Operand Text])
                       -> Either String [ExtendedInstruction Text (AI (Reg Text) Int Text)]
+    accEmitDev1 (Contact_ " ", [Var a]) = pure [EISimple $ AIAnd $ M a]
+    accEmitDev1 (Contact_ "/", _args) = pure undefined
+    accEmitDev1 (Contact_ ">", _args) = pure undefined
+    accEmitDev1 (Contact_ "<", _args) = pure undefined
+    accEmitDev1 (Contact_ d, _args) = error $ show d
     accEmitDev1 (Coil_ " ", [Var a]) = pure [EISimple $ AIStBit a]
     accEmitDev1 (Coil_ "/", _args) = pure undefined
     accEmitDev1 (Coil_ "S", _args) = pure undefined
-    accEmitDev1 (Coil_ "R", _args) = pure undefined
+    accEmitDev1 (Coil_ "R", _args) = undefined
     accEmitDev1 (Coil_ d, _args) = pure undefined
-    accEmitDev1 (Contact_ " ", [Var a]) = pure [EISimple $ AIAnd $ M a]
-    accEmitDev1 (Contact_ d, _args) = pure undefined

@@ -12,8 +12,8 @@ import Control.Monad.State
 
 -- import qualified Control.Monad.Fail --FIXME
 
-import Language.Ladder.DiagramParser (DgExt)
-import Language.Ladder.LadderParser
+-- import Language.Ladder.DiagramParser (DgExt)
+-- import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Types
 -- import Language.Ladder.Analysis
