@@ -1,6 +1,8 @@
 
 module Language.Ladder.Types
     ( Diagram(..)
+    , Operand(..)
+    , DevType(..)
     , mapDgA, mapDg
     , traverseDiagram
     , checkDataDep, collectNodesAndSinks
@@ -15,6 +17,19 @@ import Data.List
 import Data.Bifunctor
 
 import Language.Ladder.Utils
+
+--------------------------------------------------------------------------------
+
+-- |Contact operand, located above or below
+data Operand address
+    = Var !address   -- ^name of memory location
+    | Lit !Int       -- ^integer literal, usually allowed only below contact
+    deriving (Show, Eq, Functor)
+
+data DevType t
+    = Coil_    !t
+    | Contact_ !t
+    deriving (Show, Eq, Functor)
 
 --------------------------------------------------------------------------------
 

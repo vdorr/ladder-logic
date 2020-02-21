@@ -18,7 +18,8 @@ import Control.Monad.State
 import Control.Monad.Except hiding (fail)
 
 import Language.Ladder.Interpreter
-import Language.Ladder.LadderParser
+-- import Language.Ladder.LadderParser
+import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 

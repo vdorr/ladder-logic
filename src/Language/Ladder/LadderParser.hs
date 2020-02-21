@@ -27,19 +27,6 @@ import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 
--- |Contact operand, located above or below
-data Operand address
-    = Var !address   -- ^name of memory location
-    | Lit !Int       -- ^integer literal, usually allowed only below contact
-    deriving (Show, Eq, Functor)
-
-data DevType t
-    = Coil_    !t
-    | Contact_ !t
-    deriving (Show, Eq, Functor)
-
---------------------------------------------------------------------------------
-
 data LdPCtx m text device = LdPCtx
     { ctxMkDev :: !(DevType text -> m (DevOpFlag, [Operand text] -> m device))
     }
