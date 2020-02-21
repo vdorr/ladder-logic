@@ -78,7 +78,12 @@ ladder
 ladderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
 ladderLiberal
     = setDir goDown
-    *> (ann <$> currentPos <*> fmap Source vline')
+    *> withPos (Source <$> vline')
+
+ladder' :: LdP d t [(Maybe t, Cofree (Diagram Void d t) DgExt)]
+ladder'
+    = some ((,) <$> optional (label <* eol) <*> ladderLiberal)
+    <* dgIsEmpty
 
 --------------------------------------------------------------------------------
 
@@ -151,7 +156,7 @@ withOperands deviceParser
 -- isTok = on (==) (fmap (const ()))
 
 node :: LdP d t (Cofree (Diagram c d t) DgExt)
-node = ann <$> currentPos <*> (Node <$> node')
+node = withPos (Node <$> node')
 
 node' :: LdP d t [Cofree (Diagram c d t) DgExt]
 node'
