@@ -21,12 +21,28 @@ blargh
             )
 blargh ast@(q0 :< _)
     = runStateT
-        (traverseDiagram (evalDev) evalPost q0 ast)
+        (traverseDiagram (evalElem) evalPost q0 ast)
         () --(AccuEmitState q0 sinks nodes [] [])
     where
     (nodes, sinks) = collectNodesAndSinks ast
 
-    evalDev = undefined
+    evalElem = undefined
     evalPost = undefined
 
 
+    go (Node   []      ) = do
+        undefined
+    go (Node   w       ) = do
+        undefined
+    go  Sink             = do
+        undefined
+    go (Source _a       ) = do
+        undefined
+    go  End              = do
+        undefined
+    go (Device device _a) = do
+        undefined
+    go (Jump   label  ) = do
+        undefined
+    go (Cont   _continuation _a) = undefined
+    go (Conn   _continuation) = undefined

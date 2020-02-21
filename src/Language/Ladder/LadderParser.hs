@@ -111,10 +111,16 @@ contact' = eat >>= \case    Contact f -> return $ Contact_ f
                             _         -> failure "expected contact"
 
 jump :: LdP d t (Cofree (Diagram c d t) DgExt)
-jump = do
-    p <- currentPos
-    eat >>= \case   Jump' lbl -> return $ p :< Jump lbl
-                    _         -> failure "expected jump"
+jump = withPos do eat >>= \case Jump' lbl -> return $ Jump lbl
+                                _         -> failure "expected jump"
+
+label :: LdP d t t
+label = eat >>= \case Label lbl -> return lbl
+                      _         -> failure "expected label"
+
+withPos :: LdP d t (f (Cofree f DgExt)) -> LdP d t (Cofree f DgExt)
+-- withPos :: _
+withPos p = (:<) <$> currentPos <*> p
 
 --------------------------------------------------------------------------------
 
@@ -190,13 +196,19 @@ hline2 = do
 
 
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
-device = do
-    p    <- currentPos
+-- device = do
+--     p    <- currentPos
+--     dev  <- withOperands do
+--                 dev <- coil' <|> contact'
+--                 lookupDeviceParser dev
+--     dev' <- runUsrDevParser dev
+--     (p :<) <$> (Device dev' <$> hline')
+device = withPos do
     dev  <- withOperands do
                 dev <- coil' <|> contact'
                 lookupDeviceParser dev
     dev' <- runUsrDevParser dev
-    (p :<) <$> (Device dev' <$> hline')
+    Device dev' <$> hline'
 
     where
 

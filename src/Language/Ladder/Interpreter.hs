@@ -419,9 +419,9 @@ stackEmit emitDevice q p x = go x *> pure p
         pop
         lift (emitDevice dev) >>= emit
         push p
-    go (Jump   label  ) = do
+    go (Jump   lbl  ) = do
         bringToTop q q
-        emit [ EIJump label ]
+        emit [ EIJump lbl ]
         pop
     go (Cont   _continuation _a) = undefined
     go (Conn   _continuation) = undefined

@@ -109,6 +109,9 @@ getState = gets psUser
 getStream :: SFM (DgPState st tok) (Dg tok)
 getStream = gets psStr
 
+-- getCurrentLine :: SFM (DgPState st tok) [tok]
+-- getCurrentLine = toList <$> getStream
+
 lastPos :: SFM (DgPState st tok) DgExt
 lastPos = psLastBite <$> get >>= maybe (failure "lastPos: nothing parsed") pure
 
