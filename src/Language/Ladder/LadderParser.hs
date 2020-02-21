@@ -100,9 +100,9 @@ name = eat >>= \case    Name lbl -> return lbl
                         _        -> failure "expected name"
 
 hline :: LdP d t Int
-hline = eat >>= \case   HLine _ vl -> return vl
-                        _         -> failure "expected horizontal line"
-    
+hline = eat >>= \case HLine _ vl -> return vl
+                      _         -> failure "expected horizontal line"
+
 vline :: LdP d t ()
 vline = eat >>= \case   VLine -> return ()
                         _     -> failure "expected vertical line"
@@ -169,7 +169,7 @@ node'
     *> ((++) <$> (toList <$> (optional $ keepOrigin $ goRight'' *> hline'))
              <*> (toList <$>
                 ((keepOrigin (const Nothing <$> (goDown'' *> end2)))
-                    <|> (optional $ id $ goDown'' *> vline'))))
+                    <|> (optional $ goDown'' *> vline'))))
 
 --FIXME with 'node' may end only left rail, vline stemming from node must lead to another node
 vline' :: LdP d t (Cofree (Diagram c d t) DgExt)
