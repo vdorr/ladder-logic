@@ -56,6 +56,16 @@ getSignals :: Eq addr => [addr] -> TestVect addr -> [[V addr]] -> [[V addr]]
 getSignals sg vect trace = 
     transpose $ fmap (\s -> getSignal1 s vect trace) sg
 
+
+memSlotsToTestVector :: Int -> [(CellType, addr)] -> TestVect addr
+memSlotsToTestVector n m = (1, fmap g m) : [(n - 1, [])]
+-- [(Int, [(addr, (V addr))])]
+    where
+    g (t, addr) = (addr, f t)
+    f Bit     = X False
+    f Word    = I 0
+    f TwoBits = undefined --TODO
+
 --------------------------------------------------------------------------------
 
 emitDevice03
@@ -101,16 +111,6 @@ runLadderTest2 verbose test ast = do
         for_ prog print
         putStrLn "---------------------------"
     runLadderTestX verbose test prog
-
-
-memSlotsToTestVector :: Int -> [(CellType, addr)] -> TestVect addr
-memSlotsToTestVector n m = (1, fmap g m) : [(n - 1, [])]
--- [(Int, [(addr, (V addr))])]
-    where
-    g (t, addr) = (addr, f t)
-    f Bit     = X False
-    f Word    = I 0
-    f TwoBits = undefined --TODO
 
 
 runLadderTest22
@@ -188,15 +188,6 @@ runLadderTest221 verbose num ast = do
 
     addressesOnly s = [(t, a)|((t, Var a)) <- s]
 
-
--- runLadderTestXx
---     :: Bool
---     -> [ExtendedInstruction Int (V String) String]
---     -> [String]
---     -> [(Int, [(String, V String)])]
---     -> IO Bool
--- runLadderTestXx verbose prog signalNames testVect = do
---     undefined
 
 runLadderTestX
     :: Bool
