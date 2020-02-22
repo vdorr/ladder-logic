@@ -11,11 +11,11 @@ import qualified Data.Text as T
 import Control.Monad
 -- import Control.Applicative
 import Data.Traversable
-import Data.Semigroup
+-- import Data.Semigroup
 import Data.Void
 import Control.Monad.Except
 import Data.Foldable
--- import Data.Bifunctor
+import Data.Bifunctor
 import Control.Monad.Writer.Strict
 import Data.Functor.Identity
 
@@ -268,15 +268,25 @@ parseOrDie2
     -> [[(DgExt, Tok Text)]]
     -> m [(Maybe String
         , Cofree (Diagram Void dev String) DgExt)]
+-- parseOrDie2 devP lxs = do
+--     let blocks = labeledRungs lxs
+--     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
+-- 
+--     where
+--     -- |assuming comments and pragmas were filtered out
+--     parseOrDie lxs' = do
+--         case runLadderParser_ devP ladder lxs' of
+--             Right ast -> return $ ldUnpack1 ast
+--             Left  err -> throwError $ show (here, err)
 parseOrDie2 devP lxs = do
-    let blocks = labeledRungs lxs
-    for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
+--     (fmap (fmap (first (fmap unpack)))) <$> parseOrDie lxs
+    (fmap ((first (fmap unpack)))) <$> parseOrDie lxs
 
     where
     -- |assuming comments and pragmas were filtered out
     parseOrDie lxs' = do
-        case runLadderParser_ devP ladder lxs' of
-            Right ast -> return $ ldUnpack1 ast
+        case runLadderParser_ devP ladder' lxs' of
+            Right ast -> return $ fmap (fmap ldUnpack1) ast
             Left  err -> throwError $ show (here, err)
 
 --------------------------------------------------------------------------------
@@ -346,5 +356,5 @@ loadLadderTest file = do
 --         where
 --         (depend, indep) = partition (flip dep a) as
 
-sameLine :: Cofree (Diagram c d s) DgExt -> Bool
-sameLine n@((ln, _) :< _) = getAll $ foldMap (All.(ln==).fst) n
+-- sameLine :: Cofree (Diagram c d s) DgExt -> Bool
+-- sameLine n@((ln, _) :< _) = getAll $ foldMap (All.(ln==).fst) n

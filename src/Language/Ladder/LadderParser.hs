@@ -69,7 +69,7 @@ ladderLiberal
 
 ladder' :: LdP d t [(Maybe t, Cofree (Diagram Void d t) DgExt)]
 ladder'
-    = some ((,) <$> optional (label <* eol) <*> ladderLiberal)
+    = (some ((,) <$> optional (label) <*> ladderLiberal))
     <* dgIsEmpty
 
 --------------------------------------------------------------------------------
@@ -160,8 +160,12 @@ node'
 
 --FIXME with 'node' may end only left rail, vline stemming from node must lead to another node
 vline' :: LdP d t (Cofree (Diagram c d t) DgExt)
-vline' = many vline *> (end2 <|> node)
+-- vline' = many vline *> (end2 <|> node)
+vline' = many vline *> (node <|> end0)
 --TODO for non-std ladders - check if crossing label and terminate at first `Node` returning `Sink`
+
+end0 :: LdP d t (Cofree (Diagram c d t) DgExt)
+end0 = ((:< End) <$> colUnder <$> lastPos)
 
 end2 :: LdP d t (Cofree (Diagram c d t) DgExt)
 end2 = end *> ((:< End) <$> colUnder <$> lastPos)

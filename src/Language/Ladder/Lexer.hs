@@ -9,7 +9,6 @@ module Language.Ladder.Lexer
 --     , runLexer
     , getLeadingPragmas
 --     , dropPos
-
     , renderLexeme
 --     , dropPos2
 --     , lx

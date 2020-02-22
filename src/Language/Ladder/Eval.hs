@@ -9,6 +9,12 @@ import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 
+data EvResult st t = NeedJump st t | Done st | Failed
+
+data EvMem t = EvMem
+    { stBits' :: [(t, Bool)]
+    , stInts' ::  [(t, Int)]
+    }
 
 data EvSt t = EvSt
     { stBits :: [(t, Bool)]
@@ -24,10 +30,10 @@ data EvSt t = EvSt
 --             , EvSt
 --             )
 blargh ast@(q0 :< _)
-    = (runStateT
+    = runStateT (runStateT
         (traverseDiagram (evalElem) evalPost True ast)
         (EvSt [] [] []) --(AccuEmitState q0 sinks nodes [] [])
-        ) 
+        ) (EvMem [] [])
     where
 --     (nodes, sinks) = collectNodesAndSinks ast
 
