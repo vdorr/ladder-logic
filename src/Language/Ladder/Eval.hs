@@ -12,14 +12,16 @@ import Language.Ladder.Types
 data EvResult st t = NeedJump st t | Done st | Failed
 
 data EvMem t = EvMem
-    { stBits' :: [(t, Bool)]
-    , stInts' ::  [(t, Int)]
+    { stBits :: [(t, Bool)]
+    , stInts ::  [(t, Int)]
     }
 
 data EvSt t = EvSt
-    { stBits :: [(t, Bool)]
-    , stInts ::  [(t, Int)]
-    , stTmp ::  [(DgExt, Bool)]
+    {
+--         stBits :: [(t, Bool)]
+--     , stInts ::  [(t, Int)]
+--     , 
+    stTmp ::  [(DgExt, Bool)]
     }
 
 -- blargh
@@ -29,10 +31,10 @@ data EvSt t = EvSt
 --     -> IO ([p]
 --             , EvSt
 --             )
-blargh ast@(q0 :< _)
+blargh ast@(_q0 :< _)
     = runStateT (runStateT
         (traverseDiagram (evalElem) evalPost True ast)
-        (EvSt [] [] []) --(AccuEmitState q0 sinks nodes [] [])
+        (EvSt []) --(AccuEmitState q0 sinks nodes [] [])
         ) (EvMem [] [])
     where
 --     (nodes, sinks) = collectNodesAndSinks ast
@@ -66,7 +68,7 @@ blargh ast@(q0 :< _)
 
         accEmitDev1 (Contact_ " ", [Var a]) = (q &&) <$> getBit a
 --         accEmitDev1 (Contact_ "/", [Var a]) = pure undefined
---         accEmitDev1 (Contact_ ">", _args) = undefined
+        accEmitDev1 (Contact_ ">", [a, b]) = (>) <$> getInt a <*> getInt b
 --         accEmitDev1 (Contact_ "<", _args) = undefined
 --         accEmitDev1 (Contact_ d, _args) = error $ show d
         accEmitDev1 (Coil_ " ", [Var a]) = setBit q a
@@ -74,28 +76,30 @@ blargh ast@(q0 :< _)
 --         accEmitDev1 (Coil_ "S", [Var a]) = pure undefined
 --         accEmitDev1 (Coil_ "R", [Var a]) = undefined
         accEmitDev1 (Coil_ _d, _args) = undefined
+        accEmitDev1 _ = undefined
 
-        getBit n = getTag stBits n
+        getBit n = getMem stBits n
 --         getBit n = do
 --             m <- gets stBits
 --             case lookup n m of
 --                  Just vv -> return vv
 --                  _ -> undefined
-        setBit n v = setTag stBits (\vv st -> st { stBits = vv}) n v >> return v
-        getInt n = getTag stInts n
+        setBit n v = setMem stBits (\vv st -> st { stBits = vv}) n v >> return v
+        getInt (Var n) = getMem stInts n
+        getInt (Lit i) = pure i
 --         setInt n v = setTag stInts (undefined) n v
 
 --         getTmp pp = getTag stTmp pp
         getTmp' d pp = getTag' stTmp d pp
         setTmp pp v = modify $ \st -> st { stTmp = (pp, v) : stTmp st}
 
-        setTag f g n v' = do
+        setMem f g n v' = lift do
             m <- gets f
             case break ((n==).fst) m of
                  (ys, _xx:xs) -> modify $ g (ys ++ [(n, v')] ++ xs)
                  (xs, []) -> modify $ g ((n, v') : xs)
 
-        getTag f n = do
+        getMem f n = lift do
             m <- gets f
             case lookup n m of
                  Just vv -> return vv
