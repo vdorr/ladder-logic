@@ -3,13 +3,16 @@
 module Language.Ladder.Eval where
 
 import Control.Monad.State
+import Control.Monad.Except
+import Data.Foldable
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 
-data EvResult st t = NeedJump st t | Done st | Failed
+-- data EvResult st t = NeedJump st t | Done st | Failed String
+data EvResult t = NeedJump t --  Failed String
 
 data EvMem t = EvMem
     { stBits :: [(t, Bool)]
@@ -24,6 +27,25 @@ data EvSt t = EvSt
     stTmp ::  [(DgExt, Bool)]
     }
 
+eval :: Eq a0 => [(Maybe lbl
+            , Cofree (Diagram continuation (DevType String, [Operand a0]) t) DgExt)]
+                      -> EvMem a0
+                      -> EvMem a0
+eval blocks st0 =
+    (snd$flip runState st0 do
+        for_ blocks \(_ , ast) -> do
+            r <- blargh' ast
+            case r of
+                 Left (NeedJump _) -> undefined --TODO
+                 Right _ -> return ()
+    ) -- :: EvMem String
+--     undefined
+
+blargh ast
+    = runStateT
+        (blargh' ast)
+        (EvMem [] [])
+
 -- blargh
 --     :: (Ord p, Show p, Show l --     , Monad m
 --     )
@@ -31,15 +53,15 @@ data EvSt t = EvSt
 --     -> IO ([p]
 --             , EvSt
 --             )
-blargh ast@(_q0 :< _)
-    = runStateT (runStateT
-        (traverseDiagram (evalElem) evalPost True ast)
-        (EvSt []) --(AccuEmitState q0 sinks nodes [] [])
-        ) (EvMem [] [])
+blargh' ast
+    = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast) (EvSt []))
+--     = runStateT
+--         (runExceptT (runStateT (traverseDiagram evalElem evalPost True ast) (EvSt [])))
+--         (EvMem [] [])
     where
 --     (nodes, sinks) = collectNodesAndSinks ast
 
-    evalPost _ = undefined
+    evalPost _ _ = return ()
 
     evalElem (q::Bool) p x = go x
         where
@@ -48,7 +70,7 @@ blargh ast@(_q0 :< _)
 --             liftIO $ print (here)
 --             return undefined
         go (Node   _w       ) = do
-            liftIO $ print (here)
+--             liftIO $ print (here)
             q' <- getTmp' False p
             return $ q || q' 
         go  Sink             = do
@@ -60,8 +82,8 @@ blargh ast@(_q0 :< _)
             return q
         go (Device device _a) = do
             accEmitDev1 device
-        go (Jump   _label  ) = do
-            undefined --TODO
+        go (Jump   lbl  ) = do
+            throwError $ NeedJump lbl
         go (Cont   _continuation _a) = undefined
         go (Conn   _continuation) = undefined
 
@@ -71,39 +93,29 @@ blargh ast@(_q0 :< _)
         accEmitDev1 (Contact_ ">", [a, b]) = (>) <$> getInt a <*> getInt b
 --         accEmitDev1 (Contact_ "<", _args) = undefined
 --         accEmitDev1 (Contact_ d, _args) = error $ show d
-        accEmitDev1 (Coil_ " ", [Var a]) = setBit q a
+        accEmitDev1 (Coil_ " ", [Var a]) = setBit a q
 --         accEmitDev1 (Coil_ "/", [Var a]) = pure undefined
 --         accEmitDev1 (Coil_ "S", [Var a]) = pure undefined
 --         accEmitDev1 (Coil_ "R", [Var a]) = undefined
         accEmitDev1 (Coil_ _d, _args) = undefined
         accEmitDev1 _ = undefined
 
-        getBit n = getMem stBits n
---         getBit n = do
---             m <- gets stBits
---             case lookup n m of
---                  Just vv -> return vv
---                  _ -> undefined
+        getBit n = getMem stBits undefined n
         setBit n v = setMem stBits (\vv st -> st { stBits = vv}) n v >> return v
-        getInt (Var n) = getMem stInts n
+        getInt (Var n) = getMem stInts 0 n
         getInt (Lit i) = pure i
 --         setInt n v = setTag stInts (undefined) n v
 
---         getTmp pp = getTag stTmp pp
         getTmp' d pp = getTag' stTmp d pp
         setTmp pp v = modify $ \st -> st { stTmp = (pp, v) : stTmp st}
 
-        setMem f g n v' = lift do
+        setMem f g (n) v' = lift do
             m <- gets f
             case break ((n==).fst) m of
                  (ys, _xx:xs) -> modify $ g (ys ++ [(n, v')] ++ xs)
                  (xs, []) -> modify $ g ((n, v') : xs)
 
-        getMem f n = lift do
-            m <- gets f
-            case lookup n m of
-                 Just vv -> return vv
-                 _ -> undefined
+        getMem f d n = lift do getTag' f d n
 
         getTag' f d n = do
             m <- gets f

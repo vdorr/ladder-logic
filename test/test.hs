@@ -681,13 +681,16 @@ fileTests path
                  _ -> wrapDeviceSimple
 --             print (here, fn, wrapper, pgms)
 
-            let blocks = labeledRungs lxs
+--             let blocks = labeledRungs lxs
             case tst of
                 Nothing -> do
-                    for_ blocks $ \(_, lxs') -> do
-                        case runLadderParser wrapper ladder lxs' of
-                            Right _ -> return ()
-                            Left err -> fail err
+                    case runLadderParser wrapper ladder' lxs of
+                        Right _ -> return ()
+                        Left err -> fail err
+--                     for_ blocks $ \(_, lxs') -> do
+--                         case runLadderParser wrapper ladder lxs' of
+--                             Right _ -> return ()
+--                             Left err -> fail err
                 Just t -> do
                     ast <- parseForTestOrDie lxs
                     passed <- runLadderTest2 False t ast
