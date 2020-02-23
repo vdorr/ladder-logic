@@ -116,13 +116,21 @@ testVectSignals = nub . foldMap (fmap fst . snd)
 
 --------------------------------------------------------------------------------
 
+evalTestVect
+    :: (Eq addr, Show addr)
+    => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
+    -> [addr] -- ^watched memory variables
+    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+    -> Either (Memory addr, String) [[V addr]]
+evalTestVect = undefined
+
 evalTestVect'''
     :: (Eq addr, Show addr)
     => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
     -> [addr] -- ^watched memory variables
     -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
     -> Either (Memory addr, String) [[V addr]]
-evalTestVect''' prog' watch vect
+evalTestVect''' prog watch vect
 
     = case foldlM go ([], p) vect' of
         Left  (_st, err) -> error $ show (here, err)
@@ -131,7 +139,7 @@ evalTestVect''' prog' watch vect
 
     vect' = flattenTestVect vect
 
-    p = makeItpSt3 [] [(1, 0, prog')]
+    p = makeItpSt3 [] [(1, 0, prog)]
 
     go (tr, (x, y, mem)) stim = do
         st'@(_, _, mem'') <- run (x, y, mem')

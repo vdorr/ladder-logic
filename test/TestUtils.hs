@@ -298,17 +298,10 @@ pickPragma key = partition f
 
 loadLadderTest :: FilePath -> IO (Maybe LadderTest, [[(DgExt, Tok Text)]])
 loadLadderTest file = do
-    x <- lexFile file
+    x            <- lexFile file
     let (pgms, _) = pickPragma "T01" $ getLeadingPragmas $ dropPos x
---     print (here, file, pgms)
---     let lang = filter (T.words ) pgms
---     "LANGUAGE"
-
---     let pgma = fmap (filter (/='\\') . unpack) $ fmap mconcat $ getPragma $ dropPos x
---     return (pgma >>= readMaybe, x)
-    let pgms' = fmap (readMaybe . filter (/='\\') . unpack . T.concat) pgms
-    let t = [ p | Just p : _ <- for pgms' pure ]
---     print (here, file,        pgms')
+    let pgms'     = fmap (readMaybe . filter (/='\\') . unpack . T.concat) pgms
+    let t         = [ p | Just p : _ <- for pgms' pure ]
     return (t, x)
 
 --------------------------------------------------------------------------------
