@@ -27,7 +27,7 @@ import Language.Ladder.Interpreter
 import Language.Ladder.Simple
 import Language.Ladder.Types
 
-import Tooling
+import Language.Ladder.Tooling
 
 --------------------------------------------------------------------------------
 

@@ -20,5 +20,6 @@ main = do
         : "-XQuantifiedConstraints"
         : "-XBlockArguments"
         : "-XOverloadedStrings"
+        : "-XViewPatterns"
 --         : "-package ladder-logic"
         : sourceFiles

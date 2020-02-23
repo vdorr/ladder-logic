@@ -1,6 +1,6 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-module Tooling where
+module Language.Ladder.Tooling where
 
 import Data.Semigroup
 import Data.List
