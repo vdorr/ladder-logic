@@ -116,14 +116,6 @@ testVectSignals = nub . foldMap (fmap fst . snd)
 
 --------------------------------------------------------------------------------
 
-evalTestVect
-    :: (Eq addr, Show addr)
-    => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
-    -> [addr] -- ^watched memory variables
-    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
-    -> Either (Memory addr, String) [[V addr]]
-evalTestVect = undefined
-
 evalTestVect'''
     :: (Eq addr, Show addr)
     => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
