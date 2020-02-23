@@ -75,32 +75,32 @@ ladder'
 --------------------------------------------------------------------------------
 
 number :: LdP d t (Operand t)
-number = eat >>= \case  Number n -> return $ Lit n
-                        _        -> failure "expected number"
+number = eat >>= \case Number n -> return $ Lit n
+                       _        -> failure "expected number"
 
 cross :: LdP d t ()
-cross = eat >>= \case   Cross -> return ()
-                        _     -> failure "expected '+'"
+cross = eat >>= \case Cross -> return ()
+                      _     -> failure "expected '+'"
 
 name :: LdP d t t
-name = eat >>= \case    Name lbl -> return lbl
-                        _        -> failure "expected name"
+name = eat >>= \case Name lbl -> return lbl
+                     _        -> failure "expected name"
 
 hline :: LdP d t Int
 hline = eat >>= \case HLine _ vl -> return vl
-                      _         -> failure "expected horizontal line"
+                      _          -> failure "expected horizontal line"
 
 vline :: LdP d t ()
-vline = eat >>= \case   VLine -> return ()
-                        _     -> failure "expected vertical line"
+vline = eat >>= \case VLine -> return ()
+                      _     -> failure "expected vertical line"
 
 coil' :: LdP d t (DevType t)
-coil' = eat >>= \case   Coil f -> return $ Coil_ f
-                        _      -> failure "expected coil"
+coil' = eat >>= \case Coil f -> return $ Coil_ f
+                      _      -> failure "expected coil"
 
 contact' :: LdP d t (DevType t)
-contact' = eat >>= \case    Contact f -> return $ Contact_ f
-                            _         -> failure "expected contact"
+contact' = eat >>= \case Contact f -> return $ Contact_ f
+                         _         -> failure "expected contact"
 
 jump :: LdP d t (Cofree (Diagram c d t) DgExt)
 jump = withPos do eat >>= \case Jump' lbl -> return $ Jump lbl

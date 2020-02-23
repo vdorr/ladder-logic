@@ -5,6 +5,8 @@ module Language.Ladder.Eval where
 import Control.Monad.State
 import Control.Monad.Except
 import Data.Foldable
+import Data.Char (toUpper)
+-- import Data.String --IsString
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
@@ -16,18 +18,18 @@ data EvResult t = NeedJump t --  Failed String
 
 data EvMem t = EvMem
     { stBits :: [(t, Bool)]
-    , stInts ::  [(t, Int)]
+    , stInts :: [(t, Int)]
     }
 
 data EvSt t = EvSt
-    {
---         stBits :: [(t, Bool)]
---     , stInts ::  [(t, Int)]
---     , 
-    stTmp ::  [(DgExt, Bool)]
+    { stTmp ::  [(DgExt, Bool)]
     }
 
-eval :: Eq a0 => [(Maybe lbl
+-- eval :: (IsString d, Eq a0) => [(Maybe lbl
+--             , Cofree (Diagram continuation (DevType d, [Operand a0]) t) DgExt)]
+--                       -> EvMem a0
+--                       -> EvMem a0
+eval :: (Eq a0) => [(Maybe lbl
             , Cofree (Diagram continuation (DevType String, [Operand a0]) t) DgExt)]
                       -> EvMem a0
                       -> EvMem a0
@@ -38,13 +40,9 @@ eval blocks st0 =
             case r of
                  Left (NeedJump _) -> undefined --TODO
                  Right _ -> return ()
-    ) -- :: EvMem String
---     undefined
+    )
 
-blargh ast
-    = runStateT
-        (blargh' ast)
-        (EvMem [] [])
+blargh ast = runStateT (blargh' ast) (EvMem [] [])
 
 -- blargh
 --     :: (Ord p, Show p, Show l --     , Monad m
@@ -55,38 +53,23 @@ blargh ast
 --             )
 blargh' ast
     = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast) (EvSt []))
---     = runStateT
---         (runExceptT (runStateT (traverseDiagram evalElem evalPost True ast) (EvSt [])))
---         (EvMem [] [])
     where
---     (nodes, sinks) = collectNodesAndSinks ast
 
     evalPost _ _ = return ()
 
     evalElem (q::Bool) p x = go x
         where
 
---         go (Node   []      ) = do
---             liftIO $ print (here)
---             return undefined
-        go (Node   _w       ) = do
---             liftIO $ print (here)
-            q' <- getTmp' False p
-            return $ q || q' 
-        go  Sink             = do
-            setTmp p q
-            return q
-        go (Source _a       ) = do
-            return True
-        go  End              = do
-            return q
-        go (Device device _a) = do
-            accEmitDev1 device
-        go (Jump   lbl  ) = do
-            throwError $ NeedJump lbl
-        go (Cont   _continuation _a) = undefined
-        go (Conn   _continuation) = undefined
+        go (Node   _w  ) = (q ||) <$> getTmp False p
+        go  Sink         = setTmp p q *> pure q
+        go (Source _a  ) = pure True
+        go  End          = pure q
+        go (Device d _a) = evalDev d
+        go (Jump   l   ) = throwError (NeedJump l)
+        go (Cont  _c _a) = undefined
+        go (Conn  _c   ) = undefined
 
+        evalDev (d, a) = accEmitDev1 (fmap toUpper <$> d, a)
 
         accEmitDev1 (Contact_ " ", [Var a]) = (q &&) <$> getBit a
 --         accEmitDev1 (Contact_ "/", [Var a]) = pure undefined
@@ -106,7 +89,7 @@ blargh' ast
         getInt (Lit i) = pure i
 --         setInt n v = setTag stInts (undefined) n v
 
-        getTmp' d pp = getTag' stTmp d pp
+        getTmp d pp = getTag' stTmp d pp
         setTmp pp v = modify $ \st -> st { stTmp = (pp, v) : stTmp st}
 
         setMem f g (n) v' = lift do
@@ -117,11 +100,12 @@ blargh' ast
 
         getMem f d n = lift do getTag' f d n
 
-        getTag' f d n = do
-            m <- gets f
-            case lookup n m of
-                 Just vv -> return vv
-                 _ -> return d
+        getTag' f d n = gets (maybe d id . lookup n . f)
+--         getTag' f d n = do
+--             m <- gets f
+--             case lookup n m of
+--                  Just vv -> return vv
+--                  _ -> return d
 
 -- -- blargh
 -- --     :: (Ord p, Show p, Show l --     , Monad m

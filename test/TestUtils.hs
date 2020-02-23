@@ -201,8 +201,6 @@ runLadderTestX verbose test@T01{} prog = do
 --     let displaySigs = allSigs -- or (watch test)
     when verbose $ print (here, allSigs)
 
---     runLadderTestXx verbose prog allSigs (testVect test)
-
     let xxy = evalTestVect''' prog allSigs (testVect test)
 
     when verbose $ print (here, xxy)

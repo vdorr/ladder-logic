@@ -12,6 +12,7 @@ module Language.Ladder.Lexer
     , renderLexeme
 --     , dropPos2
 --     , lx
+, runLexerS'
     )
     where
 
@@ -274,10 +275,14 @@ runLexer'' :: Text -> Either String [ [(SrcRange, Tok Text)] ]
 runLexer'' s
     = ((split ((NewLine==).snd)) . fmap (fmap (fmap pack)) . lxx) <$> (lx $ unpack s)
 
-    where
-        split p xs = case break p xs of
-                          (a, []) -> [a]
-                          (a, b : rest) -> (a ++ [b]) : split p rest
+runLexerS' :: String -> Either String [ [(SrcRange, Tok String)] ]
+runLexerS' s
+    = ((split ((NewLine==).snd)) . fmap (fmap (fmap id)) . lxx) <$> (lx s)
+
+split :: (a -> Bool) -> [a] -> [[a]]
+split p xs = case break p xs of
+                    (a, []) -> [a]
+                    (a, b : rest) -> (a ++ [b]) : split p rest
 
 --------------------------------------------------------------------------------
 

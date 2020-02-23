@@ -1,6 +1,19 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
-module Language.Ladder.Interpreter where
+module Language.Ladder.Interpreter
+    ( CellType(..)
+    , Instruction(..)
+    , ExtendedInstruction(..)
+    , DeviceImpl
+    , DeviceDescription(..)
+    , resolveLabels
+    , generateStk2'
+    , devices
+    , Memory
+    , V(..)
+    , makeItpSt3
+    , run
+    ) where
 
 import Data.Foldable
 import Data.Traversable
@@ -10,13 +23,8 @@ import Data.String
 import Data.Void
 import Control.Monad.State
 
--- import qualified Control.Monad.Fail --FIXME
-
--- import Language.Ladder.DiagramParser (DgExt)
--- import Language.Ladder.LadderParser
 import Language.Ladder.Utils
 import Language.Ladder.Types
--- import Language.Ladder.Analysis
 
 --------------------------------------------------------------------------------
 
@@ -248,27 +256,27 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
 
     nextLabel lbl = f (drop lbl prog)
 
-execute' :: (Eq address, Show address)
-         => (ItpSt address
-            -> si
-            -> Either
-                (ItpSt address, String)
-                (ItpSt address))
-        -> Memory address
-        -> [ExtendedInstruction Int si]
-        -> Either (ItpSt address, String) (Memory address)
-execute' go mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
-    where
-
-    f []               st = return st
-    f (EIReturn   : _) st = return st
-    f (EIJump lbl : p) (w:ws, os, m)
-        | w               = nextLabel lbl ([], [], m) --XXX beware! jump clears stacks!
-        | otherwise       = f p (ws, os, m)
-    f (EIJump _ : _) _    = error here --stack underflow FIXME proper fail
-    f (EISimple i : p) st = go st i >>= f p
-
-    nextLabel lbl = f (drop lbl prog)
+-- execute' :: (Eq address, Show address)
+--          => (ItpSt address
+--             -> si
+--             -> Either
+--                 (ItpSt address, String)
+--                 (ItpSt address))
+--         -> Memory address
+--         -> [ExtendedInstruction Int si]
+--         -> Either (ItpSt address, String) (Memory address)
+-- execute' go mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
+--     where
+-- 
+--     f []               st = return st
+--     f (EIReturn   : _) st = return st
+--     f (EIJump lbl : p) (w:ws, os, m)
+--         | w               = nextLabel lbl ([], [], m) --XXX beware! jump clears stacks!
+--         | otherwise       = f p (ws, os, m)
+--     f (EIJump _ : _) _    = error here --stack underflow FIXME proper fail
+--     f (EISimple i : p) st = go st i >>= f p
+-- 
+--     nextLabel lbl = f (drop lbl prog)
 
 --------------------------------------------------------------------------------
 

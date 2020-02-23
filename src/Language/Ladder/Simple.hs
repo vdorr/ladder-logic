@@ -15,6 +15,8 @@ import Language.Ladder.Interpreter
 import Language.Ladder.Utils
 import Language.Ladder.Types
 
+import Language.Ladder.Eval
+
 --------------------------------------------------------------------------------
 
 -- |Execute diagram parser and return its result along with final stream state
@@ -32,6 +34,21 @@ runLadderParser_
     -> [[(DgExt, Tok t)]] -- ^input tokens
     -> Either String a -- ^parser result
 runLadderParser_ pd p s = fst <$> runParser pd p s
+
+--------------------------------------------------------------------------------
+
+parseLadder1
+    :: String
+    -> Either String
+        [(Maybe String, Cofree (Diagram Void (DevType String, [Operand String]) String) DgExt)]
+parseLadder1 s = do
+    ast <- dropWhitespace <$> runLexerS' s
+    runLadderParser_ wrapDeviceSimple ladder' ast
+
+eval1 :: [(Maybe String, Cofree (Diagram Void (DevType String, [Operand String]) String) DgExt)]
+    -> EvMem String
+    -> EvMem String
+eval1 = Language.Ladder.Eval.eval
 
 --------------------------------------------------------------------------------
 
