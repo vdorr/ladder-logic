@@ -13,6 +13,8 @@ module Language.Ladder.Interpreter
     , V(..)
     , makeItpSt3
     , run
+    , stackEmit
+    , StackEmitState(..)
     ) where
 
 import Data.Foldable
