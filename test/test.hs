@@ -26,7 +26,7 @@ import GHC.Exts hiding (toList)
 import System.Directory
 import System.FilePath
 import qualified Data.Text.IO as TIO
--- import qualified Data.Text as T
+import qualified Data.Text as T
 
 import Language.Ladder.Zipper
 import Language.Ladder.Lexer
@@ -533,11 +533,16 @@ boxTests = testGroup "Box parser"
 
 box01, box02 :: Text
 
-box01 =
-    [text|
-    +-+
-    | |
-    +-+                        |]
+box01 = T.unlines
+        [ "+-+"
+        , "| |"
+        , "+-+"
+        ]
+
+--     [text|
+--     +-+
+--     | |
+--     +-+                        |]
 
 -- box01b =
 --     [text|

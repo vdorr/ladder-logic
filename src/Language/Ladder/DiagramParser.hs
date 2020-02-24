@@ -6,7 +6,10 @@ module Language.Ladder.DiagramParser
     , DgExt, Dg, SFM
     , gap, end, eat, eol
     , dgIsEmpty --FIXME better name
-    , setDir, setPos, currentPos, lastPos, keepOrigin
+    , setDir
+    , setPos
+    , bridge
+    , currentPos, lastPos, keepOrigin
     , goRight, goDown, goUp, goLeft
     , goRight'', goDown'', goUp'', goLeft''
     , colRight, colUnder --XXX remove
@@ -137,6 +140,12 @@ setPosOrBlur (ln, (co, _)) = do
     put case zp' of
         Just zp'' -> DgPSt b zp'' ps True  st
         Nothing   -> DgPSt b zp   ps False st
+
+bridge :: Int -> SFM (DgPState st tok) ()
+bridge 0 = pure ()
+bridge vl = do
+    (ln, (co, _)) <- currentPos
+    setPos (ln, (co + vl, ()))--TODO TEST move to same location is noop
 
 --------------------------------------------------------------------------------
 

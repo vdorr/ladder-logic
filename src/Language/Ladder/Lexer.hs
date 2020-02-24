@@ -5,7 +5,7 @@ module Language.Ladder.Lexer
     , dropWhitespace
 --     , stripPos3
     , runLexer
-    , labeledRungs
+--     , labeledRungs
 --     , runLexer
     , getLeadingPragmas
 --     , dropPos
@@ -265,19 +265,18 @@ lxx = f
 --     = bimap (T.pack . errorBundlePretty) stripPos3
 --     . parse lexerLinesP "(file)"
 
-runLexer :: Text -> Either String [ [(SrcRange, Tok Text)] ]
-runLexer = runLexer''
+-- runLexer :: Text -> Either String [ [(SrcRange, Tok Text)] ]
+-- runLexer = runLexer''
 --     = bimap errorBundlePretty stripPos3
 --     . parse lexerLinesP "(file)"
 
 
-runLexer'' :: Text -> Either String [ [(SrcRange, Tok Text)] ]
-runLexer'' s
+runLexer :: Text -> Either String [ [(SrcRange, Tok Text)] ]
+runLexer s
     = ((split ((NewLine==).snd)) . fmap (fmap (fmap pack)) . lxx) <$> (lx $ unpack s)
 
 runLexerS' :: String -> Either String [ [(SrcRange, Tok String)] ]
-runLexerS' s
-    = ((split ((NewLine==).snd)) . fmap (fmap (fmap id)) . lxx) <$> (lx s)
+runLexerS' s = (split ((NewLine==).snd) . lxx) <$> lx s
 
 split :: (a -> Bool) -> [a] -> [[a]]
 split p xs = case break p xs of
@@ -293,9 +292,7 @@ split p xs = case break p xs of
 -- dropWhitespace = filter (not.null.snd) . fmap (fmap (filter (not.isWsTok.snd)))
 
 -- |Discard comments and pragmas
-dropWhitespace
-    :: [[(p, Tok a)]]
-    -> [[(p, Tok a)]]
+dropWhitespace :: [[(p, Tok a)]] -> [[(p, Tok a)]]
 dropWhitespace = filter (not.null) . fmap (filter (not.isWsTok.snd))
 
 -- |Break list of tokens into list of lists of tokens with same line number
@@ -316,24 +313,24 @@ isWsTok Whitespace{} = True
 isWsTok NewLine      = True
 isWsTok _            = False
 
--- |Chop by network labels
---TODO keep source pos for start of block
--- does not look for labels floating among logic, that is left to parser
--- produced list of (labeled) networks
-labeledRungs
-    :: [[(p, Tok a)]]
-    -> [(Maybe a, [[(p, Tok a)]])]
-labeledRungs [] = []
-labeledRungs t = (lbl, this) : labeledRungs rest
-    where
-    (this, rest) = break isLabel t'
-    (lbl, t')
-        = case t of
-            ([(_, Label x)] : xs) -> (Just x, xs)
-            xs                    -> (Nothing, xs)
-
-    isLabel [(_, Label _)] = True
-    isLabel _              = False
+-- -- |Chop by network labels
+-- --TODO keep source pos for start of block
+-- -- does not look for labels floating among logic, that is left to parser
+-- -- produced list of (labeled) networks
+-- labeledRungs
+--     :: [[(p, Tok a)]]
+--     -> [(Maybe a, [[(p, Tok a)]])]
+-- labeledRungs [] = []
+-- labeledRungs t = (lbl, this) : labeledRungs rest
+--     where
+--     (this, rest) = break isLabel t'
+--     (lbl, t')
+--         = case t of
+--             ([(_, Label x)] : xs) -> (Just x, xs)
+--             xs                    -> (Nothing, xs)
+-- 
+--     isLabel [(_, Label _)] = True
+--     isLabel _              = False
 
 --------------------------------------------------------------------------------
 

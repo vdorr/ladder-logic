@@ -1,21 +1,22 @@
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.Interpreter
-    ( CellType(..)
-    , Instruction(..)
-    , ExtendedInstruction(..)
-    , DeviceImpl
-    , DeviceDescription(..)
-    , resolveLabels
-    , generateStk2'
-    , devices
-    , Memory
-    , V(..)
-    , makeItpSt3
-    , run
-    , stackEmit
-    , StackEmitState(..)
-    ) where
+--     ( CellType(..)
+--     , Instruction(..)
+--     , ExtendedInstruction(..)
+--     , DeviceImpl
+--     , DeviceDescription(..)
+--     , resolveLabels
+--     , generateStk2'
+--     , devices
+--     , Memory
+--     , V(..)
+--     , makeItpSt3
+--     , run
+--     , stackEmit
+--     , StackEmitState(..)
+--     )
+    where
 
 import Data.Foldable
 import Data.Traversable
@@ -43,6 +44,8 @@ data V addr
 
 -- data V2 addr = T | F | I !Int | A !addr
 --     deriving (Show, Read, Eq)
+
+type Memory a = [(a, V a)]
 
 --------------------------------------------------------------------------------
 
@@ -211,6 +214,8 @@ generateStk2' doDevice ast@(p0 :< _) = do
 
 --------------------------------------------------------------------------------
 
+type ItpSt a = ([Bool], [V a], Memory a)
+
 type Program a = [ExtendedInstruction Int (Instruction (V a) a)]
 
 -- data Trigger = Periodic Int | Memory String
@@ -281,10 +286,6 @@ execute mem0 prog = (\(_, _, m) -> m) <$> f prog ([], [], mem0)
 --     nextLabel lbl = f (drop lbl prog)
 
 --------------------------------------------------------------------------------
-
-type Memory a = [(a, V a)]
-
-type ItpSt a = ([Bool], [V a], Memory a)
 
 eval :: (Eq address, Show address)
      => ItpSt address
@@ -412,12 +413,18 @@ stackEmit emitDevice q p x = go x *> pure p
             emit [ EISimple IDup ]
             push p --now result of this node is on stack
     go  Sink             = do
-        nodes <- gets esNodes
-        if elem p nodes
+        isNode <- gets (elem p . esNodes)
+        if isNode
         then bringToTop q p
         else do
             pop
             emit [ EISimple IDrop ]
+--         nodes <- gets esNodes
+--         if elem p nodes
+--         then bringToTop q p
+--         else do
+--             pop
+--             emit [ EISimple IDrop ]
     go (Source _a       ) = do
         push p
         emit [ EISimple ILdOn ]

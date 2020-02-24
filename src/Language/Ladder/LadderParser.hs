@@ -15,10 +15,9 @@ module Language.Ladder.LadderParser
 
 import Prelude hiding (fail)
 import Control.Applicative --hiding (fail)
-import Control.Monad hiding (fail)
+-- import Control.Monad hiding (fail)
 import Data.Foldable
 import Data.Void
--- import Control.Monad.State hiding (fail)
 
 import Language.Ladder.Utils
 import Language.Ladder.Lexer
@@ -50,9 +49,6 @@ runParser mkDev p s
     = fst <$> applyDgp p' (mkDgZp (dropWhitespace s)) (LdPCtx mkDev)
     where
     p' = (,) <$> p <*> getStream
--- TODO parser that:
--- accepts untreated (not split to line, with all whitespce) token stream
--- handles labels
 
 --------------------------------------------------------------------------------
 
@@ -69,7 +65,7 @@ ladderLiberal
 
 ladder' :: LdP d t [(Maybe t, Cofree (Diagram Void d t) DgExt)]
 ladder'
-    = (some ((,) <$> optional (label) <*> ladderLiberal))
+    = some ((,) <$> optional label <*> ladderLiberal)
     <* dgIsEmpty
 
 --------------------------------------------------------------------------------
@@ -139,9 +135,6 @@ withOperands deviceParser
 
 --------------------------------------------------------------------------------
 
--- isTok :: (Functor f, Eq (f ())) => f a -> f a -> Bool
--- isTok = on (==) (fmap (const ()))
-
 node :: LdP d t (Cofree (Diagram c d t) DgExt)
 node = withPos (Node <$> node')
 
@@ -186,35 +179,25 @@ hline2 :: LdP d t ()
 hline2 = do
     vl <- hline
 --FIXME don't do this, parse (skip) vlines
-    when (vl > 0) do
-        (ln, (co, _)) <- currentPos
-        setPos (ln, (co + vl, ()))--TODO TEST move to same location is noop
-
+-- can't, vlines will be almost certainly eaten first
+    bridge vl
 
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
--- device = do
---     p    <- currentPos
---     dev  <- withOperands do
---                 dev <- coil' <|> contact'
---                 lookupDeviceParser dev
---     dev' <- runUsrDevParser dev
---     (p :<) <$> (Device dev' <$> hline')
 device = withPos do
     dev  <- withOperands do
                 dev <- coil' <|> contact'
                 lookupDeviceParser dev
-    dev' <- runUsrDevParser dev
-    Device dev' <$> hline'
+    Device <$> runUsrDevParser dev <*> hline'
 
     where
 
     runUsrDevParser (operands, userDevParser)
         = case userDevParser operands of
             Left  err -> failure $ "device: device parse error '" ++ err ++ "'"
-            Right d ->  return d
+            Right d   -> return d
 
     lookupDeviceParser dev = do
-        usr      <- getState
+        usr <- getState
         case ctxMkDev usr dev of
             Left  _             -> failure "device: unknown device"
             Right (flag, mkDev) -> return (flag, mkDev)

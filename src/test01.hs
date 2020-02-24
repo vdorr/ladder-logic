@@ -16,7 +16,7 @@ import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
 import Language.Ladder.Simple
 import Language.Ladder.Interpreter
-
+import Language.Ladder.Types
 import Language.Ladder.Utils
 
 import Control.Monad.State
@@ -38,7 +38,7 @@ import Data.Traversable
 import System.Console.ANSI.Types
 import System.Console.ANSI.Codes
 
-import Language.Ladder.Types
+import TestUtils
 
 --------------------------------------------------------------------------------
 
@@ -388,7 +388,7 @@ generateStkOMFG doDevice ast@(p0 :< _) = do
                     (StackEmitState [] sinks nodes [])
     return $ esCode u
 
-compileForTest03
+compileForTest04
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
     => [( Maybe lbl
         , Cofree
@@ -400,7 +400,7 @@ compileForTest03
             DgExt
         )]
     -> m [ExtendedInstruction Int (Instruction (V String) String)]
-compileForTest03 ast = generateStk2THISISTOOMUCH pure emitDevice03 ast
+compileForTest04 ast = generateStk2THISISTOOMUCH pure emitDevice03 ast
     where
     emitDevice03
         :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
@@ -509,7 +509,7 @@ main = do
         (liftEither . runLexer)
         (pure . labeledRungs . dropWhitespace)
         (liftEither . runLadderParser_ (wrapDevice3 (pure . I) (pure . A)) ladderLiberal)
-        (liftEither . compileForTest03)
+        (liftEither . compileForTest04)
         src
     putStrLn "---------------------------"
     for_ prog print

@@ -289,6 +289,25 @@ lexFile file = do
 
 --------------------------------------------------------------------------------
 
+-- |Chop by network labels
+--TODO keep source pos for start of block
+-- does not look for labels floating among logic, that is left to parser
+-- produced list of (labeled) networks
+labeledRungs
+    :: [[(p, Tok a)]]
+    -> [(Maybe a, [[(p, Tok a)]])]
+labeledRungs [] = []
+labeledRungs t = (lbl, this) : labeledRungs rest
+    where
+    (this, rest) = break isLabel t'
+    (lbl, t')
+        = case t of
+            ([(_, Label x)] : xs) -> (Just x, xs)
+            xs                    -> (Nothing, xs)
+
+    isLabel [(_, Label _)] = True
+    isLabel _              = False
+
 pickPragma :: Text -> [[Text]] -> ([[Text]], [[Text]])
 pickPragma key = partition f
     where

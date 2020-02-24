@@ -6,6 +6,7 @@ import Data.Semigroup
 import Data.List
 import Data.Function
 import Data.Foldable
+import Data.Bifunctor
 
 -- import Language.Ladder.DiagramParser
 -- import Language.Ladder.LadderParser
@@ -116,27 +117,76 @@ testVectSignals = nub . foldMap (fmap fst . snd)
 
 --------------------------------------------------------------------------------
 
+evalTestVect
+    :: (Eq addr, Show addr)
+    => (addr -> st -> V addr)
+    -> (st -> [(addr, V addr)] -> st)
+    -> (st -> Either (st, String) st)
+    -> st
+    -> [addr] -- ^watched memory variables
+    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+    -> Either (Memory addr, String) [[V addr]]
+evalTestVect getTag setTag step st0 watch vect
+    = case foldlM go ([], st0) vect' of
+        Left  (_st, _err) -> error here -- show (here, err)
+        Right (y, _)     -> return y
+    where
+
+    vect' = flattenTestVect vect
+
+    go (tr, st) stim = do
+        st'' <- step st'
+        let tr' = [ v | (flip getTag st'' -> v) <- watch ]
+        return (tr ++ [tr'], st'')
+        where
+        st' = setTag st stim
+
+--------------------------------------------------------------------------------
+
+evalTestVect'
+    :: (Eq addr, Show addr)
+    => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
+    -> [addr] -- ^watched memory variables
+    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+    -> Either (Memory addr, String) [[V addr]]
+evalTestVect' prog
+    = evalTestVect getTag3 setTag3 (itp3) p
+    where
+    p = makeItpSt3 [] [(1, 0, prog)]
+
+itp3 :: (Show addr, Eq addr)
+    => ItpSt3 addr
+    -> Either (ItpSt3 addr, String) (ItpSt3 addr)
+itp3 = first undefined . run
+
+getTag3 :: Eq addr => addr -> ItpSt3 addr -> V addr
+getTag3 addr (_a, _b, m) = maybe undefined id $ lookup addr m
+
+setTag3 :: Eq addr => ItpSt3 addr -> [(addr, V addr)] -> ItpSt3 addr
+setTag3 (a, b, m) stim = (a, b, updateMemory m stim)
+
 evalTestVect'''
     :: (Eq addr, Show addr)
     => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
     -> [addr] -- ^watched memory variables
     -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
     -> Either (Memory addr, String) [[V addr]]
-evalTestVect''' prog watch vect
-
-    = case foldlM go ([], p) vect' of
-        Left  (_st, err) -> error $ show (here, err)
-        Right (y, _)     -> return y
-    where
-
-    vect' = flattenTestVect vect
-
-    p = makeItpSt3 [] [(1, 0, prog)]
-
-    go (tr, (x, y, mem)) stim = do
-        st'@(_, _, mem'') <- run (x, y, mem')
-        let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
-        return (tr ++ [tr'], st')
-        where
-        mem' = updateMemory mem stim
+evalTestVect''' = evalTestVect'
+-- evalTestVect''' prog watch vect
+-- 
+--     = case foldlM go ([], p) vect' of
+--         Left  (_st, err) -> error $ show (here, err)
+--         Right (y, _)     -> return y
+--     where
+-- 
+--     vect' = flattenTestVect vect
+-- 
+--     p = makeItpSt3 [] [(1, 0, prog)]
+-- 
+--     go (tr, (x, y, mem)) stim = do
+--         st'@(_, _, mem'') <- run (x, y, mem')
+--         let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+--         return (tr ++ [tr'], st')
+--         where
+--         mem' = updateMemory mem stim
 
