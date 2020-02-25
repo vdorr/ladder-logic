@@ -24,8 +24,8 @@ main = do
             passed <- runLadderTest22 True test ast
             print ("test result:", passed, if passed then "PASSED" else "FAILED")
         (_test, ["-n", value]) | Just n <- readMaybe value -> do
-            runLadderTest221 True n ast
+            evalLadder221 True n ast
         (Nothing, []) -> do
             print ("no embedded test found")
-            runLadderTest221 True 10 ast
+            evalLadder221 True 10 ast
         other -> error $ show ("TODO", other)

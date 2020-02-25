@@ -39,51 +39,6 @@ data LadderTest = T01
 
 --------------------------------------------------------------------------------
 
---FIXME should not be that specialized
-getSignal :: Eq addr => addr -> TestVect addr -> [[V addr]] -> [[V addr]]
-getSignal _ []               = const []
-getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))
-    where
-    Just i = findIndex ((s==) . fst) slice
-
-getSignal1 :: Eq addr => addr -> TestVect addr -> [[V addr]] -> [V addr]
-getSignal1 _ []               = const []
-getSignal1 s ((_, slice) : _) = fmap (!!i)
-    where
-    Just i = findIndex ((s==) . fst) slice
-
-getSignals :: Eq addr => [addr] -> TestVect addr -> [[V addr]] -> [[V addr]]
-getSignals sg vect trace = 
-    transpose $ fmap (\s -> getSignal1 s vect trace) sg
-
-
-memSlotsToTestVector :: Int -> [(CellType, addr)] -> TestVect addr
-memSlotsToTestVector n m = (1, fmap g m) : [(n - 1, [])]
--- [(Int, [(addr, (V addr))])]
-    where
-    g (t, addr) = (addr, f t)
-    f Bit     = X False
-    f Word    = I 0
-    f TwoBits = undefined --TODO
-
---------------------------------------------------------------------------------
-
-emitDevice03
-    :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
-    -> [Instruction (V String) String]
-emitDevice03 = snd . emitDevice03'
-
-emitDevice03'
-    :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
-    -> ([String], [Instruction (V String) String])
-emitDevice03' (ops, impl) = case impl (fmap unAddr ops) of
-                            Left err -> error $ show (here, err)
-                            Right x -> x
-    where
-    unAddr :: (CellType, Operand Text) -> Operand String
-    unAddr (_, Var a) = Var $ unpack a
-    unAddr (_, Lit i) = Lit i
-
 compileForTest03
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
     => [(Maybe lbl, Cofree (Diagram Void
@@ -93,42 +48,44 @@ compileForTest03
 compileForTest03 ast = do
     (++ [EIReturn]) <$> generateStk2xx pure emitDevice03 ast
 
+    where
+    emitDevice03
+        :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
+        -> [Instruction (V String) String]
+    emitDevice03 = snd . emitDevice03'
+
+        where
+        emitDevice03'
+            :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
+            -> ([String], [Instruction (V String) String])
+        emitDevice03' (ops, impl) = case impl (fmap unAddr ops) of
+                                    Left err -> error $ show (here, err)
+                                    Right x -> x
+            where
+            unAddr :: (CellType, Operand Text) -> Operand String
+            unAddr (_, Var a) = Var $ unpack a
+            unAddr (_, Lit i) = Lit i
+
 --------------------------------------------------------------------------------
 
-runLadderTest2
-    :: Bool
-    -> LadderTest
-    -> [(Maybe String
+type Ast2 = [(Maybe String
             , Cofree (Diagram Void 
                     (([(CellType, Operand Text)], DeviceImpl (V String) String))
-                    String) DgExt)]
-    -> IO Bool
-runLadderTest2 verbose test ast = do
-    when verbose $ print here
-    prog <- either fail pure $ compileForTest03 ast
-    when verbose $ do
-        putStrLn "---------------------------"
-        for_ prog print
-        putStrLn "---------------------------"
-    runLadderTestX verbose test prog
-
+                    String) DgExt)] 
 
 runLadderTest22
     :: Bool
     -> LadderTest
-    -> [(Maybe String
-            , Cofree (Diagram Void 
-                    (([(CellType, Operand Text)], DeviceImpl (V String) String))
-                    String) DgExt)]
+    -> Ast2
     -> IO Bool
 runLadderTest22 verbose test ast = do
     when verbose $ print here
     prog <- either fail pure $ compileForTest03 ast
     let memSlots :: [(CellType, Text)] = nub $ execWriter $ traverse_ (traverse_ mp2) ast
-    print (here, memSlots, "<<<<<"::String)
-    print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
 
     when verbose $ do
+        print (here, memSlots, "<<<<<"::String)
+        print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
         putStrLn "---------------------------"
         for_ prog print
         putStrLn "---------------------------"
@@ -145,7 +102,51 @@ runLadderTest22 verbose test ast = do
     addressesOnly s = [(t, a)|((t, Var a)) <- s]
 
 
-runLadderTest221
+    runLadderTestX
+        :: Bool
+        -> LadderTest
+        -> [ExtendedInstruction Int (Instruction (V String) String)]
+        -> IO Bool
+    runLadderTestX verbose test@T01{} prog = do
+
+        let allSigs = testVectSignals (testVect test)
+    --TODO select signals for display independently from signals for test evaluation
+    --     let displaySigs = allSigs -- or (watch test)
+        when verbose $ print (here, allSigs)
+
+        let xxy = evalTestVect''' prog allSigs (testVect test)
+
+        when verbose $ print (here, xxy)
+        let Right traces = xxy
+        when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
+
+        let testTrace = getSignals (watch test) (testVect test) traces
+        let passed = expected test == testTrace
+
+        when verbose $ do
+            print (here, testTrace)
+            print (here, expected test)
+            print (here, passed, if passed then "PASSED" else "FAILED" :: String)
+
+        return passed
+
+-- runLadderTest2
+--     :: Bool
+--     -> LadderTest
+--     -> Ast2
+--     -> IO Bool
+-- runLadderTest2 verbose test ast = do
+--     when verbose $ print here
+--     prog <- either fail pure $ compileForTest03 ast
+--     when verbose $ do
+--         putStrLn "---------------------------"
+--         for_ prog print
+--         putStrLn "---------------------------"
+--     runLadderTestX verbose test prog
+
+--------------------------------------------------------------------------------
+
+evalLadder221
     :: Bool
     -> Int
     -> [(Maybe String
@@ -153,7 +154,7 @@ runLadderTest221
                     (([(CellType, Operand Text)], DeviceImpl (V String) String))
                     String) DgExt)]
     -> IO ()
-runLadderTest221 verbose num ast = do
+evalLadder221 verbose num ast = do
     when verbose $ print here
     prog <- either fail pure $ compileForTest03 ast
     let memSlots' :: [(CellType, Text)] = nub $ execWriter $ traverse_ (traverse_ mp2) ast
@@ -166,7 +167,6 @@ runLadderTest221 verbose num ast = do
         putStrLn "---------------------------"
         for_ prog print
         putStrLn "---------------------------"
---     runLadderTestX verbose test prog
     let allSigs = fmap snd memSlots
     let xxy = evalTestVect''' prog allSigs vect
 
@@ -188,34 +188,51 @@ runLadderTest221 verbose num ast = do
 
     addressesOnly s = [(t, a)|((t, Var a)) <- s]
 
+--------------------------------------------------------------------------------
 
-runLadderTestX
-    :: Bool
-    -> LadderTest
-    -> [ExtendedInstruction Int (Instruction (V String) String)]
-    -> IO Bool
-runLadderTestX verbose test@T01{} prog = do
+-- |return pragmas
+parseOrDie5
+    :: DeviceParser Text dev
+    -> FilePath
+    -> IO ( [String] -- leading pragmas
+          , [(Maybe String, Cofree (Diagram Void dev String) DgExt)] )
+parseOrDie5 devP path = do
+    lxs <- lexFile path
+    ast <- case parseOrDie2 devP $ dropWhitespace lxs of
+                        Left  err -> fail err
+                        Right x   -> return x
+    let pragmas  = fmap unpack $ fmap mconcat <$> getLeadingPragmas $ dropPos lxs
+    return (pragmas, ast)
 
-    let allSigs = testVectSignals (testVect test)
---TODO select signals for display independently from signals for test evaluation
---     let displaySigs = allSigs -- or (watch test)
-    when verbose $ print (here, allSigs)
+parseOrDie2
+    :: (MonadError String m, Monad m)
+    => DeviceParser Text dev
+    -> [[(DgExt, Tok Text)]]
+    -> m [(Maybe String, Cofree (Diagram Void dev String) DgExt)]
+parseOrDie2 devP lxs = (fmap (first (fmap unpack))) <$> parseOrDie lxs
+    where
+    -- |assuming comments and pragmas were filtered out
+    parseOrDie lxs' = do
+        case runLadderParser_ devP ladder' lxs' of
+            Right ast -> return $ fmap (fmap ldUnpack1) ast
+            Left  err -> throwError $ show (here, err)
 
-    let xxy = evalTestVect''' prog allSigs (testVect test)
+--------------------------------------------------------------------------------
 
-    when verbose $ print (here, xxy)
-    let Right traces = xxy
-    when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
+lexFile :: FilePath -> IO [[(DgExt, Tok Text)]]
+lexFile file = do
+    src <- TIO.readFile file
+    case runLexer src of
+        Left  err -> fail $ show (here, err)
+        Right x   -> return x
 
-    let testTrace = getSignals (watch test) (testVect test) traces
-    let passed = expected test == testTrace
-
-    when verbose $ do
-        print (here, testTrace)
-        print (here, expected test)
-        print (here, passed, if passed then "PASSED" else "FAILED" :: String)
-
-    return passed
+loadLadderTest :: FilePath -> IO (Maybe LadderTest, [[(DgExt, Tok Text)]])
+loadLadderTest file = do
+    x            <- lexFile file
+    let (pgms, _) = pickPragma "T01" $ getLeadingPragmas $ dropPos x
+    let pgms'     = fmap (readMaybe . filter (/='\\') . unpack . T.concat) pgms
+    let t         = [ p | Just p : _ <- for pgms' pure ]
+    return (t, x)
 
 --------------------------------------------------------------------------------
 
@@ -233,59 +250,6 @@ dropPos2
     :: [[(p, Tok a)]]
     -> [[Tok a]]
 dropPos2 = fmap (fmap snd)
-
---------------------------------------------------------------------------------
-
--- |return pragmas
-parseOrDie5
-    :: DeviceParser Text dev
-    -> FilePath
-    -> IO ( [String] -- leading pragmas
-          , [(Maybe String, Cofree (Diagram Void dev String) DgExt)]
-          )
-parseOrDie5 devP path = do
-    lxs <- lexFile path
-    ast <- case parseOrDie2 devP $ dropWhitespace lxs of
-                        Left  err -> fail err
-                        Right x   -> return x
-    let pragmas  = fmap unpack $ fmap mconcat <$> getLeadingPragmas $ dropPos lxs
-    return (pragmas, ast)
-
-parseOrDie2
-    :: (MonadError String m, Monad m)
-    => DeviceParser Text dev
-    -> [[(DgExt, Tok Text)]]
-    -> m [(Maybe String
-        , Cofree (Diagram Void dev String) DgExt)]
--- parseOrDie2 devP lxs = do
---     let blocks = labeledRungs lxs
---     for blocks (\(lbl, p) -> (fmap unpack lbl,) <$> parseOrDie p)
--- 
---     where
---     -- |assuming comments and pragmas were filtered out
---     parseOrDie lxs' = do
---         case runLadderParser_ devP ladder lxs' of
---             Right ast -> return $ ldUnpack1 ast
---             Left  err -> throwError $ show (here, err)
-parseOrDie2 devP lxs = do
---     (fmap (fmap (first (fmap unpack)))) <$> parseOrDie lxs
-    (fmap ((first (fmap unpack)))) <$> parseOrDie lxs
-
-    where
-    -- |assuming comments and pragmas were filtered out
-    parseOrDie lxs' = do
-        case runLadderParser_ devP ladder' lxs' of
-            Right ast -> return $ fmap (fmap ldUnpack1) ast
-            Left  err -> throwError $ show (here, err)
-
---------------------------------------------------------------------------------
-
-lexFile :: FilePath -> IO [[(DgExt, Tok Text)]]
-lexFile file = do
-    src <- TIO.readFile file
-    case runLexer src of
-        Left  err -> fail $ show (here, err)
-        Right x   -> return x
 
 --------------------------------------------------------------------------------
 
@@ -308,6 +272,8 @@ labeledRungs t = (lbl, this) : labeledRungs rest
     isLabel [(_, Label _)] = True
     isLabel _              = False
 
+--------------------------------------------------------------------------------
+
 pickPragma :: Text -> [[Text]] -> ([[Text]], [[Text]])
 pickPragma key = partition f
     where
@@ -315,13 +281,34 @@ pickPragma key = partition f
                x : _ | key' : _ <- T.words x -> key' == key
                _                             -> False
 
-loadLadderTest :: FilePath -> IO (Maybe LadderTest, [[(DgExt, Tok Text)]])
-loadLadderTest file = do
-    x            <- lexFile file
-    let (pgms, _) = pickPragma "T01" $ getLeadingPragmas $ dropPos x
-    let pgms'     = fmap (readMaybe . filter (/='\\') . unpack . T.concat) pgms
-    let t         = [ p | Just p : _ <- for pgms' pure ]
-    return (t, x)
+--------------------------------------------------------------------------------
+
+-- --FIXME should not be that specialized
+-- getSignal :: Eq addr => addr -> TestVect addr -> [[V addr]] -> [[V addr]]
+-- getSignal _ []               = const []
+-- getSignal s ((_, slice) : _) = fmap ((:[]).(!!i))
+--     where
+--     Just i = findIndex ((s==) . fst) slice
+
+getSignal1 :: Eq addr => addr -> TestVect addr -> [[V addr]] -> [V addr]
+getSignal1 _ []               = const []
+getSignal1 s ((_, slice) : _) = fmap (!!i)
+    where
+    Just i = findIndex ((s==) . fst) slice
+
+getSignals :: Eq addr => [addr] -> TestVect addr -> [[V addr]] -> [[V addr]]
+getSignals sg vect trace = 
+    transpose $ fmap (\s -> getSignal1 s vect trace) sg
+
+
+memSlotsToTestVector :: Int -> [(CellType, addr)] -> TestVect addr
+memSlotsToTestVector n m = (1, fmap g m) : [(n - 1, [])]
+-- [(Int, [(addr, (V addr))])]
+    where
+    g (t, addr) = (addr, f t)
+    f Bit     = X False
+    f Word    = I 0
+    f TwoBits = undefined --TODO
 
 --------------------------------------------------------------------------------
 

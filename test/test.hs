@@ -578,12 +578,12 @@ otherTests = testGroup "Other tests"
     , testCase "fold ast" $
         fold (() :< Nothing)
             @=? ()
-    , testCase "get signal 0" $
-        getSignal "x" vect trace1
-            @?= [[I 2],[I 5]]
-    , testCase "get signal 1" $
-        getSignal "y" vect trace1
-            @?= [[I 3], [I 5]]
+--     , testCase "get signal 0" $
+--         getSignal "x" vect trace1
+--             @?= [[I 2],[I 5]]
+--     , testCase "get signal 1" $
+--         getSignal "y" vect trace1
+--             @?= [[I 3], [I 5]]
     , testCase "get signals" $
         getSignals ["x", "y"] vect trace1
             @?= [[I 2, I 3], [I 5, I 5]]
@@ -698,7 +698,7 @@ fileTests path
 --                             Left err -> fail err
                 Just t -> do
                     ast <- parseForTestOrDie lxs
-                    passed <- runLadderTest2 False t ast
+                    passed <- runLadderTest22 False t ast
                     passed @?= True
 
 wrapDevTest1 :: DeviceParser Text (DevType Text, [Operand Text])

@@ -30,22 +30,22 @@ prettyTrace trace = x ++ ticks
     pad s = replicate (w - length s) ' ' ++ s
 
 -- "_▅_▅▅▅_"
-sparkline :: [V addr] -> String
-sparkline = sparkline2
-#if 0
-sparkline trace = fmap (bar.asInt) trace
-    where
---     trace' = fmap asInt trace
-    asInt (X True)  = 5
---     asInt (X False) = 0
-    asInt _ = 0 --FIXME implement integers
---     asInt (I i)     = i
-    bar = ("_▂▃▄▅▆▇█" !!)
-#endif
+-- sparkline :: [V addr] -> String
+-- sparkline = sparkline2
+-- #if 0
+-- sparkline trace = fmap (bar.asInt) trace
+--     where
+-- --     trace' = fmap asInt trace
+--     asInt (X True)  = 5
+-- --     asInt (X False) = 0
+--     asInt _ = 0 --FIXME implement integers
+-- --     asInt (I i)     = i
+--     bar = ("_▂▃▄▅▆▇█" !!)
+-- #endif
 
-sparkline2 :: [V addr] -> String
-sparkline2 [] = []
-sparkline2 trace@(I _ : _) = fmap (bar.asInt) values
+sparkline :: [V addr] -> String
+sparkline [] = []
+sparkline trace@(I _ : _) = fmap (bar.asInt) values
     where
     values = (`fmap` trace) $ \case
                                      I x -> x
@@ -54,11 +54,11 @@ sparkline2 trace@(I _ : _) = fmap (bar.asInt) values
     m = maximum values
     k = abs $ (m - l) `div` 6
     asInt i = (i - l) `div` k
-sparkline2 trace@(X _ : _) = fmap (bar.asInt) trace
+sparkline trace@(X _ : _) = fmap (bar.asInt) trace
     where
     asInt (X True)  = 5
     asInt _ = 0
-sparkline2 _ = undefined
+sparkline _ = undefined
 
 bar :: Int -> Char
 bar = ("_▂▃▄▅▆▇█" !!)
@@ -124,7 +124,7 @@ evalTestVect
     -> (st -> Either (st, String) st)
     -> st
     -> [addr] -- ^watched memory variables
-    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+    -> TestVect addr -- ^test vector
     -> Either (Memory addr, String) [[V addr]]
 evalTestVect getTag setTag step st0 watch vect
     = case foldlM go ([], st0) vect' of
@@ -143,35 +143,34 @@ evalTestVect getTag setTag step st0 watch vect
 
 --------------------------------------------------------------------------------
 
-evalTestVect'
-    :: (Eq addr, Show addr)
-    => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
-    -> [addr] -- ^watched memory variables
-    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
-    -> Either (Memory addr, String) [[V addr]]
-evalTestVect' prog
-    = evalTestVect getTag3 setTag3 (itp3) p
-    where
-    p = makeItpSt3 [] [(1, 0, prog)]
-
-itp3 :: (Show addr, Eq addr)
-    => ItpSt3 addr
-    -> Either (ItpSt3 addr, String) (ItpSt3 addr)
-itp3 = first undefined . run
-
-getTag3 :: Eq addr => addr -> ItpSt3 addr -> V addr
-getTag3 addr (_a, _b, m) = maybe undefined id $ lookup addr m
-
-setTag3 :: Eq addr => ItpSt3 addr -> [(addr, V addr)] -> ItpSt3 addr
-setTag3 (a, b, m) stim = (a, b, updateMemory m stim)
-
 evalTestVect'''
     :: (Eq addr, Show addr)
     => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
     -> [addr] -- ^watched memory variables
-    -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+    -> TestVect addr -- ^test vector
     -> Either (Memory addr, String) [[V addr]]
-evalTestVect''' = evalTestVect'
+evalTestVect''' prog = evalTestVect getTag3 setTag3 itp3 p
+    where
+    p = makeItpSt3 [] [(1, 0, prog)]
+
+--     itp3 :: (Show addr, Eq addr)
+--         => ItpSt3 addr
+--         -> Either (ItpSt3 addr, String) (ItpSt3 addr)
+    itp3 = first undefined . run
+
+--     getTag3 :: Eq addr => addr -> ItpSt3 addr -> V addr
+    getTag3 addr (_a, _b, m) = maybe undefined id $ lookup addr m
+
+--     setTag3 :: Eq addr => ItpSt3 addr -> [(addr, V addr)] -> ItpSt3 addr
+    setTag3 (a, b, m) stim = (a, b, updateMemory m stim)
+
+-- evalTestVect'''
+--     :: (Eq addr, Show addr)
+--     => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
+--     -> [addr] -- ^watched memory variables
+--     -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+--     -> Either (Memory addr, String) [[V addr]]
+-- evalTestVect''' = evalTestVect'
 -- evalTestVect''' prog watch vect
 -- 
 --     = case foldlM go ([], p) vect' of

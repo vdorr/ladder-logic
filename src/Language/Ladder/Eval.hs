@@ -1,3 +1,4 @@
+{-# LANGUAGE MonadComprehensions #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
 module Language.Ladder.Eval where
@@ -10,15 +11,35 @@ import Data.Char (toUpper)
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
+import Language.Ladder.Tooling
+import Language.Ladder.Interpreter (Memory, V(..))
+
+--------------------------------------------------------------------------------
+
+evalTestVect1
+    :: (Eq addr, Show addr)
+    => [(Maybe lbl, Cofree (Diagram c (DevType String, [Operand addr]) t) DgExt)]
+    -> [addr]
+    -> TestVect addr
+    -> Either (Memory addr, String) [[V addr]]
+evalTestVect1 prog = evalTestVect getTag setTag step st0
+    where
+    getTag addr (EvMem m) = maybe undefined id $ lookup addr m -- addr -> EvMem addr -> V addr
+    setTag (EvMem m) = EvMem . updateMemory m -- EvMem addr -> [(addr, V addr)] -> EvMem addr
+    step = Right . eval prog
+    st0 = EvMem [] -- []
+-- updateMemory :: Eq addr => [(addr, V addr)] -> [(addr, V addr)] -> [(addr, V addr)]
 
 --------------------------------------------------------------------------------
 
 -- data EvResult st t = NeedJump st t | Done st | Failed String
 data EvResult t = NeedJump t --  Failed String
 
-data EvMem t = EvMem
-    { stBits :: [(t, Bool)]
-    , stInts :: [(t, Int)]
+data EvMem addr = EvMem
+--     { stBits :: [(addr, Bool)]
+--     , stInts :: [(addr, Int)]
+--     }
+    { stTags :: [(addr, V addr)]
     }
 
 data EvSt t = EvSt
@@ -29,20 +50,20 @@ data EvSt t = EvSt
 --             , Cofree (Diagram continuation (DevType d, [Operand a0]) t) DgExt)]
 --                       -> EvMem a0
 --                       -> EvMem a0
-eval :: (Eq a0) => [(Maybe lbl
-            , Cofree (Diagram continuation (DevType String, [Operand a0]) t) DgExt)]
-                      -> EvMem a0
-                      -> EvMem a0
+eval :: Eq addr
+    => [(Maybe lbl, Cofree (Diagram c (DevType String, [Operand addr]) t) DgExt)]
+    -> EvMem addr
+    -> EvMem addr
 eval blocks st0 =
-    (snd$flip runState st0 do
+    snd$flip runState st0 do
         for_ blocks \(_ , ast) -> do
             r <- blargh' ast
             case r of
                  Left (NeedJump _) -> undefined --TODO
                  Right _ -> return ()
-    )
 
-blargh ast = runStateT (blargh' ast) (EvMem [] [])
+-- blargh ast = runStateT (blargh' ast) (EvMem [] [])
+-- blargh ast = runStateT (blargh' ast) (EvMem [])
 
 -- blargh
 --     :: (Ord p, Show p, Show l --     , Monad m
@@ -57,7 +78,7 @@ blargh' ast
 
     evalPost _ _ = return ()
 
-    evalElem (q::Bool) p x = go x
+    evalElem q p x = go x
         where
 
         go (Node   _w  ) = (q ||) <$> getTmp False p
@@ -83,14 +104,12 @@ blargh' ast
         accEmitDev1 (Coil_ _d, _args) = undefined
         accEmitDev1 _ = undefined
 
-        getBit n = getMem stBits undefined n
-        setBit n v = setMem stBits (\vv st -> st { stBits = vv}) n v >> return v
-        getInt (Var n) = getMem stInts 0 n
-        getInt (Lit i) = pure i
---         setInt n v = setTag stInts (undefined) n v
-
         getTmp d pp = getTag' stTmp d pp
         setTmp pp v = modify $ \st -> st { stTmp = (pp, v) : stTmp st}
+
+        getTag' f d n = gets (maybe d id . lookup n . f)
+
+
 
         setMem f g (n) v' = lift do
             m <- gets f
@@ -100,47 +119,12 @@ blargh' ast
 
         getMem f d n = lift do getTag' f d n
 
-        getTag' f d n = gets (maybe d id . lookup n . f)
---         getTag' f d n = do
---             m <- gets f
---             case lookup n m of
---                  Just vv -> return vv
---                  _ -> return d
+        getBit n = getMem stTags undefined n >>= \case
+                                                     X b -> pure b
+                                                     _ -> undefined
+        setBit n v = setMem stTags (\vv st -> st { stTags = vv}) n (X v) >> return v
+        getInt (Lit i) = pure i
+        getInt (Var n) = getMem stTags (I 0) n >>= \case
+                                                     I i -> pure i
+                                                     _ -> undefined
 
--- -- blargh
--- --     :: (Ord p, Show p, Show l --     , Monad m
--- --     )
--- --     =>  Cofree (Diagram c d l) p
--- --     -> IO ([p]
--- --             , EvSt
--- --             )
--- blargh ast@(q0 :< _)
---     = (runStateT
---         (traverseDiagram (evalElem) evalPost q0 ast)
---         (EvSt []) --(AccuEmitState q0 sinks nodes [] [])
---         ) 
---     where
---     (nodes, sinks) = collectNodesAndSinks ast
--- 
---     evalElem q p x = go x
---     evalPost _ = undefined
--- 
--- 
---     go (Node   []      ) = do
---         liftIO $ print (here)
---         return ()
---     go (Node   w       ) = do
---         liftIO $ print (here)
---         undefined
---     go  Sink             = do
---         undefined
---     go (Source _a       ) = do
---         undefined
---     go  End              = do
---         undefined
---     go (Device device _a) = do
---         undefined
---     go (Jump   label  ) = do
---         undefined
---     go (Cont   _continuation _a) = undefined
---     go (Conn   _continuation) = undefined
