@@ -149,10 +149,7 @@ runLadderTest22 verbose test ast = do
 evalLadder221
     :: Bool
     -> Int
-    -> [(Maybe String
-            , Cofree (Diagram Void 
-                    (([(CellType, Operand Text)], DeviceImpl (V String) String))
-                    String) DgExt)]
+    -> Ast2
     -> IO ()
 evalLadder221 verbose num ast = do
     when verbose $ print here
@@ -175,8 +172,6 @@ evalLadder221 verbose num ast = do
 
     print (here, traces)
     when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
-
-    return ()
 
     where
     mp2 :: Cofree

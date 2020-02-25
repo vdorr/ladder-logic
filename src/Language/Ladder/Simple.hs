@@ -37,6 +37,14 @@ runLadderParser_ pd p s = fst <$> runParser pd p s
 
 --------------------------------------------------------------------------------
 
+parseLadder1'
+    :: [(DgExt, Tok String)]
+    -> Either String
+        [(Maybe String, Cofree (Diagram Void (DevType String, [Operand String]) String) DgExt)]
+parseLadder1' lxs = do
+    let lxs' = dropWhitespace lxs
+    runLadderParser_ wrapDeviceSimple ladder' lxs'
+
 parseLadder1
     :: String
     -> Either String
