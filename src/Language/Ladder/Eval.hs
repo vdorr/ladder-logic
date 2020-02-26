@@ -5,9 +5,9 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.Foldable
 import Data.Traversable
-import Data.Char (toUpper)
--- import Data.String --IsString
+-- import Data.Char (toUpper)
 import Data.List
+import Data.String
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
@@ -43,20 +43,26 @@ data EvSt t = EvSt
     { stTmp :: [(DgExt, Bool)]
     }
 
-eval :: (Eq addr, Show addr)
-    => [(Maybe lbl, Cofree (Diagram c (DevType String, [Operand addr]) t) DgExt)]
+eval :: (Eq addr, Show addr, IsString t, Eq t)
+    => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
     -> EvMem addr
     -> EvMem addr
-eval blocks st0 =
-    snd $ flip runState st0 do
+eval blocks st0 = either undefined id (evalM blocks st0)
+
+evalM :: (Eq addr, Show addr, IsString t, Eq t)
+    => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
+    -> EvMem addr
+    -> Either String (EvMem addr)
+evalM blocks st0 =
+    Right $ snd $ flip runState st0 do
         for_ blocks \(_ , ast) -> do
             r <- evalRung ast
             case r of
                  Left (NeedJump _) -> undefined --TODO
                  Right _ -> return ()
 
-evalRung :: (Eq addr, Show addr, Monad m)
-    => Cofree (Diagram c (DevType String, [Operand addr]) t) DgExt
+evalRung :: (Eq addr, Show addr, Monad m, IsString t, Eq t)
+    => Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt
     -> StateT (EvMem addr) m (Either (EvResult t) ([DgExt], EvSt t1))
 evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast) (EvSt []))
     where
@@ -81,7 +87,7 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
         go (Cont  _c _a) = undefined
         go (Conn  _c   ) = undefined
 
-        evalDev (d, a) = accEmitDev1 (fmap toUpper <$> d, a)
+        evalDev (d, a) = accEmitDev1 (d, a) -- accEmitDev1 (fmap toUpper <$> d, a)
 
         accEmitDev1 (Contact_ " ", [Var a   ]) = (q &&) <$> getBit a
         accEmitDev1 (Contact_ "/", [Var a   ]) = ((q &&) . not) <$> getBit a
@@ -117,8 +123,8 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
                                                      _ -> undefined
 
 getVariables
-    :: Eq addr
-    => [(Maybe lbl, Cofree (Diagram c (DevType String, [Operand addr]) t) DgExt)]
+    :: (Eq addr, IsString t, Eq t)
+    => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
     -> [(CellType, addr)]
 getVariables ast = nub $ snd $ runState (for_ ast (go' . snd)) []
     where

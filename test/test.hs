@@ -47,14 +47,14 @@ import TestUtils
 --discards whitespace tokens
 preproc5'
     :: Text
-    -> Either Text [[((Int, (Int, Int)), Tok Text)]]
+    -> Either Text [[(DgExt, Tok Text)]]
 preproc5' = preproc . first pack . runLexer
     where
     preproc = fmap dropWhitespace
 
 --------------------------------------------------------------------------------
 
-preproc5'' :: Text -> Either String [[((Int, (Int, Int)), Tok Text)]]
+preproc5'' :: Text -> Either String [[(DgExt, Tok Text)]]
 preproc5'' = first unpack . preproc5'
 
 --basic blocks
@@ -419,86 +419,7 @@ testN01 =
 analysisTests :: TestTree
 analysisTests = testGroup "Analysis"
     [ 
---     testCase "sttsort 1" $ do
--- --         print g01'
---         isSpatialOrTopo gDepends (compare `on` snd) g01'
---             @?= Nothing
---     , testCase "sttsort 2"
---         $ ts [([2], 1)] @?= [1]
---     , testCase "sttsort 3" $ ts
---             [ ([],  1)
---             , ([1], 2)
---             , ([],  3)
---             , ([1], 4)
---             ]
---             @?= [1,2,3,4]
---     , testCase "sttsort 4" $ ts
---             [ ([],  1)
---             , ([3], 2)
---             , ([] , 3)
---             , ([1], 4)
---             ]
---             @?= [1,3,2,4]
---     , testCase "sttsort 5" $ ts
---             [ ([2], 1)
---             , ([1], 2)
---             , ([], 3)
---             ]
---             @?= [2,1,3]
---     , testCase "sttsort 6" $ ts
---             [ ([2,3], 1)
---             , ([], 2)
---             , ([2], 3)
---             , ([], 4)
---             ]
---             @?= [2,3,1,4]
---     , testProperty "sttsort isSpatialOrTopo" prop_sttsort
     ]
-
---     where
---     ts = fmap snd . sttsort gDepends
-
---     let dep01 = (\(as, a) (bs, b) -> elem b as)
---     let ts = sttsort dep01
---     let testts lbl s =
---             let s2 = ts s
---             in print
---                 ( lbl
---                 , istopo dep01 s
---                 , istopo dep01 s2
---                 , istopoM dep01 s2
---                 , fmap
---                     (\p -> iscycle (on (==) snd) dep01 p s2)
---                     $ istopoM dep01 s2
---                 , s2)
--- g01, g01' :: [([Int], Int)]
--- g01' = sttsort gDepends g01
--- g01 =
---     [ ( [ 7 , 4 ] , 2 )
---     , ( [] , 3 )
---     , ( [] , 4 )
---     , ( [ 3 ] , 7 )
---     ]
--- 
--- genGraph :: Gen [([Int], Int)]
--- genGraph = do --Gen.sample $ 
---     let k = 10
---     n <- Gen.int $ constant 0 k
--- --     let l = [0..n]
---     ll <- for [0..n] $ \v -> do
---         deps <- Gen.list (linear 0 k) (Gen.int $ constant 0 k)
---         return (deps, v)
---     return ll
--- 
--- gDepends :: ([Int], Int) -> ([Int], Int) -> Bool
--- gDepends = (\(as, _a) (_bs, b) -> elem b as)
-
--- prop_sttsort :: Property
--- prop_sttsort =
---     withTests 1000 . property $ do
---         g <- forAll genGraph
---         let g' = sttsort gDepends g
---         Nothing === isSpatialOrTopo gDepends (compare `on` snd) g'
 
 --------------------------------------------------------------------------------
 
@@ -641,7 +562,6 @@ wrapDeviceForTest = wrapDevice3 (pure . I) (pure . A)
 testFromDirectory :: FilePath -> TestName -> (FilePath -> IO TestTree) -> IO TestTree
 testFromDirectory path testName mkCase = do
     files <- filter ((".txt"==).takeExtension) <$> listDirectory path
---     print (here, files)
     tests <- for files $ \fn -> mkCase fn
     return $ testGroup testName tests
 
@@ -655,17 +575,6 @@ fileTestsNeg path
                      print (here, fn, err)
                      return () --preproc failed -> test succeeeded
                  Right lxs -> do
---                     case fmap dgTrim <$> runLadderParser wrapDevTest1 ladder lxs of
---                         Right (_ast, Zp [] []) -> do
---                             _ast <- parseForTestOrDie lxs
---                             print (here, fn, err)
---                             assertFailure here
---                         Left err -> do
---                             print (here, fn, err)
---                             return ()
---                         err -> do
---                             print (here, fn, err)
---                             return ()
                     case parseOrDie2 wrapDeviceForTest lxs of
                         Left  _err -> return ()
                         Right ast   -> do
@@ -685,18 +594,12 @@ fileTests path
             let wrapper = case fmap (fmap (words . unpack)) pgms of
                  (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2
                  _ -> wrapDeviceSimple
---             print (here, fn, wrapper, pgms)
 
---             let blocks = labeledRungs lxs
             case tst of
                 Nothing -> do
                     case runLadderParser wrapper ladder' lxs of
                         Right _ -> return ()
                         Left err -> fail err
---                     for_ blocks $ \(_, lxs') -> do
---                         case runLadderParser wrapper ladder lxs' of
---                             Right _ -> return ()
---                             Left err -> fail err
                 Just t -> do
                     ast <- parseForTestOrDie lxs
                     passed <- runLadderTest22 False t ast

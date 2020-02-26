@@ -45,7 +45,6 @@ runParser
     -> [[(DgExt, Tok t)]]
     -> Either String (a, Dg (Tok t))
 runParser mkDev p s
---     = (psStr <$>) <$> applyDgp p (mkDgZp (dropWhitespace2 s)) (LdPCtx mkDev)
     = fst <$> applyDgp p' (mkDgZp (dropWhitespace s)) (LdPCtx mkDev)
     where
     p' = (,) <$> p <*> getStream
@@ -175,11 +174,7 @@ hline'
 
 -- "-||`EOL`" is not allowed
 hline2 :: LdP d t ()
-hline2 = do
-    vl <- hline
---FIXME don't do this, parse (skip) vlines
--- can't, vlines will be almost certainly eaten first
-    bridge vl -- skip 'vl' number of horizontal chars
+hline2 = hline >>= bridge -- skip 'vl' number of horizontal chars
 
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
 device = withPos do

@@ -21,7 +21,7 @@ main = do
     TIO.putStrLn src
     ast <- either fail pure $ parseOrDie2 (wrapDevice3 (pure . I) (pure . A)) lxs
 
-    ast' <- either fail pure $ parseLadder1' $ fmap (fmap (fmap (fmap unpack))) lxs
+    ast' <- either fail pure $ parseLadder4 $ fmap (fmap (fmap (fmap unpack))) lxs
 --     evalLadder4 True 10 ast'
 
     case (tst, otherArgs) of

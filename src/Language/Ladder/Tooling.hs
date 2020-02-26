@@ -7,6 +7,7 @@ import Data.List
 import Data.Function
 import Data.Foldable
 import Data.Bifunctor
+import Data.String
 
 -- import Language.Ladder.DiagramParser
 -- import Language.Ladder.LadderParser
@@ -146,8 +147,8 @@ evalTestVect getTag setTag step st0 watch vect
 --------------------------------------------------------------------------------
 
 evalTestVect1
-    :: (Eq addr, Show addr)
-    => [(Maybe lbl, Cofree (Diagram c (DevType String, [Operand addr]) t) DgExt)]
+    :: (Eq addr, Show addr, IsString t, Eq t)
+    => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
     -> [addr]
     -> TestVect addr
     -> Either (Memory addr, String) [[V addr]]
