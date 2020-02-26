@@ -132,63 +132,22 @@ runLadderTest22 verbose test ast = do
 
         return passed
 
--- runLadderTest2
---     :: Bool
---     -> LadderTest
---     -> Ast2
---     -> IO Bool
--- runLadderTest2 verbose test ast = do
---     when verbose $ print here
---     prog <- either fail pure $ compileForTest03 ast
---     when verbose $ do
---         putStrLn "---------------------------"
---         for_ prog print
---         putStrLn "---------------------------"
---     runLadderTestX verbose test prog
-
 runLadderTest4
     :: Bool
     -> LadderTest String
     -> Ast4
     -> IO Bool
-runLadderTest4 verbose test prog = do
+runLadderTest4 verbose test prog
+    = runLadderTest verbose test (getVariables prog) (evalTestVect1 prog)
 
-    let memSlots = getVariables prog -- :: [(CellType, String)]
-
-    omfg verbose test memSlots (evalTestVect1 prog)
-
---     when verbose $ do
---         print (here, memSlots, "<<<<<"::String)
---         print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
--- 
--- --TODO make into separate function
---     let allSigs = testVectSignals (testVect test)
---     when verbose $ print (here, allSigs)
--- 
---     let xxy = evalTestVect1 prog allSigs (testVect test)
--- 
---     when verbose $ print (here, xxy)
---     let Right traces = xxy
---     when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
--- 
---     let testTrace = getSignals (watch test) (testVect test) traces
---     let passed = expected test == testTrace
--- 
---     when verbose $ do
---         print (here, testTrace)
---         print (here, expected test)
---         print (here, passed, if passed then "PASSED" else "FAILED" :: String)
--- 
---     return passed
-
-omfg
+runLadderTest
     :: (Eq addr, Show addr)
     => Bool
     -> LadderTest addr
     -> [(CellType, addr)]
     -> ([addr] -> TestVect addr -> Either (Memory addr, String) [[V addr]])
     -> IO Bool
-omfg verbose test memSlots prog = do
+runLadderTest verbose test memSlots prog = do
 
     when verbose $ do
         print (here, memSlots, "<<<<<"::String)

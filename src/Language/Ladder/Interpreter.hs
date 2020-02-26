@@ -25,10 +25,12 @@ import Data.List
 import Data.String
 import Data.Void
 import Control.Monad.State
+import Control.Monad.Except
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
 import Language.Ladder.Eval (Memory, V(..), CellType(..))
+import Language.Ladder.LadderParser (DeviceParser, DevOpFlag(..))
 
 --------------------------------------------------------------------------------
 
@@ -453,5 +455,44 @@ data StackEmitState p w = StackEmitState
     , esNodes :: [p]
     , esCode :: w
     }
+
+--------------------------------------------------------------------------------
+
+-- literalFromInt2 :: (MonadError String m, Monad m) => Int -> m (V String)
+-- literalFromInt2 i = return $ I $ fromIntegral i --TODO check range
+
+generateStk2xx
+    :: (Show addr, Show word, Show lbl, Eq lbl, MonadError String m, Monad m)
+    => (dev -> Either String x) --TODO swap (Either String) for m
+    -> (x -> [Instruction word addr])
+    -> [(Maybe lbl, Cofree (Diagram Void dev lbl) DgExt)]
+    -> m [ExtendedInstruction Int (Instruction word addr)]
+generateStk2xx doOp emitDev ast = do
+    ast'   <- for ast (traverse (mapOpsM (liftEither . doOp))) --FIXME remove liftEither
+    ast''  <- for ast' (traverse (generateStk2' emitDev))
+    ast''' <- liftEither $ resolveLabels ast'' 
+    return ast'''
+
+-- |Apply monadic action to every device
+mapOpsM
+    :: Monad m
+    => (a -> m b) -- ^action to apply
+    -> Cofree (Diagram c a s) p
+    -> m (Cofree (Diagram c b s) p)
+mapOpsM f (a :< n) = (a :<) <$> (mapDgA pure f pure n >>= traverse (mapOpsM f))
+
+--------------------------------------------------------------------------------
+
+wrapDevice3
+    :: (Eq t, IsString t)
+    => (Int -> Either String word)
+    -> (addr -> Either String word)
+    -> DeviceParser t ([(CellType, Operand t)], DeviceImpl word addr)
+wrapDevice3 mkWord litFromAddr d
+    = case lookup d (devices mkWord litFromAddr) of
+        Just (DDesc _name ty impl)
+            -> Right (if length ty > 1 then Mandatory else None
+                    , \ops -> Right (zip (fmap snd ty) ops, impl))
+        Nothing -> Left "device type unknown"
 
 --------------------------------------------------------------------------------

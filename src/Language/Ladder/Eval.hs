@@ -11,8 +11,6 @@ import Data.List
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
--- import Language.Ladder.Tooling
--- import Language.Ladder.Interpreter (Memory, V(..), CellType(..))
 
 --------------------------------------------------------------------------------
 

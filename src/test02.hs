@@ -5,7 +5,7 @@ import System.Environment (getArgs)
 import Text.Read
 import Data.Text (unpack)
 
--- import Language.Ladder.Interpreter --FIXME
+import Language.Ladder.Interpreter --FIXME
 import Language.Ladder.Simple --FIXME
 import Language.Ladder.Eval
 
