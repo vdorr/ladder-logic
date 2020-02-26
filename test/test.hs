@@ -45,33 +45,25 @@ import TestUtils
 --------------------------------------------------------------------------------
 
 --discards whitespace tokens
-preproc5'
-    :: Text
-    -> Either Text [[(DgExt, Tok Text)]]
-preproc5' = preproc . first pack . runLexer
-    where
-    preproc = fmap dropWhitespace
+preproc5 :: Text -> Either String [[(DgExt, Tok Text)]]
+preproc5 = fmap dropWhitespace . runLexer
 
 --------------------------------------------------------------------------------
 
-preproc5'' :: Text -> Either String [[(DgExt, Tok Text)]]
-preproc5'' = first unpack . preproc5'
-
 --basic blocks
-testPreproc6 :: Text -> Either Text [(Maybe Text, [[Tok Text]])]
+testPreproc6 :: Text -> Either String [(Maybe Text, [[Tok Text]])]
 testPreproc6
---     = fmap (fmap (fmap (fmap (snd . fmap (fmap snd))))) . fmap labeledRungs . preproc5'
-    = fmap ( (fmap (fmap (fmap (fmap snd)))) . labeledRungs) . preproc5'
+    = fmap ((fmap (fmap (fmap (fmap snd)))) . labeledRungs) . preproc5
 
-testPreproc4 :: Text -> Either Text [[Tok Text]]
-testPreproc4 = fmap dropPos2 . preproc5'
+testPreproc4 :: Text -> Either String [[Tok Text]]
+testPreproc4 = fmap dropPos2 . preproc5
 
-testPreproc5 :: Text -> Either Text [Tok Text]
+testPreproc5 :: Text -> Either String [Tok Text]
 testPreproc5 = fmap concat . testPreproc4
 
 --keep comments and pragmas, drop position info, concat lines
-testLexer :: Text -> Either Text [Tok Text]
-testLexer = fmap dropPos . first pack . runLexer
+testLexer :: Text -> Either String [Tok Text]
+testLexer = fmap dropPos . runLexer
 
 simpleResult :: (Bifunctor f, Eq e, Monoid e) => f e a -> f Bool a
 simpleResult = first (/=mempty)
@@ -82,7 +74,7 @@ simpleResult = first (/=mempty)
 checkSyntax :: Text -> Either String ()
 checkSyntax s
     = () <$
-    (preproc5'' s >>=
+    (preproc5 s >>=
         runLadderParser_ wrapDeviceForTest ladder)
 
 assertFullyConsumed :: [[(DgExt, Tok Text)]] -> Assertion
@@ -313,12 +305,12 @@ ladderTests = testGroup "Ladder parser"
 --     Right t07 = test07_tokenized
     Right t07a = test07a_tokenized
 
-    test00_tokenized = preproc5' test00
+    test00_tokenized = preproc5 test00
 
-    test04_tokenized = preproc5' test04
---     test05_tokenized = preproc5' test05
---     test07_tokenized = preproc5' test07
-    test07a_tokenized = preproc5' test07a
+    test04_tokenized = preproc5 test04
+--     test05_tokenized = preproc5 test05
+--     test07_tokenized = preproc5 test07
+    test07a_tokenized = preproc5 test07a
 
 test00, test01, test04, test07a, test10, testN01 :: Text
 
@@ -425,7 +417,7 @@ analysisTests = testGroup "Analysis"
 
 testBox :: Int -> Text -> Either String (Dg (Tok Text))
 testBox ln input
-    = preproc5'' input >>= runLadderParser wrapDeviceSimple (box001 ln) >>= (return . snd)
+    = preproc5 input >>= runLadderParser wrapDeviceSimple (box001 ln) >>= (return . snd)
 
 boxTests :: TestTree
 boxTests = testGroup "Box parser"
@@ -449,9 +441,9 @@ boxTests = testGroup "Box parser"
             @?= Right (Zp [] [])
     ]
     where
-    Right box01_tokenized = preproc5' box01
---     Right box03_tokenized = preproc5' box03
---     Right box01b_tokenized = preproc5' box01b
+    Right box01_tokenized = preproc5 box01
+--     Right box03_tokenized = preproc5 box03
+--     Right box01b_tokenized = preproc5 box01b
 
 box01, box02 :: Text
 
@@ -542,13 +534,13 @@ basicTests =
 getTests :: IO TestTree
 getTests = do
     ftPos <- fileTests $ "test" </> "data"
-    ftNeg <- fileTestsNeg $ "test" </> "data" </> "negative"
+    ftNeg <- fileTestsNeg fileTestsNegTest1 $ "test" </> "data" </> "negative"
     return $ testGroup "Tests" [testGroup "Basic" basicTests, ftPos, ftNeg]
 
 --------------------------------------------------------------------------------
 
 parseForTestOrDie
-    :: [[((Int, (Int, Int)), Tok Text)]]
+    :: [[(DgExt, Tok Text)]]
     -> IO [ ( Maybe String
             , Cofree
                 (Diagram Void ([(CellType, Operand Text)], DeviceImpl (V addr) addr) String)
@@ -565,24 +557,39 @@ testFromDirectory path testName mkCase = do
     tests <- for files $ \fn -> mkCase fn
     return $ testGroup testName tests
 
-fileTestsNeg :: FilePath -> IO TestTree
-fileTestsNeg path
+fileTestsNeg
+    :: ([[(DgExt, Tok Text)]] -> Either String [ExtendedInstruction Int (Instruction (V String) String)])
+    -> FilePath
+    -> IO TestTree
+fileTestsNeg tst path
     = testFromDirectory path "File tests - negative" $ \fn -> do
         src <- TIO.readFile $ path </> fn
         return $ testCase fn $ do
-            case preproc5' src of
+            case preproc5 src of
                  Left err -> do
                      print (here, fn, err)
                      return () --preproc failed -> test succeeeded
                  Right lxs -> do
-                    case parseOrDie2 wrapDeviceForTest lxs of
-                        Left  _err -> return ()
-                        Right ast   -> do
-                            case compileForTest03 ast of
+--                     case parseOrDie2 wrapDeviceForTest lxs of
+--                         Left  _err -> return ()
+--                         Right ast   -> do
+--                             case compileForTest03 ast of
+--                                  Left err | length err > 0 -> return ()
+-- --                                  Left _err  -> assertFailure here
+-- --                                  Right _ -> assertFailure here
+--                                  _ -> assertFailure here
+--                     let x = parseOrDie2 wrapDeviceForTest lxs
+--                                 >>= compileForTest03
+                    case tst lxs of
                                  Left err | length err > 0 -> return ()
-                                 Left _err  -> assertFailure here
-                                 Right _ -> assertFailure here
-
+--                                  Left _err  -> assertFailure here
+--                                  Right _ -> assertFailure here
+                                 _ -> assertFailure here
+fileTestsNegTest1
+    :: [[(DgExt, Tok Text)]]
+    -> Either String [ExtendedInstruction Int (Instruction (V String) String)]
+fileTestsNegTest1 lxs
+    = parseOrDie2 wrapDeviceForTest lxs >>= compileForTest03
 
 fileTests :: FilePath -> IO TestTree
 fileTests path

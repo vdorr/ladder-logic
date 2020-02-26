@@ -23,7 +23,7 @@ data V addr
     = X !Bool
     | I !Int
     | A !addr
-    deriving (Show, Read, Eq)
+    deriving (Show, Read, Eq, Functor)
 
 -- data V2 addr = T | F | I !Int | A !addr
 --     deriving (Show, Read, Eq)

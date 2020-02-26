@@ -44,7 +44,7 @@ parseLadder4 lxs = do
 wrapDeviceSimple :: DeviceParser name (DevType name, [Operand name])
 wrapDeviceSimple dt = Right (Optional, Right . (dt,))
 
--- |Accept comporasin operators.
+-- |Accept comparison operators.
 -- Upper operand of neighbor device may overlap current device.
 wrapDeviceSimple2
     :: (Eq name, IsString name)

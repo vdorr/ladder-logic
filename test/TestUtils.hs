@@ -9,9 +9,7 @@ import qualified Data.Text.IO as TIO
 import Data.Text (Text, unpack)
 import qualified Data.Text as T
 import Control.Monad
--- import Control.Applicative
 import Data.Traversable
--- import Data.Semigroup
 import Data.Void
 import Control.Monad.Except
 import Data.Foldable
@@ -27,9 +25,7 @@ import Language.Ladder.Utils
 import Language.Ladder.Interpreter
 import Language.Ladder.Simple
 import Language.Ladder.Types
-
 import Language.Ladder.Tooling
-
 import Language.Ladder.Eval
 
 --------------------------------------------------------------------------------
@@ -48,7 +44,7 @@ data LadderTest addr = T01
     { testVect :: [(Int, [(addr, V addr)])]
     , watch :: [addr]
     , expected :: [[V addr]]
-    } deriving (Show, Read)
+    } deriving (Show, Read, Functor)
 
 --------------------------------------------------------------------------------
 
