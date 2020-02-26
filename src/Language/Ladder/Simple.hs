@@ -37,23 +37,23 @@ runLadderParser_ pd p s = fst <$> runParser pd p s
 
 --------------------------------------------------------------------------------
 
+type Ast4 = [(Maybe String, Cofree (Diagram Void (DevType String, [Operand String]) String) DgExt)]
+
 parseLadder1'
-    :: [(DgExt, Tok String)]
-    -> Either String
-        [(Maybe String, Cofree (Diagram Void (DevType String, [Operand String]) String) DgExt)]
+    :: [[(DgExt, Tok String)]]
+    -> Either String Ast4
 parseLadder1' lxs = do
     let lxs' = dropWhitespace lxs
     runLadderParser_ wrapDeviceSimple ladder' lxs'
 
 parseLadder1
     :: String
-    -> Either String
-        [(Maybe String, Cofree (Diagram Void (DevType String, [Operand String]) String) DgExt)]
+    -> Either String Ast4
 parseLadder1 s = do
     ast <- dropWhitespace <$> runLexerS' s
     runLadderParser_ wrapDeviceSimple ladder' ast
 
-eval1 :: [(Maybe String, Cofree (Diagram Void (DevType String, [Operand String]) String) DgExt)]
+eval1 :: Ast4
     -> EvMem String
     -> EvMem String
 eval1 = Language.Ladder.Eval.eval

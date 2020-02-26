@@ -38,6 +38,7 @@ import Language.Ladder.Interpreter
 import Language.Ladder.Types
 import Language.Ladder.Box
 import Language.Ladder.Tooling
+import Language.Ladder.Eval
 
 import TestUtils
 

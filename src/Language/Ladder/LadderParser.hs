@@ -107,7 +107,6 @@ label = eat >>= \case Label lbl -> return lbl
                       _         -> failure "expected label"
 
 withPos :: LdP d t (f (Cofree f DgExt)) -> LdP d t (Cofree f DgExt)
--- withPos :: _
 withPos p = (:<) <$> currentPos <*> p
 
 --------------------------------------------------------------------------------
@@ -180,7 +179,7 @@ hline2 = do
     vl <- hline
 --FIXME don't do this, parse (skip) vlines
 -- can't, vlines will be almost certainly eaten first
-    bridge vl
+    bridge vl -- skip 'vl' number of horizontal chars
 
 device :: LdP d t (Cofree (Diagram c d t) DgExt)
 device = withPos do

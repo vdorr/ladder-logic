@@ -10,9 +10,11 @@ import Data.Bifunctor
 
 -- import Language.Ladder.DiagramParser
 -- import Language.Ladder.LadderParser
--- import Language.Ladder.Utils
+import Language.Ladder.Utils
 import Language.Ladder.Interpreter
 -- import Language.Ladder.Analysis
+import Language.Ladder.Eval
+import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 
@@ -140,6 +142,21 @@ evalTestVect getTag setTag step st0 watch vect
         return (tr ++ [tr'], st'')
         where
         st' = setTag st stim
+
+--------------------------------------------------------------------------------
+
+evalTestVect1
+    :: (Eq addr, Show addr)
+    => [(Maybe lbl, Cofree (Diagram c (DevType String, [Operand addr]) t) DgExt)]
+    -> [addr]
+    -> TestVect addr
+    -> Either (Memory addr, String) [[V addr]]
+evalTestVect1 prog = evalTestVect getTag setTag step st0
+    where
+    getTag addr (EvMem m) = maybe undefined id $ lookup addr m -- addr -> EvMem addr -> V addr
+    setTag (EvMem m) new = EvMem $ updateMemory m new -- EvMem addr -> [(addr, V addr)] -> EvMem addr
+    step  = Right . Language.Ladder.Eval.eval prog
+    st0 = EvMem []
 
 --------------------------------------------------------------------------------
 

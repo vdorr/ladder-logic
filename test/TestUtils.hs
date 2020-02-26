@@ -29,12 +29,14 @@ import Language.Ladder.Types
 
 import Language.Ladder.Tooling
 
+import Language.Ladder.Eval
+
 --------------------------------------------------------------------------------
 
-data LadderTest = T01
-    { testVect :: [(Int, [(String, V String)])]
-    , watch :: [String]
-    , expected :: [[V String]]
+data LadderTest addr = T01
+    { testVect :: [(Int, [(addr, V addr)])]
+    , watch :: [addr]
+    , expected :: [[V addr]]
     } deriving (Show, Read)
 
 --------------------------------------------------------------------------------
@@ -75,7 +77,7 @@ type Ast2 = [(Maybe String
 
 runLadderTest22
     :: Bool
-    -> LadderTest
+    -> LadderTest String
     -> Ast2
     -> IO Bool
 runLadderTest22 verbose test ast = do
@@ -104,7 +106,7 @@ runLadderTest22 verbose test ast = do
 
     runLadderTestX
         :: Bool
-        -> LadderTest
+        -> LadderTest String
         -> [ExtendedInstruction Int (Instruction (V String) String)]
         -> IO Bool
     runLadderTestX verbose test@T01{} prog = do
@@ -144,7 +146,92 @@ runLadderTest22 verbose test ast = do
 --         putStrLn "---------------------------"
 --     runLadderTestX verbose test prog
 
+runLadderTest4
+    :: Bool
+    -> LadderTest String
+    -> Ast4
+    -> IO Bool
+runLadderTest4 verbose test prog = do
+
+    let memSlots = getVariables prog -- :: [(CellType, String)]
+
+    omfg verbose test memSlots (evalTestVect1 prog)
+
+--     when verbose $ do
+--         print (here, memSlots, "<<<<<"::String)
+--         print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
+-- 
+-- --TODO make into separate function
+--     let allSigs = testVectSignals (testVect test)
+--     when verbose $ print (here, allSigs)
+-- 
+--     let xxy = evalTestVect1 prog allSigs (testVect test)
+-- 
+--     when verbose $ print (here, xxy)
+--     let Right traces = xxy
+--     when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSigs $ transpose traces
+-- 
+--     let testTrace = getSignals (watch test) (testVect test) traces
+--     let passed = expected test == testTrace
+-- 
+--     when verbose $ do
+--         print (here, testTrace)
+--         print (here, expected test)
+--         print (here, passed, if passed then "PASSED" else "FAILED" :: String)
+-- 
+--     return passed
+
+omfg
+    :: (Eq addr, Show addr)
+    => Bool
+    -> LadderTest addr
+    -> [(CellType, addr)]
+    -> ([addr] -> TestVect addr -> Either (Memory addr, String) [[V addr]])
+    -> IO Bool
+omfg verbose test memSlots prog = do
+
+    when verbose $ do
+        print (here, memSlots, "<<<<<"::String)
+        print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
+
+    let allSigs = testVectSignals (testVect test)
+    when verbose $ print (here, allSigs)
+
+    let xxy = prog allSigs (testVect test)
+
+    when verbose $ print (here, xxy)
+    let Right traces = xxy
+    when verbose $ putStrLn $ unlines $ prettyTrace
+        $ fmap (first show) $ zip allSigs $ transpose traces
+
+    let testTrace = getSignals (watch test) (testVect test) traces
+    let passed = expected test == testTrace
+
+    when verbose $ do
+        print (here, testTrace)
+        print (here, expected test)
+        print (here, passed, if passed then "PASSED" else "FAILED" :: String)
+
+    return passed
+
 --------------------------------------------------------------------------------
+
+evalLadder4 :: Bool -> Int -> Ast4 -> IO ()
+evalLadder4 verbose num prog = do
+    let memSlots = getVariables prog -- :: [(CellType, String)]
+    print (here, memSlots, "<<<<<"::String)
+    let vect = memSlotsToTestVector num memSlots
+    print (here, vect, "<<<<<"::String)
+
+    let allSignalNames = fmap snd memSlots
+    let xxy = evalTestVect1 prog allSignalNames vect
+
+    when verbose $ print (here, xxy)
+    let Right traces = xxy
+
+    print (here, traces)
+    when verbose $ putStrLn $ unlines $ prettyTrace $ zip allSignalNames $ transpose traces
+    return ()
 
 evalLadder221
     :: Bool
@@ -221,7 +308,7 @@ lexFile file = do
         Left  err -> fail $ show (here, err)
         Right x   -> return x
 
-loadLadderTest :: FilePath -> IO (Maybe LadderTest, [[(DgExt, Tok Text)]])
+loadLadderTest :: FilePath -> IO (Maybe (LadderTest String), [[(DgExt, Tok Text)]])
 loadLadderTest file = do
     x            <- lexFile file
     let (pgms, _) = pickPragma "T01" $ getLeadingPragmas $ dropPos x

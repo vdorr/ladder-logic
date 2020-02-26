@@ -28,24 +28,7 @@ import Control.Monad.State
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
-
---------------------------------------------------------------------------------
-
-data CellType = Bit | TwoBits | Word
-    deriving (Show, Read, Eq, Ord)
--- | TON | TOF
- 
--- | Memory cell value, also represents its type and default value
-data V addr
-    = X !Bool
-    | I !Int
-    | A !addr
-    deriving (Show, Read, Eq)
-
--- data V2 addr = T | F | I !Int | A !addr
---     deriving (Show, Read, Eq)
-
-type Memory a = [(a, V a)]
+import Language.Ladder.Eval (Memory, V(..), CellType(..))
 
 --------------------------------------------------------------------------------
 

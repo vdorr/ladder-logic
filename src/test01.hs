@@ -18,6 +18,7 @@ import Language.Ladder.Simple
 import Language.Ladder.Interpreter
 import Language.Ladder.Types
 import Language.Ladder.Utils
+import Language.Ladder.Eval
 
 import Control.Monad.State
 -- import Control.Monad.Writer
