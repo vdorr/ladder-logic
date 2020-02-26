@@ -23,7 +23,6 @@ library
                      , Language.Ladder.DiagramParser
                      , Language.Ladder.LadderParser
                      , Language.Ladder.Interpreter
-                     , Language.Ladder.Analysis
                      , Language.Ladder.Utils
                      , Language.Ladder.Target
                      , Language.Ladder.Simple

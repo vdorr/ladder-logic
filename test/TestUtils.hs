@@ -33,6 +33,16 @@ import Language.Ladder.Eval
 
 --------------------------------------------------------------------------------
 
+-- |Execute diagram parser and return its result along with final stream state
+runLadderParser
+    :: DeviceParser t d -- ^device recognizer
+    -> LdP d t a -- ^parser
+    -> [[(DgExt, Tok t)]] -- ^input tokens
+    -> Either String (a, Dg (Tok t)) -- ^parser result and final state of parser stream
+runLadderParser = runParser
+
+--------------------------------------------------------------------------------
+
 data LadderTest addr = T01
     { testVect :: [(Int, [(addr, V addr)])]
     , watch :: [addr]
@@ -135,7 +145,7 @@ runLadderTest22 verbose test ast = do
 runLadderTest4
     :: Bool
     -> LadderTest String
-    -> Ast4
+    -> Ast4 String
     -> IO Bool
 runLadderTest4 verbose test prog
     = runLadderTest verbose test (getVariables prog) (evalTestVect1 prog)
@@ -175,7 +185,7 @@ runLadderTest verbose test memSlots prog = do
 
 --------------------------------------------------------------------------------
 
-evalLadder4 :: Bool -> Int -> Ast4 -> IO ()
+evalLadder4 :: Bool -> Int -> Ast4 String -> IO ()
 evalLadder4 verbose num prog = do
     let memSlots = getVariables prog -- :: [(CellType, String)]
     print (here, memSlots, "<<<<<"::String)
