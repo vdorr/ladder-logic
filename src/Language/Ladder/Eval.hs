@@ -54,7 +54,7 @@ evalM :: (Eq addr, Show addr, IsString t, Eq t)
     -> EvMem addr
     -> Either String (EvMem addr)
 evalM blocks st0 =
-    Right $ snd $ flip runState st0 do
+    snd <$> flip runStateT st0 do
         for_ blocks \(_ , ast) -> do
             r <- evalRung ast
             case r of
@@ -122,6 +122,8 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
                                                      I i -> pure i
                                                      _ -> undefined
 
+--------------------------------------------------------------------------------
+
 getVariables
     :: (Eq addr, IsString t, Eq t)
     => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
@@ -145,3 +147,4 @@ getVariables ast = nub $ snd $ runState (for_ ast (go' . snd)) []
     bits args = modify ( [ (Bit, addr) | Var addr <- args] ++ )
     ints args = modify ( [ (Word, addr) | Var addr <- args] ++ )
 
+--------------------------------------------------------------------------------

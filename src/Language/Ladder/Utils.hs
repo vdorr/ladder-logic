@@ -32,11 +32,11 @@ ann = (:<)
 
 --------------------------------------------------------------------------------
 
-unFix' :: Cofree f a -> (a, f (Cofree f a))
-unFix' (a :< f) = (a, f)
+--unFix' :: Cofree f a -> (a, f (Cofree f a))
+--unFix' (a :< f) = (a, f)
 
-cata' :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
-cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
+--cata' :: Functor f => ((w, f a) -> a) -> Cofree f w -> a
+--cata' alg = alg . fmap (fmap (cata' alg)) . unFix'
 
 --------------------------------------------------------------------------------
 

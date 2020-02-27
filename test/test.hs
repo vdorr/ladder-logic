@@ -533,8 +533,8 @@ basicTests =
 
 getTests :: IO TestTree
 getTests = do
-    ftPos <- fileTests $ "test" </> "data"
-    ftNeg <- fileTestsNeg fileTestsNegTest1 $ "test" </> "data" </> "negative"
+    ftPos <- fileTests actualFileTest4 $ "test" </> "data"
+    ftNeg <- fileTestsNeg fileTestsNegTest4 $ "test" </> "data" </> "negative"
     return $ testGroup "Tests" [testGroup "Basic" basicTests, ftPos, ftNeg]
 
 --------------------------------------------------------------------------------
@@ -557,8 +557,12 @@ testFromDirectory path testName mkCase = do
     tests <- for files $ \fn -> mkCase fn
     return $ testGroup testName tests
 
+--------------------------------------------------------------------------------
+
 fileTestsNeg
-    :: ([[(DgExt, Tok Text)]] -> Either String [ExtendedInstruction Int (Instruction (V String) String)])
+    :: ([[(DgExt, Tok Text)]] -> Either String ()
+--      [ExtendedInstruction Int (Instruction (V String) String)]
+     )
     -> FilePath
     -> IO TestTree
 fileTestsNeg tst path
@@ -584,36 +588,104 @@ fileTestsNeg tst path
                                  Left err | length err > 0 -> return ()
 --                                  Left _err  -> assertFailure here
 --                                  Right _ -> assertFailure here
-                                 _ -> assertFailure here
-fileTestsNegTest1
-    :: [[(DgExt, Tok Text)]]
-    -> Either String [ExtendedInstruction Int (Instruction (V String) String)]
-fileTestsNegTest1 lxs
-    = parseOrDie2 wrapDeviceForTest lxs >>= compileForTest03
+                                 failed -> assertFailure $ show (here, failed)
 
-fileTests :: FilePath -> IO TestTree
-fileTests path
+--------------------------------------------------------------------------------
+
+fileTests
+    :: ([[[String]]] -> Maybe (LadderTest String)
+                      -> [[(DgExt, Tok Text)]]
+                      -> IO (Maybe String))
+    -> FilePath -> IO TestTree
+fileTests runTest path
     = testFromDirectory path "File tests - positive" $ \fn -> do
         return $ testCase fn $ do
             (tst, lxs'') <- loadLadderTest (path </> fn)
             let lxs = dropWhitespace lxs''
-            let (pgms, _) = pickPragma "LANGUAGE" $ getLeadingPragmas $ dropPos lxs''
-            let wrapper = case fmap (fmap (words . unpack)) pgms of
-                 (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2
-                 _ -> wrapDeviceSimple
+            let (pgms', _) = pickPragma "LANGUAGE" $ getLeadingPragmas $ dropPos lxs''
+            let pgms = (fmap (fmap (words . unpack)) pgms')
 
-            case tst of
-                Nothing -> do
-                    case runLadderParser wrapper ladder' lxs of
-                        Right _ -> return ()
-                        Left err -> fail err
-                Just t -> do
-                    ast <- parseForTestOrDie lxs
-                    passed <- runLadderTest22 False t ast
-                    passed @?= True
+            testFailure <- runTest pgms tst lxs
+            testFailure @?= Nothing
+
+--             let wrapper = case pgms of
+--                  (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2
+--                  _ -> wrapDeviceSimple
+-- 
+--             case tst of
+--                 Nothing -> do
+--                     case runLadderParser wrapper ladder' lxs of
+--                         Right _ -> return ()
+--                         Left err -> fail err
+--                 Just t -> do
+--                     ast <- parseForTestOrDie lxs
+--                     passed <- runLadderTest22 False t ast
+--                     passed @?= True
 
 wrapDevTest1 :: DeviceParser Text (DevType Text, [Operand Text])
 wrapDevTest1 = wrapDeviceSimple2
+
+--------------------------------------------------------------------------------
+
+fileTestsNegTest4
+    :: [[(DgExt, Tok Text)]]
+    -> Either String ()
+fileTestsNegTest4 lxs'
+    = void $ parseLadder4 lxs >>= (\p -> Language.Ladder.Eval.evalM p (EvMem []))
+    where
+    lxs = fmap (fmap (fmap (fmap unpack))) lxs'
+
+fileTestsNegTest1
+    :: [[(DgExt, Tok Text)]]
+    -> Either String ()
+fileTestsNegTest1 lxs
+    = void $ parseOrDie2 wrapDeviceForTest lxs >>= compileForTest03
+
+
+actualFileTest1 :: [[[String]]] -> Maybe (LadderTest String)
+                      -> [[(DgExt, Tok Text)]]
+                      -> IO (Maybe String)
+actualFileTest1 pgms tst lxs = do
+    let wrapper
+            = case pgms of
+                (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2
+                _other                                          -> wrapDeviceSimple
+
+    case tst of
+        Nothing -> do
+            case runLadderParser wrapper ladder' lxs of
+                Right _ -> return Nothing
+                Left err ->
+--                             fail err
+                    return $ Just err
+        Just t -> do
+--             ast <- parseForTestOrDie lxs
+            let Right ast = parseOrDie2 wrapDeviceForTest lxs
+            passed <- runLadderTest22 False t ast
+            return $ if passed then Nothing else Just "embedded test failed"
+
+
+actualFileTest4 :: [[[String]]] -> Maybe (LadderTest String)
+                      -> [[(DgExt, Tok Text)]]
+                      -> IO (Maybe String)
+actualFileTest4 pgms tst lxs' = do
+    let wrapper
+            = case pgms of
+                (["LANGUAGE" : "BottomOperandContext" : _] : _) -> wrapDeviceSimple2
+                _other                                          -> wrapDeviceSimple
+    let lxs = fmap (fmap (fmap (fmap unpack))) lxs'
+
+    case tst of
+        Nothing -> do
+            case runLadderParser wrapper ladder' lxs of
+                Right _ -> return Nothing
+                Left err ->
+--                             fail err
+                    return $ Just err
+        Just t -> do
+            let Right ast = parseLadder4 lxs
+            passed <- runLadderTest4 False t ast
+            return $ if passed then Nothing else Just "embedded test failed"
 
 --------------------------------------------------------------------------------
 

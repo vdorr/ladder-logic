@@ -24,11 +24,12 @@ runLadderParser_ pd p s = fst <$> runParser pd p s
 type Ast4 t = [(Maybe t, Cofree (Diagram Void (DevType t, [Operand t]) t) DgExt)]
 
 parseLadder4
-    :: [[(DgExt, Tok t)]]
+    :: (IsString t, Eq t)
+    => [[(DgExt, Tok t)]]
     -> Either String (Ast4 t)
 parseLadder4 lxs = do
     let lxs' = dropWhitespace lxs
-    fst <$> runParser wrapDeviceSimple ladder' lxs'
+    fst <$> runParser wrapDeviceSimple2 ladder' lxs'
 
 -- parseLadder1
 --     :: String

@@ -40,11 +40,15 @@ runLadderParser = runParser
 
 --------------------------------------------------------------------------------
 
-data LadderTest addr = T01
+data LadderTest addr
+    = T01
     { testVect :: [(Int, [(addr, V addr)])]
     , watch :: [addr]
     , expected :: [[V addr]]
-    } deriving (Show, Read, Functor)
+    }
+--     | T02
+--     {}
+    deriving (Show, Read, Functor)
 
 --------------------------------------------------------------------------------
 
@@ -236,6 +240,54 @@ evalLadder221 verbose num ast = do
         traverse_ mp2 n
 
     addressesOnly s = [(t, a)|((t, Var a)) <- s]
+
+--------------------------------------------------------------------------------
+
+evalTestVect'''
+    :: (Eq addr, Show addr)
+    => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
+    -> [addr] -- ^watched memory variables
+    -> TestVect addr -- ^test vector
+    -> Either (Memory addr, String) [[V addr]]
+evalTestVect''' prog = evalTestVect getTag3 setTag3 itp3 p
+    where
+    p = makeItpSt3 [] [(1, 0, prog)]
+
+--     itp3 :: (Show addr, Eq addr)
+--         => ItpSt3 addr
+--         -> Either (ItpSt3 addr, String) (ItpSt3 addr)
+    itp3 = first undefined . run
+
+--     getTag3 :: Eq addr => addr -> ItpSt3 addr -> V addr
+    getTag3 addr (_a, _b, m) = maybe undefined id $ lookup addr m
+
+--     setTag3 :: Eq addr => ItpSt3 addr -> [(addr, V addr)] -> ItpSt3 addr
+    setTag3 (a, b, m) stim = (a, b, updateMemory m stim)
+
+-- evalTestVect'''
+--     :: (Eq addr, Show addr)
+--     => [ExtendedInstruction Int (Instruction (V addr) addr)] -- ^program
+--     -> [addr] -- ^watched memory variables
+--     -> TestVect addr --[(Int, [(addr, V)])] -- ^test vector
+--     -> Either (Memory addr, String) [[V addr]]
+-- evalTestVect''' = evalTestVect'
+-- evalTestVect''' prog watch vect
+-- 
+--     = case foldlM go ([], p) vect' of
+--         Left  (_st, err) -> error $ show (here, err)
+--         Right (y, _)     -> return y
+--     where
+-- 
+--     vect' = flattenTestVect vect
+-- 
+--     p = makeItpSt3 [] [(1, 0, prog)]
+-- 
+--     go (tr, (x, y, mem)) stim = do
+--         st'@(_, _, mem'') <- run (x, y, mem')
+--         let tr' = [ v | (flip lookup mem'' -> Just v) <- watch ]
+--         return (tr ++ [tr'], st')
+--         where
+--         mem' = updateMemory mem stim
 
 --------------------------------------------------------------------------------
 

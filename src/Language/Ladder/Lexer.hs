@@ -3,26 +3,15 @@ module Language.Ladder.Lexer
     ( Tok(..)
     , SrcRange
     , dropWhitespace
---     , stripPos3
     , runLexer
---     , labeledRungs
---     , runLexer
     , getLeadingPragmas
---     , dropPos
     , renderLexeme
---     , dropPos2
---     , lx
-, runLexerS'
+    , runLexerS'
     )
     where
 
---FIXME FIXME get rid of megaparsec
--- import Text.Megaparsec hiding (Label) --as P hiding (runParser', Pos)
--- import Text.Megaparsec.Char --as PC
 import Data.Bifunctor
--- import Control.Applicative.Combinators (between)
 import Data.List hiding (stripPrefix)
--- import qualified Data.Text as T
 import Data.Text (Text, breakOn, pack, unpack, stripPrefix)
 import Data.Char
 
