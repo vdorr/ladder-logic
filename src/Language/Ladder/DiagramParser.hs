@@ -12,11 +12,12 @@ module Language.Ladder.DiagramParser
     , currentPos, lastPos, keepOrigin
     , goRight, goDown, goUp, goLeft
     , goRight'', goDown'', goUp'', goLeft''
-    , colRight, colUnder --XXX remove
+--     , colRight, colUnder --XXX remove
     , applyDgp, mkDgZp
     , dgLength, dgTrim
     , getState, getStream
     , failure
+    , lookAround, nextPos
     )
     where
 
@@ -27,7 +28,6 @@ import Control.Monad hiding (fail)
 -- import Data.Maybe
 -- import Data.Traversable
 import GHC.Exts
-
 import Control.Monad.Except hiding (fail)
 import Control.Monad.State hiding (fail)
 
@@ -55,9 +55,6 @@ type SFM s = StateT s (Either String)
 sfm :: SFM s a -> s -> Either String (a, s)
 sfm = runStateT
 
--- instance Control.Monad.Fail.MonadFail (Either String) where
---     fail = Left
-
 --------------------------------------------------------------------------------
 
 -- |Diagram parser input stream (or, say, input vortex)
@@ -66,8 +63,7 @@ type Dg a = Zp (Zp (DgExt, a))
 --------------------------------------------------------------------------------
 
 -- |Move in some direction from provided origin
-type ParsingDirection tok = DgExt -> Dg tok -> Either String (Dg tok)
--- type MoveToNext tok = ParsingDirection tok
+type ParsingDirection tok = DgExt -> Dg tok -> Either (DgExt, String) (Dg tok)
 
 --TODO TODO make some tests for psFocused behaviour (e.g. gap test)
 
@@ -87,8 +83,27 @@ applyDgp p dg st = sfm p (DgPSt goRight dg Nothing True st)
 
 --------------------------------------------------------------------------------
 
-move_ :: Int -> Int -> Dg a -> Either String (Dg a)
-move_ ln co dg = maybe (throwError "move_: bad move") return (move ln co dg)
+lookAround :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
+lookAround p
+    = gets (sfm p) >>= \case
+         Right (a, _) -> return a
+         Left   err   -> failure err
+
+-- |expected position of next token
+nextPos :: SFM (DgPState st tok) DgExt
+nextPos = do
+    p <- lastPos
+    next <- gets psNext
+    str <- gets psStr
+    case next p str of
+         Left (x, _)                     -> return x
+         Right str' | Just x <- pos str' -> return x
+         _                               -> failure "nextPos"
+
+--------------------------------------------------------------------------------
+
+move_ :: Int -> Int -> Dg a -> Either (DgExt, String) (Dg a)
+move_ ln co dg = maybe (Left ((ln, (co, co)), "move_: bad move")) Right (move ln co dg)
 -- move_ ln co dg = maybe (throwError here) return (moveNotCursed ln co dg)
 
 --FIXME should move only to direct neigbour
@@ -109,9 +124,6 @@ getState = gets psUser
 
 getStream :: SFM (DgPState st tok) (Dg tok)
 getStream = gets psStr
-
--- getCurrentLine :: SFM (DgPState st tok) [tok]
--- getCurrentLine = toList <$> getStream
 
 lastPos :: SFM (DgPState st tok) DgExt
 lastPos = psLastBite <$> get >>= maybe (failure "lastPos: nothing parsed") pure
@@ -172,7 +184,6 @@ gap = do
 
 -- |Succeeds FIXME FIXME i am not sure when
 end :: SFM (DgPState st tok) ()
--- end = void peek <|> (lift $ Left "not empty")
 end = (cursor . psStr) <$> get >>= \case
                                          Nothing -> return ()
                                          _ -> failure "not empty"
@@ -185,37 +196,11 @@ currentPos = currentPosM >>= \case
                        Just p -> return p
                        _ -> failure "empty"
 
--- peek :: SFM (DgPState st tok) tok
--- peek = peekM >>= \case
---                        Just p -> return p
---                        _ -> lift $ Left "empty"
--- 
--- peekM :: SFM (DgPState st tok) (Maybe tok)
--- peekM = (cursor . psStr) <$> get
-
--- --for VLine crossing impl
--- skipSome :: (tok -> Bool) -> SFM (DgPState st tok) ()
--- skipSome f
---     = peekM >>= \case
---          Just x | f x -> step >> skipSome f
---          _            -> return ()
--- 
--- -- |Step over lexeme or do nothing
--- skip :: (tok -> Bool) -> SFM (DgPState st tok) ()
--- skip f
---     = peekM >>= \case
---          Just x | f x -> step
---          _            -> return ()
--- 
-
 --------------------------------------------------------------------------------
 
 -- |Fail if input stream is not empty
 dgIsEmpty :: SFM (DgPState st tok) ()
--- dgIsEmpty :: Show tok => SFM (DgPState st tok) ()
 dgIsEmpty
---     =   (dgNull . psStr) <$> get
---     >>= (`when` (lift $ Left $ here ++ "not empty"))
     = fmap focusDg getStream >>= \case
                                     (Zp _ (Zp _ ((p, _):_):_) ) -> 
                                         failure $ "dgIsEmpty: not empty " ++ show p
@@ -227,21 +212,6 @@ dgIsEmpty
    | *-------
   
 -}
-
--- goLeft', goUp', goDown', goRight'  :: SFM (DgPState st tok) ()
--- goLeft' = step' goLeft
--- goUp' = step' goUp
--- goDown' = step' goDown
--- goRight' = step' goRight
--- 
--- step' f = do
---     origin <- gets psLastBite >>= \case
---                                     Just ppp -> return ppp
---                                     _ -> undefined --use currently focused position?
---     DgPSt _ zp ps focused st <- get
---     case f origin zp of
---         Right zp'  -> put (DgPSt f zp' ps True st)
---         Left  _err -> lift $ Left here --or not?
 
 goLeft'', goUp'', goDown'', goRight'' :: SFM (DgPState st tok) ()
 goLeft'' = step'' goLeft
@@ -255,9 +225,6 @@ step'' f = do
                                     Just ppp -> return ppp
                                     _ -> undefined --use currently focused position?
     DgPSt _ zp ps _focused st <- get
---     case f origin zp of
---         Right zp'  -> put (DgPSt f zp' ps True st)
---         Left  _err -> lift $ Left here --or not?
     put case f origin zp of
             Right zp'  -> DgPSt f zp' ps True st
             Left  _ -> DgPSt f zp ps False st
@@ -310,11 +277,11 @@ eol = do
         DgLineEnd -> return ()
         _         -> failure "eol: not eol"
 
-colRight :: DgExt -> DgExt
-colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
-
-colUnder :: DgExt -> DgExt
-colUnder (ln, (_, co)) = (ln + 1, (co, co))
+-- colRight :: DgExt -> DgExt
+-- colRight (ln, (_, co)) = (ln, (co + 1, co + 1))
+-- 
+-- colUnder :: DgExt -> DgExt
+-- colUnder (ln, (_, co)) = (ln + 1, (co, co))
 
 --------------------------------------------------------------------------------
 
@@ -330,9 +297,6 @@ cursor = tip >=> tip >=> pure . snd
 
 pos :: Dg a -> Maybe DgExt
 pos = tip >=> tip >=> pure . fst
-
--- line :: Dg a -> Maybe Int
--- line = pos >=> pure . fst
 
 mkDgZp :: [[(DgExt, tok)]] -> Dg tok
 mkDgZp = fromList . fmap fromList
@@ -362,19 +326,11 @@ moveToLine ln = move2 (compare (Just ln) . getLineNumber)
 
 --------------------------------------------------------------------------------
 
--- colocated' :: ParsingDirection tok
---           -> SFM (DgPState st tok) t
---           -> (t -> SFM (DgPState st tok) b1)
---           -> SFM (DgPState st tok) b1
--- colocated' mapPos p pp = do
---     undefined
-
 colocated'' :: SFM (DgPState st tok) a
           -> (a -> SFM (DgPState st tok) b) -- `option (goDown' varName)` or `goUp' argument`
           -> SFM (DgPState st tok) b
 colocated'' p pp = do
     directionBackup <- gets psNext
---     begin <- currentPos
     x     <- p
     next  <- currentPos
     lastBiteBackup  <- gets psLastBite

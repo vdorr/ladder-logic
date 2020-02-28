@@ -26,6 +26,7 @@ import Data.String
 import Data.Void
 import Control.Monad.State
 import Control.Monad.Except
+import Data.Functor.Identity
 
 import Language.Ladder.Utils
 import Language.Ladder.Types
@@ -496,3 +497,24 @@ wrapDevice3 mkWord litFromAddr d
         Nothing -> Left "device type unknown"
 
 --------------------------------------------------------------------------------
+
+mapDg :: (c -> c') -> (d -> d') -> (s -> s') -> Diagram c d s a -> Diagram c' d' s' a
+mapDg z x y = runIdentity . mapDgA (pure . z) (pure . x) (pure . y)
+
+mapDgA
+    :: Applicative f
+    => (c -> f c')
+    -> (d -> f d')
+    -> (s -> f s')
+    -> Diagram c d s a
+    -> f (Diagram c' d' s' a)
+mapDgA z x y = f
+    where
+    f (Source   a) = pure $ Source     a
+    f  Sink        = pure $ Sink
+    f  End         = pure $ End
+    f (Device d a) =        Device <$> x d <*> pure a
+    f (Jump s    ) =        Jump   <$> y s
+    f (Node     a) = pure $ Node       a
+    f (Conn c    ) =        Conn   <$> z c
+    f (Cont c   a) =        Cont   <$> z c <*> pure a

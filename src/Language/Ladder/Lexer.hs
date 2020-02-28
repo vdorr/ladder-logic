@@ -6,19 +6,19 @@ module Language.Ladder.Lexer
     , runLexer
     , getLeadingPragmas
     , renderLexeme
-    , runLexerS'
+    , runLexerS
     )
     where
 
 import Data.Bifunctor
-import Data.List hiding (stripPrefix)
-import Data.Text (Text, breakOn, pack, unpack, stripPrefix)
+import Data.List
+import Data.Text (Text, pack, unpack)
 import Data.Char
 
 --------------------------------------------------------------------------------
 
--- lex2 :: (s -> (Maybe Char, s)) -> s -> Either String [Tok x]
--- lex2 uncons s = error "TODO"
+-- lex2 :: (s -> (Maybe Char, s)) -> (Char -> s -> s) -> s -> Either String [Tok x]
+-- lex2 uncons snoc s = error "TODO"
 
 --------------------------------------------------------------------------------
 
@@ -55,40 +55,6 @@ data Tok a
 --------------------------------------------------------------------------------
 
 type SrcRange = (Int, (Int, Int))
-
--- lx :: String -> Either String [(SrcRange, Tok String)]
--- lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
---     where
---     f    ('{':     xs) t = lol xs (Pragma . lines)  (takeUntilC '}') t
---     f    ('(':'*': xs) t = lol xs (Comment . lines) (takeUntil "*)") t
---     f xs@(' ':    _xs) t = lol xs (Whitespace . (length)) (chars ' ') t
---     f    ('\n':    xs) t = lol' (+1) (+1) xs (\_ _ -> NewLine) (const $ Right ((), xs)) t
---     f    ('|':     xs) t = lol xs (const VLine) (const $ Right ((), xs)) t
---     f    ('+':     xs) t = lol xs (const Cross) (const $ Right ((), xs)) t
---     f    ('-':     xs) t = lol' (+1) id xs (\a b -> HLine (length a + 1) (countvl b)) (chars '-') t
---     f    ('[':     xs) t = lol xs (Contact) (takeUntil "]" ) t
---     f    ('(':     xs) t = lol xs (Coil)  (takeUntil ")" ) t
---     f    ('>':     xs) t = lol xs (const REdge) (const $ Right ((), xs)) t
---     f    ('<':     xs) t = lol xs (const FEdge) (const $ Right ((), xs)) t
---     f    (':':     xs) t = lol xs (const Colon) (const $ Right ((), xs)) t
---     f xs@(c  :     _)  t
---         | isDigit c      = lol xs (Number . read)  (digits) t
---         | isAlpha c || c=='%'     = lol xs (Name)  (alphaNum) t
---     f    []            t = Right (t, [])
---     f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
--- 
---     lol' :: (Int -> Int) -> (Int -> Int) -> String -> (w -> String -> Tok String)
---         -> (String -> Either String (w, String))
---         -> (Int, Int, [(SrcRange, Tok String)])
---         -> Either String
---             ((Int, Int, [(SrcRange, Tok String)]), String)
---     lol' mapCol mapLine xs g p (ln, k, ys) = do
---         (a, xs') <- p xs
---         let ln' = mapLine ln
---         let k0 = k -- if ln == ln' then (k) else (1)
---         let k' = k0 + length xs - length xs'
---         f xs' (ln', mapCol k', ((ln, (k0, k')), g a xs') : ys) -- g a xs' : ys)
---     lol mapCol xs g p ys = lol' mapCol id xs (\a _ -> g a) p ys
 
 lx :: String -> Either String [(SrcRange, Tok String)]
 lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
@@ -138,16 +104,28 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
     digits cs = Right $ span (isDigit) cs
     alphaNum cs = Right $ span (\c -> isAlphaNum c || c == '_' || c == '%') cs
     chars c cs = Right $ span (==c) cs -- or until, not sure
-    takeUntil n h = case breakOn (pack n) (pack h) of
-                     (p, xs) -> case stripPrefix (pack n) xs of
+
+--     takeUntil n h = case breakOn (pack n) (pack h) of
+--                      (p, xs) -> case stripPrefix (pack n) xs of
+--                                      Nothing -> Left "wtf"
+--                                      Just xxs -> Right (unpack p, unpack xxs)
+    takeUntil n h = case breakOnString n h of
+                     (p, xs) -> case stripPrefix n xs of
                                      Nothing -> Left "wtf"
-                                     Just xxs -> Right (unpack p, unpack xxs)
+                                     Just xxs -> Right (p, xxs)
+
     takeUntilC n h = case break (==n) (h) of
                      (p, n':xs) | n'==n, isSuffixOf "\\" p
                         -> first ((p++[n'])++) <$> takeUntilC n xs
                      (p, n':xs) | n'==n -> Right (p, xs)
                      (_p, _xs) -> Left "lol"
 
+breakOnString:: (Eq a) => [a] -> [a] -> ([a], [a])
+breakOnString needle = go []
+    where
+    go ys [] = (reverse ys, [])
+    go ys xs | isPrefixOf needle xs = (reverse ys, xs)
+    go ys (x:xs) = go (x:ys) xs
 
 lxx :: [(SrcRange, Tok String)] -> [(SrcRange, Tok String)]
 lxx = f
@@ -261,11 +239,11 @@ lxx = f
 
 
 runLexer :: Text -> Either String [ [(SrcRange, Tok Text)] ]
-runLexer s
-    = ((split ((NewLine==).snd)) . fmap (fmap (fmap pack)) . lxx) <$> (lx $ unpack s)
+runLexer = fmap (fmap (fmap (fmap (fmap pack)))) . runLexerS . unpack
+--     = ((split ((NewLine==).snd)) . fmap (fmap (fmap pack)) . lxx) <$> (lx $ unpack s)
 
-runLexerS' :: String -> Either String [ [(SrcRange, Tok String)] ]
-runLexerS' s = (split ((NewLine==).snd) . lxx) <$> lx s
+runLexerS :: String -> Either String [ [(SrcRange, Tok String)] ]
+runLexerS s = (split ((NewLine==).snd) . lxx) <$> lx s
 
 split :: (a -> Bool) -> [a] -> [[a]]
 split p xs = case break p xs of

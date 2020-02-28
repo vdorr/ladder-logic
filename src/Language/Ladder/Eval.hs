@@ -4,7 +4,7 @@ module Language.Ladder.Eval where
 import Control.Monad.State
 import Control.Monad.Except
 import Data.Foldable
-import Data.Traversable
+-- import Data.Traversable
 -- import Data.Char (toUpper)
 import Data.List
 import Data.String
@@ -43,27 +43,26 @@ data EvSt t = EvSt
     { stTmp :: [(DgExt, Bool)]
     }
 
-eval :: (Eq addr, Show addr, IsString t, Eq t)
-    => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
-    -> EvMem addr
-    -> EvMem addr
-eval blocks st0 = either undefined id (evalM blocks st0)
-
-evalM :: (Eq addr, Show addr, IsString t, Eq t)
-    => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
+evalM :: (Eq addr, Show addr, IsString t, Eq t, Show t)
+    => [(Maybe t, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
     -> EvMem addr
     -> Either String (EvMem addr)
-evalM blocks st0 =
-    snd <$> flip runStateT st0 do
-        for_ blocks \(_ , ast) -> do
-            r <- evalRung ast
-            case r of
-                 Left (NeedJump _) -> undefined --TODO
-                 Right _ -> return ()
+evalM blocks = execStateT (go blocks)
+    where
+    go ((_, x):xs)
+        = evalRung x
+        >>= \case
+                Left (NeedJump lbl)
+                      -> case break ((Just lbl==).fst) blocks of
+                              (_, []) -> lift $ Left $ "label not found: " ++ show lbl
+                              (_, target) -> go target
+                Right _ -> go xs
+    go [] = pure ()
+                                          
 
-evalRung :: (Eq addr, Show addr, Monad m, IsString t, Eq t)
+evalRung :: (Eq addr, Show addr, IsString t, Eq t, Show t)
     => Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt
-    -> StateT (EvMem addr) m (Either (EvResult t) ([DgExt], EvSt t1))
+    -> StateT (EvMem addr) (Either String) (Either (EvResult t) ([DgExt], EvSt t1))
 evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast) (EvSt []))
     where
 
@@ -73,9 +72,10 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
         where
 
         aaaargh (pp :< Node w) = do
-            xx <- for w aaaargh
-            t <- getTmp False pp
-            return $ or $ t : xx
+            (||) <$> getTmp False pp <*> foldlM (\a b -> (a||) <$> aaaargh b) False w
+--             xx <- for w aaaargh
+--             t <- getTmp False pp
+--             return $ or $ t : xx
         aaaargh _ = pure False
 
         go node@(Node _) = (q ||) <$> aaaargh (p :< node)
@@ -83,9 +83,10 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
         go (Source _a  ) = pure True
         go  End          = pure q
         go (Device d _a) = evalDev d
-        go (Jump   l   ) = throwError (NeedJump l)
-        go (Cont  _c _a) = undefined
-        go (Conn  _c   ) = undefined
+        go (Jump   l   ) = if q then throwError (NeedJump l) else pure q
+--         go (Cont  _c _a) = undefined
+--         go (Conn  _c   ) = undefined
+        go _ = undefined
 
         evalDev (d, a) = accEmitDev1 (d, a) -- accEmitDev1 (fmap toUpper <$> d, a)
 
@@ -94,11 +95,11 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
         accEmitDev1 (Contact_ ">", [    a, b]) = (>) <$> getInt a <*> getInt b
         accEmitDev1 (Contact_ "<", [    a, b]) = (<) <$> getInt a <*> getInt b
         accEmitDev1 (Coil_    " ", [Var a   ]) = setBit a q
-        accEmitDev1 (Coil_    "/", [Var _a   ]) = undefined
-        accEmitDev1 (Coil_    "S", [Var _a   ]) = undefined
-        accEmitDev1 (Coil_    "R", [Var _a   ]) = undefined
-        accEmitDev1 (Coil_    _d , _args     ) = undefined
-        accEmitDev1 _                          = undefined
+        accEmitDev1 (Coil_    "/", [Var a   ]) = setBit a (not q)
+        accEmitDev1 (Coil_    "S", [Var a   ]) = if q then setBit a True else pure q
+        accEmitDev1 (Coil_    "R", [Var a   ]) = if q then setBit a False else pure q
+--         accEmitDev1 (Coil_    _d , _args     ) = undefined
+        accEmitDev1 other = lift $ lift $ lift $ Left $ "unknown device:" ++ show other
 
         getTmp d pp = getTag' stTmp d pp
         setTmp pp v = modify $ \st -> st { stTmp = (pp, v) : stTmp st}

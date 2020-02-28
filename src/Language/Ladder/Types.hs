@@ -4,13 +4,13 @@ module Language.Ladder.Types
     , Operand(..)
     , DevType(..)
     , DgExt
-    , mapDgA, mapDg
+--     , mapDgA, mapDg
     , traverseDiagram
     , checkDataDep, collectNodesAndSinks
     )
 where
 
-import Data.Functor.Identity
+-- import Data.Functor.Identity
 import Control.Monad.State
 -- import Data.Traversable
 import Data.Foldable
@@ -51,28 +51,6 @@ data Diagram continuation device label a
     | Cont   !continuation !a
     | Conn   !continuation
     deriving (Show, Functor, Eq, Foldable, Traversable)
-
-mapDg :: (c -> c') -> (d -> d') -> (s -> s') -> Diagram c d s a -> Diagram c' d' s' a
-mapDg z x y = runIdentity . mapDgA (pure . z) (pure . x) (pure . y)
-
-mapDgA
-    :: Applicative f
-    => (c -> f c')
-    -> (d -> f d')
-    -> (s -> f s')
-    -> Diagram c d s a
-    -> f (Diagram c' d' s' a)
-mapDgA z x y = f
-    where
-    f (Source   a) = pure $ Source     a
-    f  Sink        = pure $ Sink
-    f  End         = pure $ End
-    f (Device d a) =        Device <$> x d <*> pure a
-    f (Jump s    ) =        Jump   <$> y s
-    f (Node     a) = pure $ Node       a
-    f (Conn c    ) =        Conn   <$> z c
-    f (Cont c   a) =        Cont   <$> z c <*> pure a
---     f  Stub        = Stub
 
 --------------------------------------------------------------------------------
 

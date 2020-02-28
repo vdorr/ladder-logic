@@ -15,7 +15,7 @@ module Language.Ladder.LadderParser
 
 import Prelude hiding (fail)
 import Control.Applicative --hiding (fail)
--- import Control.Monad hiding (fail)
+import Control.Monad hiding (fail)
 import Data.Foldable
 import Data.Void
 
@@ -133,6 +133,17 @@ withOperands deviceParser
 
 --------------------------------------------------------------------------------
 
+-- for evil version of usual grammar
+vlineX :: LdP d t ()
+vlineX = do
+    (ln, _) <- currentPos
+    lookAround do
+        setPos (ln, (1, ()))
+        void label
+--     return ()
+
+--------------------------------------------------------------------------------
+
 node :: LdP d t (Cofree (Diagram c d t) DgExt)
 node = withPos (Node <$> node')
 
@@ -156,21 +167,25 @@ vline' = many vline *> (node <|> end0)
 --TODO for non-std ladders - check if crossing label and terminate at first `Node` returning `Sink`
 
 end0 :: LdP d t (Cofree (Diagram c d t) DgExt)
-end0 = ((:< End) <$> colUnder <$> lastPos)
+-- end0 = ((:< End) <$> colUnder <$> lastPos)
+end0 = (:< End) <$> nextPos
 
 end2 :: LdP d t (Cofree (Diagram c d t) DgExt)
-end2 = end *> ((:< End) <$> colUnder <$> lastPos)
+-- end2 = end *> ((:< End) <$> colUnder <$> lastPos)
+end2 = end *> ((:< End) <$> nextPos)
 
 eol2 :: LdP d t (Cofree (Diagram c d t) DgExt)
-eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
+-- eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
+eol2 = eol *> ((:< Sink) <$> nextPos)
 
-gap2 :: LdP d t (Cofree (Diagram c d t) DgExt)
-gap2 = gap *> ((:< Sink) <$> colRight <$> lastPos)
+hgap2 :: LdP d t (Cofree (Diagram c d t) DgExt)
+-- hgap2 = gap *> ((:< Sink) <$> colRight <$> lastPos)
+hgap2 = gap *> ((:< Sink) <$> nextPos)
 
 hline' :: LdP d t (Cofree (Diagram c d t) DgExt)
 hline'
     = some hline2
-    *> (device <|> node <|> jump <|> gap2 <|> eol2)
+    *> (device <|> node <|> jump <|> hgap2 <|> eol2)
 
 -- "-||`EOL`" is not allowed
 hline2 :: LdP d t ()
