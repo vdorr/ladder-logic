@@ -99,7 +99,9 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
         accEmitDev1 (Coil_    "S", [Var a   ]) = if q then setBit a True else pure q
         accEmitDev1 (Coil_    "R", [Var a   ]) = if q then setBit a False else pure q
 --         accEmitDev1 (Coil_    _d , _args     ) = undefined
-        accEmitDev1 other = lift $ lift $ lift $ Left $ "unknown device:" ++ show other
+        accEmitDev1 other = failure $ "unknown device:" ++ show other
+
+        failure s = lift $ lift $ lift $ Left s
 
         getTmp d pp = getTag' stTmp d pp
         setTmp pp v = modify $ \st -> st { stTmp = (pp, v) : stTmp st}
@@ -116,12 +118,12 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
 
         getBit n = getMem stTags (error (show n)) n >>= \case
                                                      X b -> pure b
-                                                     _ -> undefined
+                                                     _ -> failure "type mismatch"
         setBit n v = setMem stTags (\vv st -> st { stTags = vv}) n (X v) >> return v
         getInt (Lit i) = pure i
         getInt (Var n) = getMem stTags (I 0) n >>= \case
                                                      I i -> pure i
-                                                     _ -> undefined
+                                                     _ -> failure "type mismatch"
 
 --------------------------------------------------------------------------------
 

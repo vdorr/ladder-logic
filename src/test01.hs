@@ -559,22 +559,24 @@ main = do
 
     where
 --     deviceThing = wrapDevice3 (pure . I) (pure . A)
-    deviceThing = wrapDeviceSimple
+    deviceThing = wrapDeviceSimple2
 
---     accEmitDev2 :: ([(CellType, Operand Text)], DeviceImpl (V String) String)
---              -> Either String [ExtendedInstruction Text (AI Int Int Int)]
---     accEmitDev2 (x, y) = (error . show) x
+accEmitDev1
+    :: (DevType Text, [Operand Text])
+    -> Either String [ExtendedInstruction Text (AI (Reg Text) (V Text) Text)]
+accEmitDev1 = f
+    where
+    simple = Right . map EISimple
 
---     accEmitDev1 :: d -> Either String [ExtendedInstruction Text (AI Int Int Int)]
-    accEmitDev1 :: (DevType Text, [Operand Text])
-                      -> Either String [ExtendedInstruction Text (AI (Reg Text) Int Text)]
-    accEmitDev1 (Contact_ " ", [Var a]) = pure [EISimple $ AIAnd $ M a]
-    accEmitDev1 (Contact_ "/", _args) = pure undefined
-    accEmitDev1 (Contact_ ">", _args) = pure undefined
-    accEmitDev1 (Contact_ "<", _args) = pure undefined
-    accEmitDev1 (Contact_ d, _args) = error $ show d
-    accEmitDev1 (Coil_ " ", [Var a]) = pure [EISimple $ AIStBit a]
-    accEmitDev1 (Coil_ "/", _args) = pure undefined
-    accEmitDev1 (Coil_ "S", _args) = pure undefined
-    accEmitDev1 (Coil_ "R", _args) = undefined
-    accEmitDev1 (Coil_ d, _args) = pure undefined
+    f (Contact_ " ", [Var a]) = simple [AIAnd $ M a]
+    f (Contact_ "/", [Var a]) = simple [AINot, AIAnd $ M a]
+    f (Contact_ ">", [a, b]) = simple $ getArg a ++ getArg b ++ [AIGt]
+    f (Contact_ "<", [a, b]) = simple $ getArg a ++ getArg b ++ [AILt]
+    f (Coil_    " ", [Var a]) = simple [AIStBit a]
+    f (Coil_    "/", [Var a]) = simple [AINot, AIStBit a, AINot]
+    f (Coil_    "S", [Var a]) = simple [AIOr $ M a, AIStBit a]
+    f (Coil_    "R", [Var a]) = simple undefined -- [AIOr $ M a, AIStBit a]
+    f (         d  , args) = error $ show (d, args)
+
+    getArg (Var a) = [ AILdCnA (A a), AILdM ]
+    getArg (Lit i) = [ AILdCnA (I i) ]

@@ -78,11 +78,6 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
     f    []            t = Right (t, [])
     f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
 
---     lol :: String -> (w -> Tok String)
---         -> (String -> Either String (w, String))
---         -> (Int, Int, [((Int, (Int, Int)), Tok String)])
---         -> Either String
---             ((Int, Int, [((Int, (Int, Int)), Tok String)]), String)
     lol' :: Int -> Bool -> String -> (w -> String -> Tok String)
         -> (String -> Either String (w, String))
         -> (Int, Int, [(SrcRange, Tok String)])
@@ -105,10 +100,6 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
     alphaNum cs = Right $ span (\c -> isAlphaNum c || c == '_' || c == '%') cs
     chars c cs = Right $ span (==c) cs -- or until, not sure
 
---     takeUntil n h = case breakOn (pack n) (pack h) of
---                      (p, xs) -> case stripPrefix (pack n) xs of
---                                      Nothing -> Left "wtf"
---                                      Just xxs -> Right (unpack p, unpack xxs)
     takeUntil n h = case breakOnString n h of
                      (p, xs) -> case stripPrefix n xs of
                                      Nothing -> Left "wtf"
@@ -240,7 +231,6 @@ lxx = f
 
 runLexer :: Text -> Either String [ [(SrcRange, Tok Text)] ]
 runLexer = fmap (fmap (fmap (fmap (fmap pack)))) . runLexerS . unpack
---     = ((split ((NewLine==).snd)) . fmap (fmap (fmap pack)) . lxx) <$> (lx $ unpack s)
 
 runLexerS :: String -> Either String [ [(SrcRange, Tok String)] ]
 runLexerS s = (split ((NewLine==).snd) . lxx) <$> lx s
@@ -301,41 +291,6 @@ isWsTok _            = False
 
 --------------------------------------------------------------------------------
 
--- |Discard 'SourcePos', keep only integer line numbers and column ranges
--- stripPos
---     :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
---     -> [ (Int, [((Int, Int), a)]) ]
--- stripPos = fmap (bimap (unPos.sourceLine)
---     (fmap (first (bimap (unPos.sourceColumn) ((+(-1)).unPos.sourceColumn)))))
--- 
--- stripPos2
---     :: [ (SourcePos, [((SourcePos, SourcePos), a)]) ]
---     -> [[((Int, (Int, Int)), a)]]
--- stripPos2 = fmap (fmap (first line) . snd)
---     where
---     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
-
--- stripPos3
---     :: [[((SourcePos, SourcePos), a)]]
---     -> [[((Int, (Int, Int)), a)]]
--- stripPos3 = fmap (fmap (first line))
---     where
---     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
-
--- stripPos3
---     :: [[((SrcPos, SrcPos), a)]]
---     -> [[(SrcRange, a)]]
--- stripPos3 = fmap (fmap (first line))
---     where
---     line (s, e) = (pline s, (column s, (column e)-1))
---     column = snd
---     pline = fst
--- fmap (fmap (first line))
---     where
---     line (s, e) = (unPos$sourceLine s, (unPos$sourceColumn s, (unPos$sourceColumn e)-1))
-
---------------------------------------------------------------------------------
-
 -- |Look for first pragma in list of lexemes
 -- getPragma :: [Tok a] -> Maybe [a]
 -- getPragma xs = case getLeadingPragmas xs of
@@ -351,17 +306,6 @@ getLeadingPragmas = go
     go (Whitespace _ : xs) =     go xs
     go (NewLine      : xs) =     go xs
     go _                   = []
-
--- -- |Discard position informations from list of lexemes
--- dropPos
---     :: [[(p, Tok a)]]
---     -> [Tok a]
--- dropPos = foldMap (fmap snd)
--- 
--- dropPos2
---     :: [[(p, Tok a)]]
---     -> [[Tok a]]
--- dropPos2 = fmap (fmap snd)
 
 --------------------------------------------------------------------------------
 
@@ -385,25 +329,5 @@ renderLexeme t = case t of
     NewLine          -> "\n" --FIXME windows
     Whitespace   n   -> replicate n ' '
     Colon            -> ":"
-
--- lexemeLength :: Tok String -> (Int, Int)
--- lexemeLength t = case t of
---     Cross            -> (0, 1)
---     VLine            -> (0, 1)
---     Label        a   -> (0, 1 + length a)
---     HLine        n _ -> (0, n + 1)
---     REdge            -> (0, 1)
---     FEdge            -> (0, 1)
---     Number       n   -> (0, length $ show n)
---     Contact      a   -> (0, 2 + length a)
---     Coil         a   -> (0, 2 + length a)
---     Continuation a   -> (0, 2 + length a)
---     Return           -> (0, 8)
---     Jump'        a   -> (0, 2 + length a)
---     Name         a   -> (0, length a)
---     Comment      a   -> (length a - 1, 4 + (length $ unlines a))
---     Pragma       a   -> (length a - 1, 2 + (length $ unlines a))
---     NewLine          -> (1, 0)
---     Whitespace   n   -> (0, n)
 
 --------------------------------------------------------------------------------
