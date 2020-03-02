@@ -10,7 +10,6 @@ import System.Environment (getArgs)
 import Data.Foldable
 import Data.Void
 
--- import Language.Ladder.Zipper
 import Language.Ladder.Lexer
 import Language.Ladder.DiagramParser
 import Language.Ladder.LadderParser
@@ -21,23 +20,16 @@ import Language.Ladder.Utils
 import Language.Ladder.Eval
 
 import Control.Monad.State
--- import Control.Monad.Writer
--- import Control.Monad.Error
 import Control.Monad.Except
--- import qualified Data.Map as M
-import Data.Bifunctor
-import Data.List
--- import Data.Function
--- import Data.Proxy
+-- import Data.Bifunctor
+-- import Data.List
 import Data.Text (Text, unpack)
 import qualified Data.Text as T --(Text, lines)
 import Text.Printf
--- import Data.Functor.Identity
-
 import Data.Traversable
 
-import System.Console.ANSI.Types
-import System.Console.ANSI.Codes
+-- import System.Console.ANSI.Types
+-- import System.Console.ANSI.Codes
 
 import TestUtils
 
@@ -69,52 +61,52 @@ data AI r w a
 
 type AccItpSt a = (Bool, [Bool], [V a], Memory a)
 
-accEval :: (Eq address, Show address)
-     => AI Int (V address) address
-     -> AccItpSt address
-     -> Either
-         (AccItpSt address, String)
-         (AccItpSt address)
-accEval = go
-    where
-    go  AITrap     st                = halt st "trap"
-    go  AILdOn        (a, rf, os, m) = pure (True, rf, os, m)
-
-    go (AILdReg r) st@(_, rf, os, m) = (,rf,os,m) <$> getReg r st
-
-    go (AIStReg r) st@(a, rf, os, m)
-        | (f,v:g) <- splitAt r rf    = pure (a, f ++ a : g, os, m)
-        | otherwise                  = halt st (show ("rf idx out of range"::String, r, rf))
-    go (AILdBit i) st@(_, rf, os, m)
-        | Just (X v) <- lookup i m   = pure (v, rf, os, m)
-        | otherwise                  = halt st (show (here, "invalid memory access"::String, i))
-    go (AIStBit i) st@(a, rf, os, m)
-        | (m0,(_,X _):m1) <- break ((i==) . fst) m
-                                     = pure (a, rf, os, (m0 ++ (i, X a) : m1))
-        | otherwise                  = halt st (show (here, "invalid memory access"::String, i))
-
---     go (AIAnd   r) st@(a, rf, os, m) = getReg r st >>= \b -> pure (a && b, rf, os, m)
-    go (AIAnd   r) st@(a, rf, os, m) = (,rf,os,m) <$> ((a &&) <$> getReg r st)
-
-    go (AIOr    r) st@(a, rf, os, m) = (,rf,os,m) <$> ((a ||) <$> getReg r st)
-    go  AINot      st@(a, rf, os, m) = pure (not a, rf, os, m)
-
-    go (AILdCnA k) (a, rf, os, m)    = pure (a, rf, k : os, m)
-    go  AILdM      st@(a, rf, A i : os, m)
-       | Just v <- lookup i m        = pure (a, rf, v : os, m)
-       | otherwise                   = halt st (show (here, "invalid memory access"::String, i))
-    go  AIStM      st = undefined --TODO
-    go  AIEq       st = undefined
-    go  AILt       (_, rf,   I b : I a : os, m) = pure (a < b, rf, os, m)
-    go  AIGt       (_, rf,   I b : I a : os, m) = pure (a > b, rf, os, m)
-    go  i          st                = halt st (show i)
-
-    halt st e = Left (st, show e)
-
-    getReg r st@(a, rf, os, m)
---         | r >= 0 && r < length rf = pure (rf !! r, rf, os, m)
-        | r >= 0 && r < length rf = pure (rf !! r)
-        | otherwise               = Left (st, show ("rf idx out of range"::String, r, rf))
+-- accEval :: (Eq address, Show address)
+--      => AI Int (V address) address
+--      -> AccItpSt address
+--      -> Either
+--          (AccItpSt address, String)
+--          (AccItpSt address)
+-- accEval = go
+--     where
+--     go  AITrap     st                = halt st "trap"
+--     go  AILdOn        (a, rf, os, m) = pure (True, rf, os, m)
+-- 
+--     go (AILdReg r) st@(_, rf, os, m) = (,rf,os,m) <$> getReg r st
+-- 
+--     go (AIStReg r) st@(a, rf, os, m)
+--         | (f,v:g) <- splitAt r rf    = pure (a, f ++ a : g, os, m)
+--         | otherwise                  = halt st (show ("rf idx out of range"::String, r, rf))
+--     go (AILdBit i) st@(_, rf, os, m)
+--         | Just (X v) <- lookup i m   = pure (v, rf, os, m)
+--         | otherwise                  = halt st (show (here, "invalid memory access"::String, i))
+--     go (AIStBit i) st@(a, rf, os, m)
+--         | (m0,(_,X _):m1) <- break ((i==) . fst) m
+--                                      = pure (a, rf, os, (m0 ++ (i, X a) : m1))
+--         | otherwise                  = halt st (show (here, "invalid memory access"::String, i))
+-- 
+-- --     go (AIAnd   r) st@(a, rf, os, m) = getReg r st >>= \b -> pure (a && b, rf, os, m)
+--     go (AIAnd   r) st@(a, rf, os, m) = (,rf,os,m) <$> ((a &&) <$> getReg r st)
+-- 
+--     go (AIOr    r) st@(a, rf, os, m) = (,rf,os,m) <$> ((a ||) <$> getReg r st)
+--     go  AINot      st@(a, rf, os, m) = pure (not a, rf, os, m)
+-- 
+--     go (AILdCnA k) (a, rf, os, m)    = pure (a, rf, k : os, m)
+--     go  AILdM      st@(a, rf, A i : os, m)
+--        | Just v <- lookup i m        = pure (a, rf, v : os, m)
+--        | otherwise                   = halt st (show (here, "invalid memory access"::String, i))
+--     go  AIStM      st = undefined --TODO
+--     go  AIEq       st = undefined
+--     go  AILt       (_, rf,   I b : I a : os, m) = pure (a < b, rf, os, m)
+--     go  AIGt       (_, rf,   I b : I a : os, m) = pure (a > b, rf, os, m)
+--     go  i          st                = halt st (show i)
+-- 
+--     halt st e = Left (st, show e)
+-- 
+--     getReg r st@(a, rf, os, m)
+-- --         | r >= 0 && r < length rf = pure (rf !! r, rf, os, m)
+--         | r >= 0 && r < length rf = pure (rf !! r)
+--         | otherwise               = Left (st, show ("rf idx out of range"::String, r, rf))
 
 --------------------------------------------------------------------------------
 
@@ -128,8 +120,8 @@ accEval2 :: (Eq address, Show address)
          (AccItpSt2 address)
 accEval2 = go
     where
-    go  AITrap     st                = halt st "trap"
-    go  AILdOn        (a, os, m) = pure (True, os, m)
+    go  AITrap     st                = halt st ("trap"::String)
+    go  AILdOn        (_a, os, m) = pure (True, os, m)
 
     go (AILdReg r) st@(_, os, m) = (,os,m) <$> getReg r st
 
@@ -140,7 +132,7 @@ accEval2 = go
 --     go (AILdBit i) st@(_, os, m)
 --         | Just (X v) <- lookup i m   = pure (v, os, m)
 --         | otherwise                  = halt st (show (here, "invalid memory access"::String, i))
-    go (AILdBit i) st@(a, os, m) = (,os,m) <$> loadBit i st
+    go (AILdBit i) st@(_a, os, m) = (,os,m) <$> loadBit i st
 --     go (AIStBit i) st@(a, os, m)
 --         | (m0,(_,X _):m1) <- break ((i==) . fst) m
 --                                      = pure (a, os, (m0 ++ (i, X a) : m1))
@@ -148,14 +140,14 @@ accEval2 = go
     go (AIStBit i) st = storeBit i st
     go (AIAnd   r) st@(a, os, m) = (,os,m) <$> ((a &&) <$> getReg r st)
     go (AIOr    r) st@(a, os, m) = (,os,m) <$> ((a ||) <$> getReg r st)
-    go  AINot      st@(a, os, m) = pure (not a, os, m)
+    go  AINot      _st@(a, os, m) = pure (not a, os, m)
 
     go (AILdCnA k) (a, os, m)    = pure (a, k : os, m)
     go  AILdM      st@(a, A i : os, m)
        | Just v <- lookup i m        = pure (a, v : os, m)
        | otherwise                   = halt st (show (here, "invalid memory access"::String, i))
-    go  AIStM      st = undefined --TODO
-    go  AIEq       st = undefined
+    go  AIStM      _st = undefined --TODO
+    go  AIEq       _st = undefined
     go  AILt       (_,    I b : I a : os, m) = pure (a < b, os, m)
     go  AIGt       (_,    I b : I a : os, m) = pure (a > b, os, m)
     go  i          st                = halt st (show i)
@@ -202,10 +194,8 @@ accuEmit emitDevice q p x = go x *> pure p
         getValue q
         for_ deps \d -> do
             r <- getFromRegs d
---             accEmit' [ "or $" ++ show r ]
             accEmit' [ EISimple $ AIOr $ R r ]
         accSet p
---         when (length w > 1) do accSpill (length w) p
         unless (null w) do accSpill (length w) p
     go  Sink             = do
         nodes <- gets aesNodes
@@ -215,20 +205,17 @@ accuEmit emitDevice q p x = go x *> pure p
             accSpill 1 p
         else return ()
     go (Source _a       ) = do
---         accEmit' [ "ld #1" ]
         accEmit' [ EISimple AILdOn ]
         accSet p
     go  End              = do
         return ()
-    go (Device device _a) = do
+    go (Device d _a) = do
         getValue q
---         accEmit' [ "eval " ++ show device ++ " // " ++ show p ]
-        lift (emitDevice device) >>= accEmit'
+        lift (emitDevice d) >>= accEmit'
         accSet p
-    go (Jump   label  ) = do
+    go (Jump   l  ) = do
         getValue q
---         accEmit' [ "cjmp " ++ show label ]
-        accEmit' [ EIJump label ]
+        accEmit' [ EIJump l ]
     go (Cont   _continuation _a) = undefined
     go (Conn   _continuation) = undefined
 
@@ -241,7 +228,6 @@ accuEmit emitDevice q p x = go x *> pure p
 
     accEmit' = accEmit . fmap (Just p,)
 
---     load r = accEmit' [ "ld $" ++ show r ]
     load r = accEmit' [ EISimple $ AILdReg $ R r ]
 
     getFromRegs pp = do
@@ -253,40 +239,34 @@ accuEmit emitDevice q p x = go x *> pure p
                             UseCount 1 -> pre ++ rest
                             UseCount u -> pre ++ (ppp, (v, UseCount $ u - 1)) : rest
                             _ -> undefined --TODO
---                 let rf' = rf --TODO
                 modify \st -> st { aesRegisters = rf'}
                 return v
 
--- accEmit ::  MonadState (AccuEmitState p [a]) m => [a] -> m ()
+accEmit :: MonadState (AccuEmitState p [a]) m => [a] -> m ()
 accEmit s = modify \st -> st { aesCode = aesCode st ++ s }
--- accSet :: MonadState (AccuEmitState p w) m => p -> m ()
+
+accSet :: MonadState (AccuEmitState p w) m => p -> m ()
 accSet q = modify \st -> st { aesAccu = q }
 
--- accSpill :: Int -> p -> StateT
---         (AccuEmitState p [String])
---         (Either String) ()
-accSpill uses name = do
+accSpill
+    :: Monad m
+    => Int
+    -> p
+    -> StateT (AccuEmitState p [(Maybe p, ExtendedInstruction l (AI (Reg adr) k adr))]) m ()
+accSpill uses rename = do
     rf   <- gets aesRegisters
 
     let rUseNumber = snd . snd
     case break ((UseCount 0==) . rUseNumber) rf of
         (_pre, []) -> do --free register not found
-            modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, UseCount uses))] }
---             accEmit [ (Nothing, "st $" ++ show (length rf)) ] 
+            modify \st -> st { aesRegisters =  rf ++ [(rename, (length rf, UseCount uses))] }
             accEmit [ (Nothing, EISimple $ AIStReg (R $ length rf)) ] 
         (pre, (_ppp, (v, _uses)) : rest) -> do
-            modify \st -> st { aesRegisters =  pre ++ (name, (v, UseCount uses)) : rest }
---             accEmit [ (Nothing, "st $" ++ show v) ] 
+            modify \st -> st { aesRegisters =  pre ++ (rename, (v, UseCount uses)) : rest }
             accEmit [ (Nothing, EISimple $ AIStReg $ R v) ] 
 
---     modify \st -> st { aesRegisters =  rf ++ [(name, (length rf, uses))] }
---     accEmit [ "st $" ++ show (length rf) ] 
-
--- accuPost
---     :: a
---     -> Cofree (Diagram c d l) a
---     -> StateT (AccuEmitState a [String]) (Either String) ()
-accuPost :: (Monad m)
+accuPost
+    :: (Monad m)
     => p
     -> Cofree (Diagram continuation device label) a
     -> StateT
@@ -319,7 +299,7 @@ blargh
 blargh accEmitDevice ast@(q0 :< _)
     = runStateT
         (traverseDiagram (accuEmit accEmitDevice) accuPost q0 ast)
-        (AccuEmitState q0 sinks nodes [] [])
+        (AccuEmitState q0 sinks nodes [(q0, (0, Forever))] [])
     where
     (nodes, sinks) = collectNodesAndSinks ast --do i need this?
 
@@ -336,31 +316,6 @@ blarghX emitDev  s = do
     chunks <- for s \(_lbl, ast) -> do
         blargh emitDev ast
     return (foldMap (aesCode.snd) chunks) --fixme 
-
---------------------------------------------------------------------------------
-
---TODO TODO TODO
-
-data Setup src t lxs ast d code m = Setup
-    { sLexer        :: t -> m lxs
-    , sDeviceParser :: t -> m d
-    , sParser       :: (t -> m d) -> lxs -> m ast
-    , sDeviceEmit   :: d -> m code
-    , sCodeGen      :: ast -> m code
-    }
-
--- accSetup = Setup
---     { sLexer        = undefined
---     , sDeviceParser = undefined
---     , sParser       = undefined
---     , sDeviceEmit   = undefined
---     , sCodeGen      = undefined
---     }
-
-{-
-data Failure = Lexing | Parsing | CodeGen | ...
-:: Setup -> m Failure
--}
 
 --------------------------------------------------------------------------------
 
@@ -419,40 +374,7 @@ compileForTest04 ast = generateStk2THISISTOOMUCH pure emitDevice03 ast
             unAddr (_, Var a) = Var $ unpack a
             unAddr (_, Lit i) = Lit i
 
--- -- ehlo
--- --     :: [(Maybe String
--- --             , Cofree (Diagram Void 
--- --                     (([(CellType, Operand Text)], DeviceImpl (V String) String))
--- --                     String) DgExt)]
--- --     -> IO ()
--- ehlo ast = do
--- --     when verbose $ print here
---     prog <- either fail pure $ compileForTest03 ast
--- --     let memSlots :: [(CellType, Text)] = nub $ execState (traverse_ (traverse_ mp2) ast) []
--- --     print (here, memSlots, "<<<<<"::String)
--- --     print (here, memSlotsToTestVector 4 memSlots, "<<<<<"::String)
--- 
---     putStrLn "---------------------------"
---     for_ prog print
---     putStrLn "---------------------------"
--- 
--- --     where
--- --     mp2 :: Cofree
--- --                         (Diagram c' ([(CellType, Operand txt)], b) s') a
--- --                       -> StateT [(CellType, txt)] Identity ()
--- --     mp2 (_ :< n) = do
--- --         void $ mapDgA pure ((modify.(++)).addressesOnly.fst) pure n
--- --         traverse_ mp2 n
--- -- 
--- --     addressesOnly s = [(t, a)|((t, Var a)) <- s]
-
 --------------------------------------------------------------------------------
-
--- test1 ast1 = do
---     let Right (_, st) = blargh ast1
---     print (here)
---     for_ (aesCode st) print
---     return ()
 
 pipeline :: Show e2 => (t -> ExceptT e IO t1)
                       -> (t1 -> ExceptT e1 IO [(a, t2)])
@@ -472,18 +394,6 @@ pipeline lexer postLex parser compile sourceText = do
     Right code <- runExceptT $ compile ast
     return code
 
--- test2 lxs = do
--- 
---     case runLadderParser_ (wrapDevice3 (pure . I) (pure . A)) ladderLiberal lxs of
---         Left  err -> print (here, err)
---         Right ast -> do
---             print here
---             ehlo [(Nothing, ast)]
--- --             for_ ((esCode u) :: [ExtendedInstruction T.Text Int Int]) print
--- --             for_ (esCode u) print
--- --             print $ length $ esStack u
---             return ()
-
 niceSrc :: (String -> IO ()) -> String -> Text -> IO ()
 niceSrc outputLine file src = do
     outputLine $ "     ┊ " ++ file
@@ -501,10 +411,10 @@ main = do
     [file] <- getArgs
     src <- TIO.readFile file
 
-    print (here, "--------------------------------------------------")
+    print (here, "--------------------------------------------------"::String)
 --     TIO.putStrLn src
     niceSrc putStrLn file src
-    print (here, "--------------------------------------------------")
+    print (here, "--------------------------------------------------"::String)
 #if 1
     prog <- pipeline
         (liftEither . runLexer)
@@ -544,7 +454,6 @@ main = do
 --                         test1 ast1
 --                         return ()
 #if 1
-    ;
     prog1 <- pipeline
         (liftEither . runLexer)
         (pure . labeledRungs . dropWhitespace)
@@ -575,7 +484,8 @@ accEmitDev1 = f
     f (Coil_    " ", [Var a]) = simple [AIStBit a]
     f (Coil_    "/", [Var a]) = simple [AINot, AIStBit a, AINot]
     f (Coil_    "S", [Var a]) = simple [AIOr $ M a, AIStBit a]
-    f (Coil_    "R", [Var a]) = simple undefined -- [AIOr $ M a, AIStBit a]
+    f (Coil_    "R", [Var a]) = simple
+        [AIStReg (R 0), AINot, AIAnd $ M a, AIStBit a, AILdReg (R 0)]
     f (         d  , args) = error $ show (d, args)
 
     getArg (Var a) = [ AILdCnA (A a), AILdM ]

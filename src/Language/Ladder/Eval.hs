@@ -101,7 +101,7 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
 --         accEmitDev1 (Coil_    _d , _args     ) = undefined
         accEmitDev1 other = failure $ "unknown device:" ++ show other
 
-        failure s = lift $ lift $ lift $ Left s
+        failure = lift . lift . lift . Left
 
         getTmp d pp = getTag' stTmp d pp
         setTmp pp v = modify $ \st -> st { stTmp = (pp, v) : stTmp st}
