@@ -15,12 +15,16 @@ import Data.List
 import Data.Text (Text, pack, unpack)
 import Data.Char
 
+import Control.Monad.State
+
 --------------------------------------------------------------------------------
 
 -- lex2 :: (s -> (Maybe Char, s)) -> (Char -> s -> s) -> s -> Either String [Tok x]
 -- lex2 uncons snoc s = error "TODO"
 
 --------------------------------------------------------------------------------
+
+type SrcRange = (Int, (Int, Int))
 
 -- |Diagram token
 data Tok a
@@ -54,7 +58,20 @@ data Tok a
 
 --------------------------------------------------------------------------------
 
-type SrcRange = (Int, (Int, Int))
+data LxSt t = LxSt
+    { lxS :: !t
+    , lxL, lxC :: !Int
+    }
+
+one uncons p
+    = gets (uncons . lxS) >> \case
+         Just (c@'\n', xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
+         Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1}
+         Just _                  ->      lift (Left "not matching")
+         Nothing                 ->      lift (Left "end reached")
+
+
+--------------------------------------------------------------------------------
 
 lx :: String -> Either String [(SrcRange, Tok String)]
 lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])

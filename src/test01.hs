@@ -28,6 +28,8 @@ import qualified Data.Text as T --(Text, lines)
 import Text.Printf
 import Data.Traversable
 
+import Data.Bits
+
 -- import System.Console.ANSI.Types
 -- import System.Console.ANSI.Codes
 
@@ -57,6 +59,35 @@ data AI r w a
     | AIGt
     deriving (Show, Eq)
 
+encAccI = f
+    where
+    byte v = Left ""
+    word v = Left ""
+    f  AITrap         = byte 0x01
+    f  AILdOn         = byte 0x02
+    f (AILdReg (R r)) = byte (0x80 .|. r)
+    f (AILdReg (M a)) = undefined --byte (0x80 .|. a)
+    f (AIStReg (R r)) = byte (0xc0 .|. r)
+    f (AIStReg (M a)) = undefined --byte (0xc0 .|. a)
+
+    f (AILdBit    a ) = byte 0x03 *> byte a
+    f (AIStBit    a ) = byte 0x04 *> byte a
+
+    f (AIAnd   (R r)) = byte 0x05 *> byte r
+    f (AIAnd   (M a)) = byte 0x05 *> byte a
+    f (AIOr    (R r)) = byte 0x06 *> byte r
+    f (AIOr    (M a)) = byte 0x06 *> byte a
+    f  AINot          = byte 0x07
+
+    f (AILdCnA    w ) = byte 0x08 *> word w
+    f  AILdM          = byte 0x09
+    f  AIStM          = byte 0x0a
+
+    f  AIEq           = byte 0x0b
+    f  AILt           = byte 0x0c
+    f  AIGt           = byte 0x0d
+
+    
 --------------------------------------------------------------------------------
 
 type AccItpSt a = (Bool, [Bool], [V a], Memory a)
@@ -190,13 +221,13 @@ accuEmit emitDevice q p x = go x *> pure p
         accSet p -- "optimization"
     go (Node   w       ) = do
         sinks <- gets aesSinks
-        let deps = (foldMap (checkDataDep sinks) w) ++ [] -- ugh
+        let deps = foldMap (checkDataDep sinks) w ++ []
         getValue q
         for_ deps \d -> do
             r <- getFromRegs d
             accEmit' [ EISimple $ AIOr $ R r ]
         accSet p
-        unless (null w) do accSpill (length w) p
+        unless (null w) (accSpill (length w) p)
     go  Sink             = do
         nodes <- gets aesNodes
         if elem p nodes
@@ -266,14 +297,10 @@ accSpill uses rename = do
             accEmit [ (Nothing, EISimple $ AIStReg $ R v) ] 
 
 accuPost
-    :: (Monad m)
+    :: Monad m
     => p
     -> Cofree (Diagram continuation device label) a
-    -> StateT
-        (AccuEmitState p [(Maybe p, ExtendedInstruction l (AI (Reg adr) k adr))])
-        m -- (Either String)
-        ()
-
+    -> StateT (AccuEmitState p [(Maybe p, ExtendedInstruction l (AI (Reg adr) k adr))]) m ()
 accuPost q (_ :< Node w@(_:_)) = accSpill (length w) q
 accuPost _  _                  = return () --not needed, forget it
 
@@ -348,11 +375,7 @@ compileForTest04
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
     => [( Maybe lbl
         , Cofree
-            (Diagram
-                Void
-                (([(CellType, Operand Text)], DeviceImpl (V String) String))
-                lbl
-            )
+            (Diagram Void (([(CellType, Operand Text)], DeviceImpl (V String) String)) lbl)
             DgExt
         )]
     -> m [ExtendedInstruction Int (Instruction (V String) String)]
