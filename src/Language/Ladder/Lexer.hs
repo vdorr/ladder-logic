@@ -16,6 +16,7 @@ import Data.Text (Text, pack, unpack)
 import Data.Char
 
 import Control.Monad.State
+import Control.Applicative
 
 --------------------------------------------------------------------------------
 
@@ -63,13 +64,65 @@ data LxSt t = LxSt
     , lxL, lxC :: !Int
     }
 
-one uncons p
-    = gets (uncons . lxS) >> \case
-         Just (c@'\n', xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
-         Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1}
-         Just _                  ->      lift (Left "not matching")
-         Nothing                 ->      lift (Left "end reached")
+-- one uncons p
+--     = gets (uncons . lxS) >>= \case
+--          Just (c@'\n', xs) | True <- p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
+--          Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1}
+--          Just _                  ->      lift (Left "not matching")
+--          Nothing                 ->      lift (Left "end reached")
+-- 
+-- string uncons = traverse (one uncons . (==))
+-- 
+-- comment2 uncons = many (commentInnerChar uncons) <* (string uncons ("*)"::String))
+-- 
+-- commentInnerChar uncons
+--     = (string uncons ("*)"::String) *> lift (Left "..."))
+--     <|> one uncons (const True)
+-- 
+-- comment uncons = do
+--     one uncons (const True) >>= \case
+--          c@'*' -> (one uncons (==')') *> lift (Left "...")) <|> pure c
+--          c -> pure c
 
+-- XXX i can use fromString isteaad of snoc+s0
+lx2 uncons s = runStateT (many go) (LxSt s 1 1)
+    where
+    go = char >>= f
+    f '{'  = undefined -- lol 1 xs (Pragma . lines)  (takeUntilC '}') t
+    f '('  =  char >>= \case
+             '*' -> Comment . lines <$> comment
+             c   -> Coil . (c:) <$> untilS ")"
+    f ' '  = Whitespace . length <$> many (one (==' '))
+    f '\n' = undefined -- = lol' 1 True xs (\_ _ -> NewLine) (const $ Right ((), xs)) t
+    f '|' = undefined -- = lol 1 xs (const VLine) (const $ Right ((), xs)) t
+    f '+' = undefined -- = lol 1 xs (const Cross) (const $ Right ((), xs)) t
+    f '-' = undefined
+    -- lol' 1 False xs (\a b -> HLine (length a) (countvl b)) (chars '-') t
+    f '[' = undefined -- lol 1 xs (Contact) (takeUntil "]" ) t
+    f '>' = undefined -- lol 1 xs (const REdge) (const $ Right ((), xs)) t
+    f '<' = undefined -- lol 1 xs (const FEdge) (const $ Right ((), xs)) t
+    f ':' = undefined -- lol 1 xs (const Colon) (const $ Right ((), xs)) t
+    f c
+        | isDigit c      = undefined -- lol 0 xs (Number . read)  (digits) t
+        | isAlpha c || c=='%'     = undefined -- lol 0 xs (Name)  (alphaNum) t
+    f other = lift $ Left ("unexpected char '" ++ [other] ++ "'")
+
+    one p = gets (uncons . lxS) >>= \case
+            Just (c@'\n', xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
+            Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1}
+            Just _                  ->      lift (Left "not matching")
+            Nothing                 ->      lift (Left "end reached")
+
+    char = one (const True)
+    string = traverse (one . (==))
+
+    untilS end = many (innerChar end) <* string end
+    comment = untilS ("*)"::String)
+--     comment = many (innerChar ("*)"::String)) <* string ("*)"::String)
+
+    innerChar end
+        = (string (end::String) *> lift (Left "..."))
+        <|> one (const True)
 
 --------------------------------------------------------------------------------
 
@@ -128,7 +181,7 @@ lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
                      (p, n':xs) | n'==n -> Right (p, xs)
                      (_p, _xs) -> Left "lol"
 
-breakOnString:: (Eq a) => [a] -> [a] -> ([a], [a])
+breakOnString :: (Eq a) => [a] -> [a] -> ([a], [a])
 breakOnString needle = go []
     where
     go ys [] = (reverse ys, [])
