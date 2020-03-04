@@ -64,48 +64,28 @@ data LxSt t = LxSt
     , lxL, lxC :: !Int
     }
 
--- one uncons p
---     = gets (uncons . lxS) >>= \case
---          Just (c@'\n', xs) | True <- p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
---          Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1}
---          Just _                  ->      lift (Left "not matching")
---          Nothing                 ->      lift (Left "end reached")
--- 
--- string uncons = traverse (one uncons . (==))
--- 
--- comment2 uncons = many (commentInnerChar uncons) <* (string uncons ("*)"::String))
--- 
--- commentInnerChar uncons
---     = (string uncons ("*)"::String) *> lift (Left "..."))
---     <|> one uncons (const True)
--- 
--- comment uncons = do
---     one uncons (const True) >>= \case
---          c@'*' -> (one uncons (==')') *> lift (Left "...")) <|> pure c
---          c -> pure c
-
 -- XXX i can use fromString isteaad of snoc+s0
 lx2 uncons s = runStateT (many go) (LxSt s 1 1)
     where
     go = char >>= f
-    f '{'  = undefined -- lol 1 xs (Pragma . lines)  (takeUntilC '}') t
-    f '('  =  char >>= \case
-             '*' -> Comment . lines <$> comment
-             c   -> Coil . (c:) <$> untilS ")"
+    f '{'  = Pragma . lines <$> untilS "}"
+--     f '('  = char >>= \case '*' -> Comment . lines <$> comment
+--                             c   -> Coil . (c:) <$> untilS ")"
+    f '('  =   (one (=='*') *> (Comment . lines <$> untilS "*)"))
+             <|> (Coil <$> untilS ")")
     f ' '  = Whitespace . length <$> many (one (==' '))
-    f '\n' = undefined -- = lol' 1 True xs (\_ _ -> NewLine) (const $ Right ((), xs)) t
-    f '|' = undefined -- = lol 1 xs (const VLine) (const $ Right ((), xs)) t
-    f '+' = undefined -- = lol 1 xs (const Cross) (const $ Right ((), xs)) t
-    f '-' = undefined
-    -- lol' 1 False xs (\a b -> HLine (length a) (countvl b)) (chars '-') t
-    f '[' = undefined -- lol 1 xs (Contact) (takeUntil "]" ) t
-    f '>' = undefined -- lol 1 xs (const REdge) (const $ Right ((), xs)) t
-    f '<' = undefined -- lol 1 xs (const FEdge) (const $ Right ((), xs)) t
-    f ':' = undefined -- lol 1 xs (const Colon) (const $ Right ((), xs)) t
-    f c
-        | isDigit c      = undefined -- lol 0 xs (Number . read)  (digits) t
-        | isAlpha c || c=='%'     = undefined -- lol 0 xs (Name)  (alphaNum) t
-    f other = lift $ Left ("unexpected char '" ++ [other] ++ "'")
+    f '\n' = pure NewLine
+    f '|'  = pure VLine
+    f '+'  = pure Cross
+    f '-'  = HLine <$> fmap length (some (one (=='-'))) <*> undefined
+    -- lol' 1 False xs (\a b ->  (length a) (countvl b)) (chars '-') t
+    f '[' = Contact <$> untilS "]"
+    f '>' = pure REdge
+    f '<' = pure FEdge
+    f ':' = pure Colon
+    f c | isDigit c             = Number . read . (c:) <$> many (one isDigit)
+        | isAlpha c || c == '%' = Name . (c:) <$> many (one isAlphaNum)
+    f other = lift (Left ("unexpected char '" ++ [other] ++ "'"))
 
     one p = gets (uncons . lxS) >>= \case
             Just (c@'\n', xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
@@ -117,12 +97,14 @@ lx2 uncons s = runStateT (many go) (LxSt s 1 1)
     string = traverse (one . (==))
 
     untilS end = many (innerChar end) <* string end
-    comment = untilS ("*)"::String)
+--     comment = untilS ("*)")
 --     comment = many (innerChar ("*)"::String)) <* string ("*)"::String)
 
     innerChar end
         = (string (end::String) *> lift (Left "..."))
         <|> one (const True)
+
+--     xx = fmap length (some (one (=='|')))
 
 --------------------------------------------------------------------------------
 
