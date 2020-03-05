@@ -17,11 +17,7 @@ import Data.Char
 
 import Control.Monad.State
 import Control.Applicative
-
---------------------------------------------------------------------------------
-
--- lex2 :: (s -> (Maybe Char, s)) -> (Char -> s -> s) -> s -> Either String [Tok x]
--- lex2 uncons snoc s = error "TODO"
+import Data.String
 
 --------------------------------------------------------------------------------
 
@@ -61,50 +57,54 @@ data Tok a
 
 data LxSt t = LxSt
     { lxS :: !t
-    , lxL, lxC :: !Int
+    , lxL
+    , lxC :: !Int
     }
 
--- XXX i can use fromString isteaad of snoc+s0
-lx2 uncons s = runStateT (many go) (LxSt s 1 1)
+lx2 :: IsString t => (t -> Maybe (Char, t)) -> t -> Either String [(SrcRange, Tok t)]
+lx2 uncons' s = evalStateT (many go <* checkEmpty) (LxSt s 1 1)
     where
-    go = char >>= f
+
+    checkEmpty = join ((char *> pure (failure "not empty")) <|> pure (pure ()))
+    go = wrap <$> getPos <*> (char >>= f) <*> getPos
+    wrap (ln, c0) x (_, c1)  = ((ln, (c0, c1 - 1)), fromString <$> x)
+    getPos = gets \st -> (lxL st, lxC st)
+
     f '{'  = Pragma . lines <$> untilS "}"
---     f '('  = char >>= \case '*' -> Comment . lines <$> comment
---                             c   -> Coil . (c:) <$> untilS ")"
     f '('  =   (one (=='*') *> (Comment . lines <$> untilS "*)"))
-             <|> (Coil <$> untilS ")")
-    f ' '  = Whitespace . length <$> many (one (==' '))
+           <|> (Coil <$> untilS ")")
+    f ' '  = Whitespace . ((1+).length) <$> many (one (==' '))
     f '\n' = pure NewLine
     f '|'  = pure VLine
     f '+'  = pure Cross
-    f '-'  = HLine <$> fmap length (some (one (=='-'))) <*> undefined
-    -- lol' 1 False xs (\a b ->  (length a) (countvl b)) (chars '-') t
-    f '[' = Contact <$> untilS "]"
-    f '>' = pure REdge
-    f '<' = pure FEdge
-    f ':' = pure Colon
-    f c | isDigit c             = Number . read . (c:) <$> many (one isDigit)
-        | isAlpha c || c == '%' = Name . (c:) <$> many (one isAlphaNum)
-    f other = lift (Left ("unexpected char '" ++ [other] ++ "'"))
+    f '-'  = HLine <$> length <$> (many (one (=='-'))) <*> pure 0
+    f '['  = Contact <$> untilS "]"
+    f '>'  = pure REdge
+    f '<'  = pure FEdge
+    f ':'  = pure Colon
+    f '%'  = Name . ('%':) <$> some (one isNameChar)
+    f c | isDigit c = Number . read . (c:) <$> many (one isDigit)
+        | isAlpha c = Name . (c:)          <$> many (one isNameChar)
+    f other = failure ("unexpected char '" ++ [other] ++ "'")
 
-    one p = gets (uncons . lxS) >>= \case
+    isNameChar '_' = True
+    isNameChar c = isAlphaNum c
+
+    one p = gets (uncons' . lxS) >>= \case
             Just (c@'\n', xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
-            Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1}
-            Just _                  ->      lift (Left "not matching")
-            Nothing                 ->      lift (Left "end reached")
+            Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1+lxC st}
+            Just _                  ->      failure "not matching"
+            Nothing                 ->      failure "end reached"
 
     char = one (const True)
     string = traverse (one . (==))
 
     untilS end = many (innerChar end) <* string end
---     comment = untilS ("*)")
---     comment = many (innerChar ("*)"::String)) <* string ("*)"::String)
+    innerChar (end::String)
+        = (one (=='\\') *> char)
+        <|> join (((string end >> pure (lift (Left "..."))) <|> pure char))
 
-    innerChar end
-        = (string (end::String) *> lift (Left "..."))
-        <|> one (const True)
-
---     xx = fmap length (some (one (=='|')))
+    failure = lift . Left
 
 --------------------------------------------------------------------------------
 
@@ -170,9 +170,12 @@ breakOnString needle = go []
     go ys xs | isPrefixOf needle xs = (reverse ys, xs)
     go ys (x:xs) = go (x:ys) xs
 
+--------------------------------------------------------------------------------
+
 lxx :: [(SrcRange, Tok String)] -> [(SrcRange, Tok String)]
 lxx = f
     where
+    f ((a, HLine n _) : xs) = (a, HLine n (length (takeWhile ((==VLine).snd) xs))) : f xs
     f ((a, Name lbl) : (b, Colon) : xs) = (ext a b, Label lbl) : f xs
     f ((a, Number n) : (b, Colon) : xs) = (ext a b, Label (show n)) : f xs --FIXME jump to number
     f ((a, REdge) : (_, REdge) : (b, Name lbl) : xs) = (ext a b, Jump' lbl) : f xs
@@ -285,7 +288,7 @@ runLexer :: Text -> Either String [ [(SrcRange, Tok Text)] ]
 runLexer = fmap (fmap (fmap (fmap (fmap pack)))) . runLexerS . unpack
 
 runLexerS :: String -> Either String [ [(SrcRange, Tok String)] ]
-runLexerS s = (split ((NewLine==).snd) . lxx) <$> lx s
+runLexerS s = (split ((NewLine==).snd) . lxx) <$> lx2 uncons s
 
 split :: (a -> Bool) -> [a] -> [[a]]
 split p xs = case break p xs of
