@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wunused-imports  -Wall #-}
 {-# LANGUAGE CPP, TupleSections, FlexibleContexts, ScopedTypeVariables
     , BlockArguments
-    , OverloadedStrings
+    , OverloadedStrings, LambdaCase
 #-}
 #define here (__FILE__ ++ ":" ++ show (__LINE__ :: Integer) ++ " ")
 
@@ -217,38 +217,34 @@ accuEmit
 accuEmit emitDevice q p x = go x *> pure p
     where
 
-    go (Node   []      ) = do
-        accSet p -- "optimization"
-    go (Node   w       ) = do
-        sinks <- gets aesSinks
-        let deps = foldMap (checkDataDep sinks) w ++ []
-        getValue q
-        for_ deps \d -> do
-            r <- getFromRegs d
-            accEmit' [ EISimple $ AIOr $ R r ]
-        accSet p
-        unless (null w) (accSpill (length w) p)
-    go  Sink             = do
-        nodes <- gets aesNodes
-        if elem p nodes
-        then do
-            accSet p
-            accSpill 1 p
-        else return ()
-    go (Source _a       ) = do
-        accEmit' [ EISimple AILdOn ]
-        accSet p
-    go  End              = do
-        return ()
-    go (Device d _a) = do
-        getValue q
-        lift (emitDevice d) >>= accEmit'
-        accSet p
-    go (Jump   l  ) = do
-        getValue q
-        accEmit' [ EIJump l ]
-    go (Cont   _continuation _a) = undefined
-    go (Conn   _continuation) = undefined
+    go (Node    []  ) = accSet p -- "optimization"
+    go (Node    w   ) = currentNodeDependencies w
+                      >>= \deps
+                      -> getValue q
+                      *> (for_ deps \d
+                          -> getFromRegs d
+                          >>= \r -> accEmit' [ EISimple $ AIOr $ R r ])
+                      *> accSet p
+                      *> (accSpill (length w) p) --cant be empty unless (null w) 
+    go  Sink          =   gets (elem p . aesNodes) 
+                      >>= \case
+                                True -> accSet p
+                                     *> accSpill 1 p
+                                _    -> return ()
+    go (Source _a   ) =  accEmit' [ EISimple AILdOn ]
+                      *> accSet p
+    go  End           =  return ()
+    go (Device  d _a) =  getValue q
+                      *> (lift (emitDevice d) >>= accEmit')
+                      *> accSet p
+    go (Jump    l   ) =  getValue q
+                      *> accEmit' [ EIJump l ]
+    go (Cont   _c _a) =  undefined
+    go (Conn   _c   ) =  undefined
+
+    currentNodeDependencies w
+        = gets aesSinks
+        >>= \sinks -> return $ foldMap (checkDataDep sinks) w ++ []
 
     --find value in registers
     getValue pp = do
