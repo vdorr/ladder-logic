@@ -10,7 +10,7 @@ module Language.Ladder.Lexer
     )
     where
 
-import Data.Bifunctor
+-- import Data.Bifunctor
 import Data.List
 import Data.Text (Text, pack, unpack)
 import Data.Char
@@ -62,13 +62,12 @@ data LxSt t = LxSt
     }
 
 lx2 :: IsString t => (t -> Maybe (Char, t)) -> t -> Either String [(SrcRange, Tok t)]
-lx2 uncons' s = evalStateT (many go <* checkEmpty) (LxSt s 1 1)
+lx2 uncons' s = evalStateT (many lexeme <* checkEmpty) (LxSt s 1 1)
     where
 
-    checkEmpty = join ((char *> pure (failure "not empty")) <|> pure (pure ()))
-    go = wrap <$> getPos <*> (char >>= f) <*> getPos
+    lexeme = wrap <$> getPos <*> (char >>= f) <*> getPos
     wrap (ln, c0) x (_, c1)  = ((ln, (c0, c1 - 1)), fromString <$> x)
-    getPos = gets \st -> (lxL st, lxC st)
+    getPos = gets \LxSt{..} -> (lxL, lxC)
 
     f '{'  = Pragma . lines <$> untilS "}"
     f '('  =   (one (=='*') *> (Comment . lines <$> untilS "*)"))
@@ -77,7 +76,8 @@ lx2 uncons' s = evalStateT (many go <* checkEmpty) (LxSt s 1 1)
     f '\n' = pure NewLine
     f '|'  = pure VLine
     f '+'  = pure Cross
-    f '-'  = HLine <$> length <$> (many (one (=='-'))) <*> pure 0
+    f '-'  = HLine <$> (length <$> many (one (=='-')))
+                   <*> (length <$> lookAhead (many (one (=='|'))))
     f '['  = Contact <$> untilS "]"
     f '>'  = pure REdge
     f '<'  = pure FEdge
@@ -88,11 +88,11 @@ lx2 uncons' s = evalStateT (many go <* checkEmpty) (LxSt s 1 1)
     f other = failure ("unexpected char '" ++ [other] ++ "'")
 
     isNameChar '_' = True
-    isNameChar c = isAlphaNum c
+    isNameChar c   = isAlphaNum c
 
     one p = gets (uncons' . lxS) >>= \case
-            Just (c@'\n', xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1,lxL=1+lxL st}
-            Just (c     , xs) | p c -> c <$ modify \st->st{lxS=xs,lxC=1+lxC st}
+            Just (c@'\n', xs) | p c -> c <$ modify \LxSt{..} -> LxSt xs (1 + lxL) 1
+            Just (c     , xs) | p c -> c <$ modify \LxSt{..} -> LxSt xs lxL (1 + lxC)
             Just _                  ->      failure "not matching"
             Nothing                 ->      failure "end reached"
 
@@ -102,80 +102,89 @@ lx2 uncons' s = evalStateT (many go <* checkEmpty) (LxSt s 1 1)
     untilS end = many (innerChar end) <* string end
     innerChar (end::String)
         = (one (=='\\') *> char)
-        <|> join (((string end >> pure (lift (Left "..."))) <|> pure char))
+        <|> join ((string end *> pure (failure "...")) <|> pure char)
 
     failure = lift . Left
+    lookAhead p = get >>= lift . evalStateT p
+    checkEmpty = join ((char *> pure (failure "not empty")) <|> pure (pure ()))
+
+--     countVLines = maybe 0 ((1 +) . countVLines . snd) . uncons'
+--     countVLines ss = case uncons' ss of
+--                           Just ('|', ss') -> 1 + countVLines ss'
+--                           _ -> 0
+--     countVLinesM = gets (countVLines . lxS)
+--     countVLinesM = length <$> lookAhead (many (one (=='|')))
 
 --------------------------------------------------------------------------------
 
-lx :: String -> Either String [(SrcRange, Tok String)]
-lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
-    where
---     len = length s
-    f    ('{':     xs) t = lol 1 xs (Pragma . lines)  (takeUntilC '}') t
-    f    ('(':'*': xs) t = lol 2 xs (Comment . lines) (takeUntil "*)") t
-    f xs@(' ':    _xs) t = lol 0 xs (Whitespace . (length)) (chars ' ') t
-    f    ('\n':    xs) t = lol' 1 True xs (\_ _ -> NewLine) (const $ Right ((), xs)) t
-    f    ('|':     xs) t = lol 1 xs (const VLine) (const $ Right ((), xs)) t
-    f    ('+':     xs) t = lol 1 xs (const Cross) (const $ Right ((), xs)) t
-    f    ('-':     xs) t = lol' 1 False xs (\a b -> HLine (length a) (countvl b)) (chars '-') t
-    f    ('[':     xs) t = lol 1 xs (Contact) (takeUntil "]" ) t
-    f    ('(':     xs) t = lol 1 xs (Coil)  (takeUntil ")" ) t
-    f    ('>':     xs) t = lol 1 xs (const REdge) (const $ Right ((), xs)) t
-    f    ('<':     xs) t = lol 1 xs (const FEdge) (const $ Right ((), xs)) t
-    f    (':':     xs) t = lol 1 xs (const Colon) (const $ Right ((), xs)) t
-    f xs@(c  :     _)  t
-        | isDigit c      = lol 0 xs (Number . read)  (digits) t
-        | isAlpha c || c=='%'     = lol 0 xs (Name)  (alphaNum) t
-    f    []            t = Right (t, [])
-    f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
-
-    lol' :: Int -> Bool -> String -> (w -> String -> Tok String)
-        -> (String -> Either String (w, String))
-        -> (Int, Int, [(SrcRange, Tok String)])
-        -> Either String
-            ((Int, Int, [(SrcRange, Tok String)]), String)
-    lol' kk q xs g p (ln, k, ys) = do
-        (a, xs') <- p xs
-        case q of
-             False -> do
-                let k' = kk + k + length xs - length xs' - 1
-                f xs' (ln, k' +1, ((ln, (k, k')), g a xs') : ys)
-             True -> do
-                let k' = k + length xs - length xs'
-                f xs' (ln+1, 1, ((ln, (k, k')), g a xs') : ys)
-
-    lol kk xs g p ys = lol' kk False xs (\a _ -> g a) p ys
-
-    countvl xs = length $ takeWhile (=='|') xs
-    digits cs = Right $ span (isDigit) cs
-    alphaNum cs = Right $ span (\c -> isAlphaNum c || c == '_' || c == '%') cs
-    chars c cs = Right $ span (==c) cs -- or until, not sure
-
-    takeUntil n h = case breakOnString n h of
-                     (p, xs) -> case stripPrefix n xs of
-                                     Nothing -> Left "wtf"
-                                     Just xxs -> Right (p, xxs)
-
-    takeUntilC n h = case break (==n) (h) of
-                     (p, n':xs) | n'==n, isSuffixOf "\\" p
-                        -> first ((p++[n'])++) <$> takeUntilC n xs
-                     (p, n':xs) | n'==n -> Right (p, xs)
-                     (_p, _xs) -> Left "lol"
-
-breakOnString :: (Eq a) => [a] -> [a] -> ([a], [a])
-breakOnString needle = go []
-    where
-    go ys [] = (reverse ys, [])
-    go ys xs | isPrefixOf needle xs = (reverse ys, xs)
-    go ys (x:xs) = go (x:ys) xs
+-- lx :: String -> Either String [(SrcRange, Tok String)]
+-- lx s = fmap (\((_, _, q), _) -> reverse q) $ f s (1, 1, [])
+--     where
+-- --     len = length s
+--     f    ('{':     xs) t = lol 1 xs (Pragma . lines)  (takeUntilC '}') t
+--     f    ('(':'*': xs) t = lol 2 xs (Comment . lines) (takeUntil "*)") t
+--     f xs@(' ':    _xs) t = lol 0 xs (Whitespace . (length)) (chars ' ') t
+--     f    ('\n':    xs) t = lol' 1 True xs (\_ _ -> NewLine) (const $ Right ((), xs)) t
+--     f    ('|':     xs) t = lol 1 xs (const VLine) (const $ Right ((), xs)) t
+--     f    ('+':     xs) t = lol 1 xs (const Cross) (const $ Right ((), xs)) t
+--     f    ('-':     xs) t = lol' 1 False xs (\a b -> HLine (length a) (countvl b)) (chars '-') t
+--     f    ('[':     xs) t = lol 1 xs (Contact) (takeUntil "]" ) t
+--     f    ('(':     xs) t = lol 1 xs (Coil)  (takeUntil ")" ) t
+--     f    ('>':     xs) t = lol 1 xs (const REdge) (const $ Right ((), xs)) t
+--     f    ('<':     xs) t = lol 1 xs (const FEdge) (const $ Right ((), xs)) t
+--     f    (':':     xs) t = lol 1 xs (const Colon) (const $ Right ((), xs)) t
+--     f xs@(c  :     _)  t
+--         | isDigit c      = lol 0 xs (Number . read)  (digits) t
+--         | isAlpha c || c=='%'     = lol 0 xs (Name)  (alphaNum) t
+--     f    []            t = Right (t, [])
+--     f (other:       _) _ = Left ("unexpected char '" ++ [other] ++ "'")
+-- 
+--     lol' :: Int -> Bool -> String -> (w -> String -> Tok String)
+--         -> (String -> Either String (w, String))
+--         -> (Int, Int, [(SrcRange, Tok String)])
+--         -> Either String
+--             ((Int, Int, [(SrcRange, Tok String)]), String)
+--     lol' kk q xs g p (ln, k, ys) = do
+--         (a, xs') <- p xs
+--         case q of
+--              False -> do
+--                 let k' = kk + k + length xs - length xs' - 1
+--                 f xs' (ln, k' +1, ((ln, (k, k')), g a xs') : ys)
+--              True -> do
+--                 let k' = k + length xs - length xs'
+--                 f xs' (ln+1, 1, ((ln, (k, k')), g a xs') : ys)
+-- 
+--     lol kk xs g p ys = lol' kk False xs (\a _ -> g a) p ys
+-- 
+--     countvl xs = length $ takeWhile (=='|') xs
+--     digits cs = Right $ span (isDigit) cs
+--     alphaNum cs = Right $ span (\c -> isAlphaNum c || c == '_' || c == '%') cs
+--     chars c cs = Right $ span (==c) cs -- or until, not sure
+-- 
+--     takeUntil n h = case breakOnString n h of
+--                      (p, xs) -> case stripPrefix n xs of
+--                                      Nothing -> Left "wtf"
+--                                      Just xxs -> Right (p, xxs)
+-- 
+--     takeUntilC n h = case break (==n) (h) of
+--                      (p, n':xs) | n'==n, isSuffixOf "\\" p
+--                         -> first ((p++[n'])++) <$> takeUntilC n xs
+--                      (p, n':xs) | n'==n -> Right (p, xs)
+--                      (_p, _xs) -> Left "lol"
+-- 
+-- breakOnString :: (Eq a) => [a] -> [a] -> ([a], [a])
+-- breakOnString needle = go []
+--     where
+--     go ys [] = (reverse ys, [])
+--     go ys xs | isPrefixOf needle xs = (reverse ys, xs)
+--     go ys (x:xs) = go (x:ys) xs
 
 --------------------------------------------------------------------------------
 
 lxx :: [(SrcRange, Tok String)] -> [(SrcRange, Tok String)]
 lxx = f
     where
-    f ((a, HLine n _) : xs) = (a, HLine n (length (takeWhile ((==VLine).snd) xs))) : f xs
+--     f ((a, HLine n _) : xs)             = (a, HLine n (length (takeWhile ((==VLine).snd) xs))) : f xs
     f ((a, Name lbl) : (b, Colon) : xs) = (ext a b, Label lbl) : f xs
     f ((a, Number n) : (b, Colon) : xs) = (ext a b, Label (show n)) : f xs --FIXME jump to number
     f ((a, REdge) : (_, REdge) : (b, Name lbl) : xs) = (ext a b, Jump' lbl) : f xs
