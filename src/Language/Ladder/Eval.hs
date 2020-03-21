@@ -33,7 +33,7 @@ type Memory a = [(a, V a)]
 --------------------------------------------------------------------------------
 
 -- data EvResult st t = NeedJump st t | Done st | Failed String
-data EvResult t = NeedJump t --  Failed String
+data EvResult t = NeedJump (Either Int t) --  Failed String
 
 data EvMem addr = EvMem
     { stTags :: [(addr, V addr)]
@@ -44,7 +44,8 @@ data EvSt t = EvSt
     }
 
 evalM :: (Eq addr, Show addr, IsString t, Eq t, Show t)
-    => [(Maybe t, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
+    => [ (Maybe (Either Int t)
+       , Cofree (Diagram c (DevType t, [Operand addr]) (Either Int t)) DgExt)]
     -> EvMem addr
     -> Either String (EvMem addr)
 evalM blocks = execStateT (go blocks)
@@ -61,7 +62,7 @@ evalM blocks = execStateT (go blocks)
                                           
 
 evalRung :: (Eq addr, Show addr, IsString t, Eq t, Show t)
-    => Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt
+    => Cofree (Diagram c (DevType t, [Operand addr]) (Either Int t)) DgExt
     -> StateT (EvMem addr) (Either String) (Either (EvResult t) ([DgExt], EvSt t1))
 evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast) (EvSt []))
     where
@@ -129,7 +130,8 @@ evalRung ast = runExceptT (runStateT (traverseDiagram evalElem evalPost True ast
 
 getVariables
     :: (Eq addr, IsString t, Eq t)
-    => [(Maybe lbl, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
+    => [ (Maybe (Either Int lbl)
+       , Cofree (Diagram c (DevType t, [Operand addr]) (Either Int t)) DgExt)]
     -> [(CellType, addr)]
 getVariables ast = nub $ snd $ runState (for_ ast (go' . snd)) []
     where

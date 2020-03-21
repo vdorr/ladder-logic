@@ -51,18 +51,18 @@ runParser mkDev p s
 
 --------------------------------------------------------------------------------
 
-ladder :: LdP d t (Cofree (Diagram Void d t) DgExt)
+ladder :: LdP d t (Cofree (Diagram Void d (Either Int t)) DgExt)
 ladder
     = ladderLiberal
     <* dgIsEmpty
 
 -- like 'ladder' but do not check if all lexemes consumed
-ladderLiberal :: LdP d t (Cofree (Diagram Void d t) DgExt)
+ladderLiberal :: LdP d t (Cofree (Diagram Void d (Either Int t)) DgExt)
 ladderLiberal
     = setDir goDown
     *> withPos (Source <$> vline')
 
-ladder' :: LdP d t [(Maybe t, Cofree (Diagram Void d t) DgExt)]
+ladder' :: LdP d t [(Maybe (Either Int t), Cofree (Diagram Void d (Either Int t)) DgExt)]
 ladder'
     = some ((,) <$> optional label <*> ladderLiberal)
     <* dgIsEmpty
@@ -97,11 +97,11 @@ contact' :: LdP d t (DevType t)
 contact' = eat >>= \case Contact f -> return $ Contact_ f
                          _         -> failure "expected contact"
 
-jump :: LdP d t (Cofree (Diagram c d t) DgExt)
+jump :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 jump = withPos do eat >>= \case Jump' lbl -> return $ Jump lbl
                                 _         -> failure "expected jump"
 
-label :: LdP d t t
+label :: LdP d t (Either Int t)
 label = eat >>= \case Label lbl -> return lbl
                       _         -> failure "expected label"
 
@@ -144,10 +144,10 @@ vlineX = do
 
 --------------------------------------------------------------------------------
 
-node :: LdP d t (Cofree (Diagram c d t) DgExt)
+node :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 node = withPos (Node <$> node')
 
-node' :: LdP d t [Cofree (Diagram c d t) DgExt]
+node' :: LdP d t [Cofree (Diagram c d (Either Int t)) DgExt]
 node'
 --     = branch
 --         (isTok Cross)
@@ -161,28 +161,28 @@ node'
                     <|> (optional $ goDown'' *> vline'))))
 
 --FIXME with 'node' may end only left rail, vline stemming from node must lead to another node
-vline' :: LdP d t (Cofree (Diagram c d t) DgExt)
+vline' :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 -- vline' = many vline *> (end2 <|> node)
 vline' = many vline *> (node <|> end0)
 --TODO for non-std ladders - check if crossing label and terminate at first `Node` returning `Sink`
 
-end0 :: LdP d t (Cofree (Diagram c d t) DgExt)
+end0 :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 -- end0 = ((:< End) <$> colUnder <$> lastPos)
 end0 = (:< End) <$> nextPos
 
-end2 :: LdP d t (Cofree (Diagram c d t) DgExt)
+end2 :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 -- end2 = end *> ((:< End) <$> colUnder <$> lastPos)
 end2 = end *> ((:< End) <$> nextPos)
 
-eol2 :: LdP d t (Cofree (Diagram c d t) DgExt)
+eol2 :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 -- eol2 = eol *> ((:< Sink) <$> colRight <$> lastPos)
 eol2 = eol *> ((:< Sink) <$> nextPos)
 
-hgap2 :: LdP d t (Cofree (Diagram c d t) DgExt)
+hgap2 :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 -- hgap2 = gap *> ((:< Sink) <$> colRight <$> lastPos)
 hgap2 = gap *> ((:< Sink) <$> nextPos)
 
-hline' :: LdP d t (Cofree (Diagram c d t) DgExt)
+hline' :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 hline'
     = some hline2
     *> (device <|> node <|> jump <|> hgap2 <|> eol2)
@@ -191,7 +191,7 @@ hline'
 hline2 :: LdP d t ()
 hline2 = hline >>= bridge -- skip 'vl' number of horizontal chars
 
-device :: LdP d t (Cofree (Diagram c d t) DgExt)
+device :: LdP d t (Cofree (Diagram c d (Either Int t)) DgExt)
 device = withPos do
     dev  <- withOperands do
                 dev <- coil' <|> contact'

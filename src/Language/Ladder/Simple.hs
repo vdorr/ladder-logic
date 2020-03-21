@@ -21,7 +21,8 @@ runLadderParser_ pd p s = fst <$> runParser pd p s
 
 --------------------------------------------------------------------------------
 
-type Ast4 t = [(Maybe t, Cofree (Diagram Void (DevType t, [Operand t]) t) DgExt)]
+type Ast4 t
+    = [(Maybe (Either Int t), Cofree (Diagram Void (DevType t, [Operand t]) (Either Int t)) DgExt)]
 
 parseLadder4
     :: (IsString t, Eq t)

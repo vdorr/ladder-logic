@@ -225,7 +225,7 @@ accuEmit emitDevice q p x = go x *> pure p
                           -> getFromRegs d
                           >>= \r -> accEmit' [ EISimple $ AIOr $ R r ])
                       *> accSet p
-                      *> (accSpill (length w) p) --cant be empty unless (null w) 
+                      *> (accSpill (length w) p) --cant be empty; unless (null w) 
     go  Sink          =   gets (elem p . aesNodes) 
                       >>= \case
                                 True -> accSet p

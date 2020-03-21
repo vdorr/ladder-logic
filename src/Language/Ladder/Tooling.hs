@@ -92,7 +92,8 @@ evalTestVect getTag setTag step st0 watch vect
 
 evalTestVect1
     :: (Eq addr, Show addr, IsString t, Eq t, Show t)
-    => [(Maybe t, Cofree (Diagram c (DevType t, [Operand addr]) t) DgExt)]
+    => [(Maybe (Either Int t)
+       , Cofree (Diagram c (DevType t, [Operand addr]) (Either Int t)) DgExt)]
     -> [addr]
     -> TestVect addr
     -> Either (Memory addr, String) [[V addr]]

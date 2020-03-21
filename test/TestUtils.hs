@@ -81,10 +81,10 @@ compileForTest03 ast = do
 
 --------------------------------------------------------------------------------
 
-type Ast2 = [(Maybe String
+type Ast2 = [(Maybe (Either Int String)
             , Cofree (Diagram Void 
                     (([(CellType, Operand Text)], DeviceImpl (V String) String))
-                    String) DgExt)] 
+                    (Either Int String)) DgExt)] 
 
 runLadderTest22
     :: Bool
@@ -296,7 +296,7 @@ parseOrDie5
     :: DeviceParser Text dev
     -> FilePath
     -> IO ( [String] -- leading pragmas
-          , [(Maybe String, Cofree (Diagram Void dev String) DgExt)] )
+          , [(Maybe (Either Int String), Cofree (Diagram Void dev (Either Int String)) DgExt)] )
 parseOrDie5 devP path = do
     lxs <- lexFile path
     ast <- case parseOrDie2 devP $ dropWhitespace lxs of
@@ -309,13 +309,14 @@ parseOrDie2
     :: (MonadError String m, Monad m)
     => DeviceParser Text dev
     -> [[(DgExt, Tok Text)]]
-    -> m [(Maybe String, Cofree (Diagram Void dev String) DgExt)]
-parseOrDie2 devP lxs = (fmap (first (fmap unpack))) <$> parseOrDie lxs
+    -> m
+        [(Maybe (Either Int String), Cofree (Diagram Void dev (Either Int String)) DgExt)]
+parseOrDie2 devP lxs = (fmap (first (fmap (fmap ( unpack))))) <$> parseOrDie lxs
     where
     -- |assuming comments and pragmas were filtered out
     parseOrDie lxs' = do
         case runLadderParser_ devP ladder' lxs' of
-            Right ast -> return $ fmap (fmap ldUnpack1) ast
+            Right ast -> return $ fmap (fmap ( ldUnpack1)) ast
             Left  err -> throwError $ show (here, err)
 
 --------------------------------------------------------------------------------
@@ -337,9 +338,9 @@ loadLadderTest file = do
 
 --------------------------------------------------------------------------------
 
-ldUnpack1 :: Cofree (Diagram c op Text) a
-         -> Cofree (Diagram c op String) a
-ldUnpack1 (a :< n) = a :< fmap ldUnpack1 (mapDg id id unpack n)
+ldUnpack1 :: Cofree (Diagram c op (Either Int Text)) a
+         -> Cofree (Diagram c op (Either Int String)) a
+ldUnpack1 (a :< n) = a :< fmap ldUnpack1 (mapDg id id (fmap unpack) n)
 
 -- |Discard position informations from list of lexemes
 dropPos
@@ -360,7 +361,7 @@ dropPos2 = fmap (fmap snd)
 -- produced list of (labeled) networks
 labeledRungs
     :: [[(p, Tok a)]]
-    -> [(Maybe a, [[(p, Tok a)]])]
+    -> [(Maybe (Either Int a), [[(p, Tok a)]])]
 labeledRungs [] = []
 labeledRungs t = (lbl, this) : labeledRungs rest
     where

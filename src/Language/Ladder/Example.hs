@@ -15,7 +15,7 @@ import Language.Ladder.Types
 
 --------------------------------------------------------------------------------
 
-type LadderAst = Cofree (Diagram Void (DevType Text, [Operand Text]) Text) DgExt
+type LadderAst = Cofree (Diagram Void (DevType Text, [Operand Text]) (Either Int Text)) DgExt
 
 -- | parseLd
 --

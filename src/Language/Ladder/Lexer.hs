@@ -27,7 +27,7 @@ type SrcRange = (Int, (Int, Int))
 data Tok a
     = Cross            -- ^ "+"
     | VLine            -- ^ "|"
-    | Label        !a   -- ^ network label "LABEL:"
+    | Label        !(Either Int a)   -- ^ network label "LABEL:"
     | HLine        !Int !Int -- ^ number of "-" consumed, number of following '|' seen
     | REdge            -- ^ as block input "--->"
     | FEdge            -- ^ as block input "---<"
@@ -43,7 +43,7 @@ data Tok a
     | Continuation !a   -- ^ ">NAME>---", same as Connector
     | Return           -- ^ "---\<RETURN>"
 --Jump additionaly is followed by end of line
-    | Jump'        !a   -- ^ "--->>LABEL"
+    | Jump'        !(Either Int a)   -- ^ "--->>LABEL"
     | Name         !a   -- ^device operand or block name
     | Comment      ![a]   -- ^ (* ... *)
     | Pragma       ![a]   -- ^ { ... }
@@ -185,9 +185,10 @@ lxx :: [(SrcRange, Tok String)] -> [(SrcRange, Tok String)]
 lxx = f
     where
 --     f ((a, HLine n _) : xs)             = (a, HLine n (length (takeWhile ((==VLine).snd) xs))) : f xs
-    f ((a, Name lbl) : (b, Colon) : xs) = (ext a b, Label lbl) : f xs
-    f ((a, Number n) : (b, Colon) : xs) = (ext a b, Label (show n)) : f xs --FIXME jump to number
-    f ((a, REdge) : (_, REdge) : (b, Name lbl) : xs) = (ext a b, Jump' lbl) : f xs
+    f ((a, Name lbl) : (b, Colon) : xs) = (ext a b, Label (Right lbl)) : f xs
+    f ((a, Number n) : (b, Colon) : xs) = (ext a b, Label (Left n)) : f xs --FIXME jump to number
+    f ((a, REdge) : (_, REdge) : (b, Name lbl) : xs) = (ext a b, Jump' (Right lbl)) : f xs
+    f ((a, REdge) : (_, REdge) : (b, Number lbl) : xs) = (ext a b, Jump' (Left lbl)) : f xs
     f ((a, REdge) : (b, Name lbl) : (_, REdge) : xs) = (ext a b, Continuation lbl) : f xs
     f ((a, FEdge) : (_, Name ret) : (b, REdge) : xs)
         | fmap toLower ret == "return" = (ext a b, Return) : f xs
@@ -377,7 +378,8 @@ renderLexeme :: Tok String -> String
 renderLexeme t = case t of
     Cross            -> "+"
     VLine            -> "|"
-    Label        a   -> a <> ":"
+    Label        (Right a)   -> a <> ":"
+    Label        (Left l)   -> show l <> ":"
     HLine        n _ -> replicate (n+1) '-'
     REdge            -> ">"
     FEdge            -> "<"
@@ -386,7 +388,8 @@ renderLexeme t = case t of
     Coil         a   -> "(" <> a <> ")"
     Continuation a   -> ">" <> a <> ">"
     Return           -> "<RETURN>"
-    Jump'        a   -> ">>" <> a
+    Jump'        (Right a)   -> ">>" <> a
+    Jump'        (Left l)   -> ">>" <> show l
     Name         a   -> a
     Comment      a   -> "(*" <> mconcat a <> "*)"
     Pragma       a   -> "{" <> mconcat a <> "}"

@@ -51,7 +51,7 @@ preproc5 = fmap dropWhitespace . runLexer
 --------------------------------------------------------------------------------
 
 --basic blocks
-testPreproc6 :: Text -> Either String [(Maybe Text, [[Tok Text]])]
+testPreproc6 :: Text -> Either String [(Maybe (Either Int Text), [[Tok Text]])]
 testPreproc6
     = fmap ((fmap (fmap (fmap (fmap snd)))) . labeledRungs) . preproc5
 
@@ -102,16 +102,16 @@ tokenizerTests = testGroup "Tokenizer"
             +
             |               |]
     , testCase "5" $
-        (Right [[VLine],[Cross,HLine 0 0,Jump' "LBL"]] @=?) $ testPreproc4 $ [text|
+        (Right [[VLine],[Cross,HLine 0 0,Jump' (Right "LBL")]] @=?) $ testPreproc4 $ [text|
             | (* hello *)
             +->>LBL         |]
     , testCase "label" $
-        (Right [[VLine],[Label "LBL"],[VLine]] @=?) $ testPreproc4 $ [text|
+        (Right [[VLine],[Label (Right "LBL")],[VLine]] @=?) $ testPreproc4 $ [text|
             | (* hello *)
             LBL:
             |               |]
     , testCase "label/blocks" $
-        (Right [(Nothing, [[VLine]]),(Just "LBL", [[VLine]])] @=?)
+        (Right [(Nothing, [[VLine]]),(Just (Right "LBL"), [[VLine]])] @=?)
             $ testPreproc6 $ [text|
                 | (* hello *)
                 LBL:
@@ -186,7 +186,7 @@ genToken =
     Gen.choice
         [ pure Cross
         , pure VLine
-        ,      Label        <$> shortName --TODO numeric label
+        ,      Label        <$> Right <$> shortName --TODO numeric label
         ,      HLine        <$> smallNonZero <*> pure 0
         , pure REdge
         , pure FEdge
@@ -195,7 +195,7 @@ genToken =
         ,      Coil         <$> shortName
         ,      Continuation <$> shortName
         , pure Return
-        ,      Jump'        <$> shortName --TODO numeric label
+        ,      Jump'        <$> Right <$> shortName --TODO numeric label
         ,      Name         <$> shortName
         ,      Comment      <$> pure <$> shortName --TODO richer alphabet
         ,      Pragma       <$> pure <$> shortName --TODO richer alphabet
@@ -541,10 +541,12 @@ getTests = do
 
 parseForTestOrDie
     :: [[(DgExt, Tok Text)]]
-    -> IO [ ( Maybe String
+    -> IO [ ( Maybe (Either Int String)
             , Cofree
-                (Diagram Void ([(CellType, Operand Text)], DeviceImpl (V addr) addr) String)
-                DgExt)]
+                (Diagram Void
+                    ([(CellType, Operand Text)], DeviceImpl (V addr) addr) (Either Int String))
+                DgExt)
+            ]
 parseForTestOrDie = either fail pure . parseOrDie2 wrapDeviceForTest
 
 wrapDeviceForTest
@@ -642,7 +644,9 @@ fileTestsNegTest1 lxs
     = void $ parseOrDie2 wrapDeviceForTest lxs >>= compileForTest03
 
 
-actualFileTest1 :: [[[String]]] -> Maybe (LadderTest String)
+actualFileTest1
+    :: [[[String]]]
+    -> Maybe (LadderTest String)
                       -> [[(DgExt, Tok Text)]]
                       -> IO (Maybe String)
 actualFileTest1 pgms tst lxs = do
