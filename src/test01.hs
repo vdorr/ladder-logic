@@ -369,9 +369,12 @@ generateStkOMFG doDevice ast@(p0 :< _) = do
 
 compileForTest04
     :: (Show lbl, Eq lbl, MonadError String m, Monad m)
-    => [( Maybe lbl
+    => [( Maybe (Either Int lbl)
         , Cofree
-            (Diagram Void (([(CellType, Operand Text)], DeviceImpl (V String) String)) lbl)
+            (Diagram Void
+                (([(CellType, Operand Text)], DeviceImpl (V String) String))
+                (Either Int lbl)
+                )
             DgExt
         )]
     -> m [ExtendedInstruction Int (Instruction (V String) String)]
@@ -491,7 +494,7 @@ main = do
 
 accEmitDev1
     :: (DevType Text, [Operand Text])
-    -> Either String [ExtendedInstruction Text (AI (Reg Text) (V Text) Text)]
+    -> Either String [ExtendedInstruction lbl (AI (Reg Text) (V Text) Text)]
 accEmitDev1 = f
     where
     simple = Right . map EISimple

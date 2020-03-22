@@ -315,7 +315,7 @@ split p xs = case break p xs of
 
 -- |Discard comments and pragmas
 dropWhitespace :: [[(p, Tok a)]] -> [[(p, Tok a)]]
-dropWhitespace = filter (not.null) . fmap (filter (not.isWsTok.snd))
+dropWhitespace = filter (not . null) . fmap (filter (not . isWhitespace . snd))
 
 -- |Break list of tokens into list of lists of tokens with same line number
 -- breakLines
@@ -328,12 +328,12 @@ dropWhitespace = filter (not.null) . fmap (filter (not.isWsTok.snd))
 -- breakLines [] = []
 
 -- |Returns True if lexeme is comment or pragma
-isWsTok :: Tok a -> Bool
-isWsTok Pragma    {} = True
-isWsTok Comment   {} = True
-isWsTok Whitespace{} = True
-isWsTok NewLine      = True
-isWsTok _            = False
+isWhitespace :: Tok a -> Bool
+isWhitespace Pragma    {} = True
+isWhitespace Comment   {} = True
+isWhitespace Whitespace{} = True
+isWhitespace NewLine      = True
+isWhitespace _            = False
 
 -- -- |Chop by network labels
 -- --TODO keep source pos for start of block

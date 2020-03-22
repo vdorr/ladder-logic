@@ -76,7 +76,7 @@ evalTestVect
 evalTestVect getTag setTag step st0 watch vect
     = case foldlM go ([], st0) vect' of
         Left  (_st, _err) -> error "evalTestVect" -- show (here, err)
-        Right (y, _)     -> return y
+        Right (y, _)      -> return y
     where
 
     vect' = flattenTestVect vect

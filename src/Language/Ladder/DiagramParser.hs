@@ -226,8 +226,8 @@ step'' f = do
                                     _ -> undefined --use currently focused position?
     DgPSt _ zp ps _focused st <- get
     put case f origin zp of
-            Right zp'  -> DgPSt f zp' ps True st
-            Left  _ -> DgPSt f zp ps False st
+            Right zp' -> DgPSt f zp' ps True  st
+            Left  _   -> DgPSt f zp  ps False st
 
 -- backup and restore last bit position for parsing multiple paths from same origin
 keepOrigin :: SFM (DgPState st tok) a -> SFM (DgPState st tok) a
